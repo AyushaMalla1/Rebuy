@@ -13,17 +13,34 @@ function LandingPage() {
   const [showCart, setShowCart] = useState(false);
   const [user, setUser] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
-  // Products
+  // Products - Extended collection for better browsing
   const allProducts = [
-    { id: 1, name: 'Hoodie', price: 5100, category: 'NEW', image: 'https://i.pinimg.com/1200x/85/50/eb/8550eb7065f3ae9b2617558814ff21f7.jpg', rating: 4.5 },
-    { id: 2, name: 'T-Shirt', price: 3000, category: 'BEST', image: 'https://i.pinimg.com/736x/28/68/77/2868771ebc5e4708ba23a67646d12663.jpg', rating: 4.8 },
-    { id: 3, name: 'Vintage Jacket', price: 8000, category: 'TOP', image: 'https://i.pinimg.com/1200x/06/56/44/065644e9485e9b7010771873bc5b61c8.jpg', rating: 4.9 },
-    { id: 4, name: 'Jersey', price: 4200, category: 'NEW', image: 'https://i.pinimg.com/1200x/9f/66/52/9f665241f2a2f3347c91a5f0104b2733.jpg', rating: 4.3 },
-    { id: 5, name: 'Blazer', price: 3100, category: 'BEST', image: 'https://i.pinimg.com/736x/f5/6e/01/f56e016ac0abff71aff30bf64cab7b83.jpg', rating: 4.6 },
-    { id: 6, name: 'Jeans', price: 4100, category: 'TOP', image: 'https://i.pinimg.com/1200x/d3/71/05/d371058d1ac4ee47396aaa35a37f0684.jpg', rating: 4.7 },
-    { id: 7, name: 'Jacket', price: 5200, category: 'NEW', image: 'https://i.pinimg.com/1200x/1a/96/f6/1a96f6aed31f53371dd7d9642d4b01c0.jpg', rating: 4.4 },
-    { id: 8, name: 'Jorts', price: 3100, category: 'BEST', image: 'https://i.pinimg.com/736x/78/52/04/7852042ddd26913b9576eb80db5515a2.jpg', rating: 4.2 },
+    { id: 1, name: 'Hoodie', price: 5100, category: 'NEW', image: 'https://i.pinimg.com/1200x/85/50/eb/8550eb7065f3ae9b2617558814ff21f7.jpg', rating: 4.5, reviews: 128 },
+    { id: 2, name: 'T-Shirt', price: 3000, category: 'BEST', image: 'https://i.pinimg.com/736x/28/68/77/2868771ebc5e4708ba23a67646d12663.jpg', rating: 4.8, reviews: 245 },
+    { id: 3, name: 'Vintage Jacket', price: 8000, category: 'TOP', image: 'https://i.pinimg.com/1200x/06/56/44/065644e9485e9b7010771873bc5b61c8.jpg', rating: 4.9, reviews: 189 },
+    { id: 4, name: 'Jersey', price: 4200, category: 'NEW', image: 'https://i.pinimg.com/1200x/9f/66/52/9f665241f2a2f3347c91a5f0104b2733.jpg', rating: 4.3, reviews: 92 },
+    { id: 5, name: 'Blazer', price: 3100, category: 'BEST', image: 'https://i.pinimg.com/736x/f5/6e/01/f56e016ac0abff71aff30bf64cab7b83.jpg', rating: 4.6, reviews: 156 },
+    { id: 6, name: 'Jeans', price: 4100, category: 'TOP', image: 'https://i.pinimg.com/1200x/d3/71/05/d371058d1ac4ee47396aaa35a37f0684.jpg', rating: 4.7, reviews: 203 },
+    { id: 7, name: 'Jacket', price: 5200, category: 'NEW', image: 'https://i.pinimg.com/1200x/1a/96/f6/1a96f6aed31f53371dd7d9642d4b01c0.jpg', rating: 4.4, reviews: 134 },
+    { id: 8, name: 'Jorts', price: 3100, category: 'BEST', image: 'https://i.pinimg.com/736x/78/52/04/7852042ddd26913b9576eb80db5515a2.jpg', rating: 4.2, reviews: 87 },
+    { id: 9, name: 'Denim Jacket', price: 6500, category: 'TOP', image: 'https://i.pinimg.com/736x/bc/83/08/bc8308ad115003adae43e7743ef2254f.jpg', rating: 4.8, reviews: 167 },
+    { id: 10, name: 'Cargo Pants', price: 4800, category: 'NEW', image: 'https://i.pinimg.com/736x/db/ca/a2/dbcaa2ff3acec468b323a56ce5c6461a.jpg', rating: 4.5, reviews: 112 },
+    { id: 11, name: 'Sweater', price: 3800, category: 'BEST', image: 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg', rating: 4.6, reviews: 198 },
+    { id: 12, name: 'Leather Jacket', price: 9500, category: 'TOP', image: 'https://i.pinimg.com/1200x/0c/84/90/0c8490ba8312437f20816c196febce73.jpg', rating: 4.9, reviews: 221 },
+    { id: 13, name: 'Polo Shirt', price: 2800, category: 'NEW', image: 'https://i.pinimg.com/736x/28/68/77/2868771ebc5e4708ba23a67646d12663.jpg', rating: 4.3, reviews: 89 },
+    { id: 14, name: 'Chinos', price: 3500, category: 'BEST', image: 'https://i.pinimg.com/1200x/d3/71/05/d371058d1ac4ee47396aaa35a37f0684.jpg', rating: 4.4, reviews: 145 },
+    { id: 15, name: 'Bomber Jacket', price: 7200, category: 'TOP', image: 'https://i.pinimg.com/1200x/1a/96/f6/1a96f6aed31f53371dd7d9642d4b01c0.jpg', rating: 4.7, reviews: 176 },
+    { id: 16, name: 'Shorts', price: 2500, category: 'NEW', image: 'https://i.pinimg.com/736x/78/52/04/7852042ddd26913b9576eb80db5515a2.jpg', rating: 4.2, reviews: 73 },
+    { id: 17, name: 'Windbreaker', price: 5800, category: 'BEST', image: 'https://i.pinimg.com/1200x/85/50/eb/8550eb7065f3ae9b2617558814ff21f7.jpg', rating: 4.5, reviews: 132 },
+    { id: 18, name: 'Track Pants', price: 3200, category: 'TOP', image: 'https://i.pinimg.com/736x/db/ca/a2/dbcaa2ff3acec468b323a56ce5c6461a.jpg', rating: 4.3, reviews: 95 },
+    { id: 19, name: 'Puffer Jacket', price: 8500, category: 'NEW', image: 'https://i.pinimg.com/1200x/06/56/44/065644e9485e9b7010771873bc5b61c8.jpg', rating: 4.8, reviews: 187 },
+    { id: 20, name: 'Sweatpants', price: 2900, category: 'BEST', image: 'https://i.pinimg.com/1200x/d3/71/05/d371058d1ac4ee47396aaa35a37f0684.jpg', rating: 4.4, reviews: 108 },
+    { id: 21, name: 'Flannel Shirt', price: 3400, category: 'TOP', image: 'https://i.pinimg.com/736x/28/68/77/2868771ebc5e4708ba23a67646d12663.jpg', rating: 4.6, reviews: 154 },
+    { id: 22, name: 'Trench Coat', price: 9800, category: 'NEW', image: 'https://i.pinimg.com/1200x/0c/84/90/0c8490ba8312437f20816c196febce73.jpg', rating: 4.9, reviews: 213 },
+    { id: 23, name: 'Graphic Tee', price: 2200, category: 'BEST', image: 'https://i.pinimg.com/736x/28/68/77/2868771ebc5e4708ba23a67646d12663.jpg', rating: 4.2, reviews: 67 },
+    { id: 24, name: 'Overalls', price: 4500, category: 'TOP', image: 'https://i.pinimg.com/1200x/d3/71/05/d371058d1ac4ee47396aaa35a37f0684.jpg', rating: 4.5, reviews: 119 },
   ];
 
   useEffect(() => {
@@ -46,6 +63,9 @@ function LandingPage() {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTab && matchesSearch;
   });
+
+  // Show only first 8 products initially, or all if "View All" is clicked
+  const displayedProducts = showAllProducts ? filteredProducts : filteredProducts.slice(0, 8);
 
   const toggleFavorite = (productId) => {
     const newFavorites = favorites.includes(productId)
@@ -115,16 +135,15 @@ function LandingPage() {
         <div className="logo">
           <img src="/logo.png" alt="rebuy" />
         </div>
-        
-        <form className="search-bar" onSubmit={handleSearch}>
-          <input 
-            type="text" 
-            placeholder="Search products..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <FiSearch className="search-icon" />
-        </form>
+        <div className="search-bar">
+          <input type="text" placeholder="Search" />
+          <span className="search-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          </span>
+        </div>
 
         <div className="header-right">
           <div className="header-links">
@@ -193,7 +212,7 @@ function LandingPage() {
                   <strong>Total:</strong>
                   <strong>Rs. {getTotalPrice().toLocaleString()}</strong>
                 </div>
-                <button className="checkout-btn">Proceed to Checkout</button>
+                <Link to="/checkout" className="checkout-btn">Proceed to Checkout</Link>
               </>
             )}
           </div>
@@ -231,13 +250,16 @@ function LandingPage() {
           <button className={activeTab === 'TOP' ? 'active' : ''} onClick={() => setActiveTab('TOP')}>TOP RATED</button>
         </div>
         <div className="product-grid">
-          {filteredProducts.map(product => (
-            <div key={product.id} className="product-card">
+          {displayedProducts.map(product => (
+            <div key={product.id} className="product-card" onClick={() => navigate(`/product/${product.id}`)}>
               <div className="product-image-placeholder">
                 <img src={product.image} alt={product.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
                 <FiHeart 
                   className={`product-heart-icon ${favorites.includes(product.id) ? 'favorited' : ''}`}
-                  onClick={() => toggleFavorite(product.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFavorite(product.id);
+                  }}
                 />
               </div>
               <h3>{product.name}</h3>
@@ -245,7 +267,13 @@ function LandingPage() {
                 {'⭐'.repeat(Math.floor(product.rating))} {product.rating}
               </div>
               <p>Rs. {product.price.toLocaleString()}</p>
-              <button className="add-to-cart-btn" onClick={() => addToCart(product)}>
+              <button 
+                className="add-to-cart-btn" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addToCart(product);
+                }}
+              >
                 Add to Cart
               </button>
             </div>
@@ -254,7 +282,14 @@ function LandingPage() {
         {filteredProducts.length === 0 && (
           <p className="no-products">No products found matching your search.</p>
         )}
-        <button className="view-all">View All Products</button>
+        {filteredProducts.length > 8 && (
+          <button 
+            className="view-all" 
+            onClick={() => setShowAllProducts(!showAllProducts)}
+          >
+            {showAllProducts ? 'Show Less' : `View All Products (${filteredProducts.length})`}
+          </button>
+        )}
       </section>
 
       {/* Collections */}
@@ -349,7 +384,7 @@ function LandingPage() {
           </ul>
         </div>
         <div className="footer-logo">
-          <img src="/logo.png" alt="rebuy" style={{height: '40px', marginBottom: '10px'}} />
+          <img src="/logo.png" alt="rebuy" style={{height: '80px', marginBottom: '3px'}} />
           <p>THRIFT SHOP</p>
         </div>
       </footer>
