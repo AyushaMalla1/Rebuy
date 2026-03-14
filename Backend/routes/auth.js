@@ -51,17 +51,13 @@ router.post('/signup', async (req, res) => {
       fullName,
       email,
       password,
-      userType: userType || 'user'
+      userType: 'customer' // Default to customer for buyers
     };
 
-    // Add seller-specific fields if userType is seller
-    if (userType === 'seller') {
-      userData.phone = phone || '';
-      userData.storeName = storeName || '';
-      userData.storeDescription = storeDescription || '';
-      userData.address = address || '';
-      userData.city = city || '';
-    }
+    // Add customer-specific fields
+    userData.phone = phone || '';
+    userData.address = address || '';
+    userData.city = city || '';
 
     const user = await User.create(userData);
 
@@ -73,13 +69,12 @@ router.post('/signup', async (req, res) => {
       message: 'Account created successfully',
       token,
       user: {
+        _id: user._id,
         id: user._id,
         fullName: user.fullName,
         email: user.email,
         userType: user.userType,
         phone: user.phone,
-        storeName: user.storeName,
-        storeDescription: user.storeDescription,
         address: user.address,
         city: user.city
       }
@@ -140,10 +135,14 @@ router.post('/login', async (req, res) => {
       message: 'Login successful',
       token,
       user: {
+        _id: user._id,
         id: user._id,
         fullName: user.fullName,
         email: user.email,
-        userType: user.userType
+        userType: user.userType,
+        phone: user.phone,
+        address: user.address,
+        city: user.city
       }
     });
   } catch (error) {

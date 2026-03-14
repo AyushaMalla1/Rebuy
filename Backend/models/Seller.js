@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const userSchema = new mongoose.Schema({
+const sellerSchema = new mongoose.Schema({
   fullName: {
     type: String,
     required: [true, 'Full name is required'],
@@ -20,23 +20,45 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters']
   },
-  userType: {
-    type: String,
-    enum: ['customer', 'buyer', 'admin'],
-    default: 'customer'
-  },
-  // Customer/Buyer specific fields
   phone: {
+    type: String,
+    required: [true, 'Phone number is required']
+  },
+  storeName: {
+    type: String,
+    required: [true, 'Store name is required'],
+    trim: true
+  },
+  storeDescription: {
     type: String,
     default: ''
   },
   address: {
     type: String,
-    default: ''
+    required: [true, 'Address is required']
   },
   city: {
     type: String,
-    default: ''
+    required: [true, 'City is required']
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'suspended'],
+    default: 'pending'
+  },
+  rating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5
+  },
+  totalSales: {
+    type: Number,
+    default: 0
+  },
+  totalProducts: {
+    type: Number,
+    default: 0
   },
   createdAt: {
     type: Date,
@@ -45,7 +67,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-userSchema.pre('save', async function(next) {
+sellerSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
   try {
@@ -58,8 +80,8 @@ userSchema.pre('save', async function(next) {
 });
 
 // Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
+sellerSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('Seller', sellerSchema);
