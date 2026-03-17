@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, FiHeart, FiSettings, FiLogOut, FiEdit2, FiSave, FiX, FiHome, FiPackage, FiRefreshCw, FiTruck, FiStar, FiAward, FiGift, FiMessageSquare, FiSend } from 'react-icons/fi';
 import './BuyerProfile.css';
+import { orderAPI, loyaltyAPI } from './services/api';
 
 function BuyerProfile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('profile');
+  const [orderFilter, setOrderFilter] = useState('all'); // all, pending, processing, shipped, delivered
   const [isEditing, setIsEditing] = useState(false);
   const [userData, setUserData] = useState({
     fullName: '',
@@ -15,9 +18,12 @@ function BuyerProfile() {
     city: ''
   });
   const [editData, setEditData] = useState({ ...userData });
+  const [orders, setOrders] = useState([]);
+  const [loyaltyData, setLoyaltyData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Sample orders data with detailed tracking
-  const [orders] = useState([
+  const [sampleOrders] = useState([
     { 
       id: '#ORD-001', 
       date: '2026-03-01', 
@@ -64,12 +70,8 @@ function BuyerProfile() {
     },
   ]);
 
-  // Sample wishlist data
-  const [wishlist] = useState([
-    { id: 1, name: 'Vintage Jacket', price: 8000, image: 'https://i.pinimg.com/1200x/06/56/44/065644e9485e9b7010771873bc5b61c8.jpg' },
-    { id: 2, name: 'Hoodie', price: 5100, image: 'https://i.pinimg.com/1200x/85/50/eb/8550eb7065f3ae9b2617558814ff21f7.jpg' },
-    { id: 3, name: 'Blazer', price: 3100, image: 'https://i.pinimg.com/736x/f5/6e/01/f56e016ac0abff71aff30bf64cab7b83.jpg' },
-  ]);
+  // Wishlist state - load from localStorage
+  const [wishlist, setWishlist] = useState([]);
 
   // Address Book
   const [addresses, setAddresses] = useState([
@@ -122,10 +124,178 @@ function BuyerProfile() {
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [verificationData, setVerificationData] = useState({
+    matchesDescription: null,
+    customerNotes: ''
+  });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showLoginActivityModal, setShowLoginActivityModal] = useState(false);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showPaymentMethodsModal, setShowPaymentMethodsModal] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  const [showRedeemModal, setShowRedeemModal] = useState(false);
+  const [redeemAmount, setRedeemAmount] = useState('');
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnData, setReturnData] = useState({
+    orderId: null,
+    reason: '',
+    description: '',
+    images: []
+  });
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelData, setCancelData] = useState({
+    orderId: null,
+    reason: ''
+  });
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
+
+  const handleSendMessage = () => {
+    if (!messageText.trim() || !selectedChat) return;
+    
+    // Add message to chat
+    const newMessage = {
+      id: selectedChat.messages.length + 1,
+      sender: 'buyer',
+      text: messageText,
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    };
+    
+    selectedChat.messages.push(newMessage);
+    setMessageText('');
+    
+    // In a real app, this would send to backend
+    console.log('Message sent:', newMessage);
+  };
+
+  const handleChangePassword = () => {
+    setShowPasswordModal(true);
+  };
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+  };
+
+  const handlePasswordSubmit = () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      showToast('Please fill in all fields', 'error');
+      return;
+    }
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      showToast('New passwords do not match!', 'error');
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 6) {
+      showToast('Password must be at least 6 characters long', 'error');
+      return;
+    }
+    
+    // In a real app, this would call the backend API
+    showToast('Password changed successfully!', 'success');
+    setShowPasswordModal(false);
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  };
+
+  const handleRedeemPoints = () => {
+    const points = loyaltyData ? loyaltyData.totalPoints : 1250;
+    const amount = parseInt(redeemAmount);
+    
+    if (!redeemAmount || isNaN(amount)) {
+      showToast('Please enter a valid amount', 'error');
+      return;
+    }
+    
+    if (amount <= 0 || amount > points) {
+      showToast(`Please enter a value between 1 and ${points}`, 'error');
+      return;
+    }
+    
+    showToast(`Successfully redeemed ${amount} points! You received Rs. ${amount / 10} discount.`, 'success');
+    setShowRedeemModal(false);
+    setRedeemAmount('');
+  };
+
+  const handleEnable2FA = () => {
+    showToast('Two-Factor Authentication setup will be available soon!', 'success');
+  };
+
+  const handleViewLoginActivity = () => {
+    setShowLoginActivityModal(true);
+  };
+
+  const handleManagePaymentMethods = () => {
+    setShowPaymentMethodsModal(true);
+  };
+
+  const handleViewTransactionHistory = () => {
+    setShowTransactionModal(true);
+  };
+
+  const handleDownloadData = () => {
+    if (window.confirm('Download Your Account Data?\n\nThis will include:\n• Profile information\n• Order history\n• Transaction records\n• Wishlist items\n• Messages\n\nYou will receive an email with a download link within 24 hours.')) {
+      showToast('Data download request submitted! Check your email within 24 hours.', 'success');
+    }
+  };
+
+  const handleDeactivateAccount = () => {
+    setShowDeactivateModal(true);
+  };
+
+  const confirmDeactivateAccount = () => {
+    // In a real app, this would call the backend API
+    showToast('Account deactivated successfully. You can reactivate anytime by logging in.', 'success');
+    setShowDeactivateModal(false);
+    // Optionally logout user
+    setTimeout(() => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/');
+    }, 2000);
+  };
+
+  const handleDeleteAccount = () => {
+    setShowDeleteModal(true);
+    setDeleteConfirmPassword('');
+  };
+
+  const confirmDeleteAccount = () => {
+    if (!deleteConfirmPassword.trim()) {
+      showToast('Please enter your password to confirm deletion', 'error');
+      return;
+    }
+    
+    // In a real app, this would verify password and call backend API
+    showToast('Account deletion scheduled for April 12, 2026. You can cancel by logging in before that date.', 'warning');
+    setShowDeleteModal(false);
+    setDeleteConfirmPassword('');
+    
+    // Optionally logout user
+    setTimeout(() => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/');
+    }, 3000);
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
     if (user) {
+      // Redirect sellers to seller dashboard
+      if (user.userType === 'seller') {
+        navigate('/seller/dashboard');
+        return;
+      }
+      
       const data = {
         fullName: user.fullName || 'John Doe',
         email: user.email || 'john.doe@example.com',
@@ -135,8 +305,72 @@ function BuyerProfile() {
       };
       setUserData(data);
       setEditData(data);
+      
+      // Fetch orders and loyalty data
+      if (user._id) {
+        fetchOrders(user._id);
+        fetchLoyaltyData(user._id);
+      }
+    } else {
+      // Redirect to login if not logged in
+      navigate('/login');
     }
-  }, []);
+    
+    // Load wishlist from localStorage favorites
+    loadWishlist();
+    
+    // Check URL params for tab
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [location, navigate]);
+
+  const loadWishlist = () => {
+    try {
+      const savedFavorites = localStorage.getItem('favorites');
+      const allProductsStr = localStorage.getItem('allProducts');
+      
+      if (savedFavorites && allProductsStr) {
+        const favoriteIds = JSON.parse(savedFavorites);
+        const allProducts = JSON.parse(allProductsStr);
+        const wishlistItems = allProducts.filter(p => favoriteIds.includes(p.id));
+        setWishlist(wishlistItems);
+      } else {
+        setWishlist([]);
+      }
+    } catch (error) {
+      console.error('Error loading wishlist:', error);
+      setWishlist([]);
+    }
+  };
+
+  const fetchOrders = async (customerId) => {
+    try {
+      const fetchedOrders = await orderAPI.getCustomerOrders(customerId);
+      if (fetchedOrders && fetchedOrders.length > 0) {
+        setOrders(fetchedOrders);
+      } else {
+        // Use sample orders if no real orders
+        setOrders(sampleOrders);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      setOrders(sampleOrders);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLoyaltyData = async (customerId) => {
+    try {
+      const data = await loyaltyAPI.get(customerId);
+      setLoyaltyData(data);
+    } catch (error) {
+      console.error('Error fetching loyalty data:', error);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -154,12 +388,43 @@ function BuyerProfile() {
   };
 
   const handleSave = () => {
+    // Validate required fields
+    if (!editData.fullName.trim()) {
+      showToast('Full name is required', 'error');
+      return;
+    }
+    
+    if (!editData.email.trim()) {
+      showToast('Email is required', 'error');
+      return;
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editData.email)) {
+      showToast('Please enter a valid email address', 'error');
+      return;
+    }
+    
+    if (!editData.phone.trim()) {
+      showToast('Phone number is required', 'error');
+      return;
+    }
+    
+    // Validate phone number format
+    const phoneRegex = /^(\+977)?[9][6-9]\d{8}$/;
+    const cleanPhone = editData.phone.replace(/[\s-]/g, '');
+    if (!phoneRegex.test(cleanPhone)) {
+      showToast('Please enter a valid phone number (e.g., 9812345678)', 'error');
+      return;
+    }
+    
     setUserData({ ...editData });
     const user = JSON.parse(localStorage.getItem('user'));
     const updatedUser = { ...user, ...editData };
     localStorage.setItem('user', JSON.stringify(updatedUser));
     setIsEditing(false);
-    alert('Profile updated successfully!');
+    showToast('Profile updated successfully!', 'success');
   };
 
   const handleChange = (e) => {
@@ -198,6 +463,40 @@ function BuyerProfile() {
   };
 
   const handleSaveAddress = () => {
+    // Validate required fields
+    if (!newAddress.name.trim()) {
+      showToast('Address label is required (e.g., Home, Office)', 'error');
+      return;
+    }
+    
+    if (!newAddress.fullName.trim()) {
+      showToast('Full name is required', 'error');
+      return;
+    }
+    
+    if (!newAddress.phone.trim()) {
+      showToast('Phone number is required', 'error');
+      return;
+    }
+    
+    // Validate phone number format
+    const phoneRegex = /^(\+977)?[9][6-9]\d{8}$/;
+    const cleanPhone = newAddress.phone.replace(/[\s-]/g, '');
+    if (!phoneRegex.test(cleanPhone)) {
+      showToast('Please enter a valid phone number', 'error');
+      return;
+    }
+    
+    if (!newAddress.address.trim()) {
+      showToast('Address is required', 'error');
+      return;
+    }
+    
+    if (!newAddress.city.trim()) {
+      showToast('City is required', 'error');
+      return;
+    }
+    
     if (editingAddress) {
       setAddresses(addresses.map(addr => 
         addr.id === editingAddress ? { ...newAddress, id: editingAddress } : addr
@@ -208,6 +507,7 @@ function BuyerProfile() {
     }
     setShowAddressForm(false);
     setEditingAddress(null);
+    showToast('Address saved successfully!', 'success');
   };
 
   const handleDeleteAddress = (id) => {
@@ -223,12 +523,210 @@ function BuyerProfile() {
     })));
   };
 
+  const handleAddToCartFromWishlist = async (item) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      // Add to cart
+      const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+      const existingItem = cart.find(cartItem => cartItem.id === item.id);
+      
+      if (existingItem) {
+        existingItem.quantity += 1;
+      } else {
+        cart.push({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          image: item.image,
+          quantity: 1,
+          seller: item.seller,
+          sellerName: item.sellerName,
+          storeName: item.storeName
+        });
+      }
+      
+      localStorage.setItem('cart', JSON.stringify(cart));
+      showToast('Item added to cart!', 'success');
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      showToast('Failed to add item to cart', 'error');
+    }
+  };
+
+  const handleRemoveFromWishlist = (itemId) => {
+    try {
+      // Remove from wishlist
+      const updatedWishlist = wishlist.filter(item => item.id !== itemId);
+      setWishlist(updatedWishlist);
+      
+      // Update favorites in localStorage
+      const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+      const updatedFavorites = favorites.filter(id => id !== itemId);
+      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
+      
+      showToast('Item removed from wishlist', 'success');
+    } catch (error) {
+      console.error('Error removing from wishlist:', error);
+      showToast('Failed to remove item from wishlist', 'error');
+    }
+  };
+
   const getStatusClass = (status) => {
+    if (!status) return '';
     switch (status.toLowerCase()) {
       case 'delivered': return 'status-delivered';
       case 'shipped': return 'status-shipped';
       case 'processing': return 'status-processing';
+      case 'confirmed': return 'status-shipped';
+      case 'cancelled': return 'status-cancelled';
       default: return '';
+    }
+  };
+
+  const handleVerifyCondition = async (orderId) => {
+    setSelectedOrder(orders.find(o => o._id === orderId || o.id === orderId));
+    setShowVerificationModal(true);
+  };
+
+  const submitVerification = async () => {
+    if (verificationData.matchesDescription === null) {
+      showToast('Please select if the item matches the description', 'error');
+      return;
+    }
+    
+    try {
+      await orderAPI.verifyCondition(selectedOrder._id || selectedOrder.id, {
+        matchesDescription: verificationData.matchesDescription,
+        customerNotes: verificationData.customerNotes || '',
+        images: []
+      });
+      
+      if (verificationData.matchesDescription) {
+        showToast('Thank you! You earned 50 bonus loyalty points!', 'success');
+      } else {
+        showToast('Thank you for your feedback. Our team will review this.', 'success');
+      }
+      
+      setShowVerificationModal(false);
+      setVerificationData({ matchesDescription: null, customerNotes: '' });
+      
+      // Refresh orders
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user._id) {
+        fetchOrders(user._id);
+        fetchLoyaltyData(user._id);
+      }
+    } catch (error) {
+      console.error('Error verifying condition:', error);
+      showToast('Failed to submit verification', 'error');
+    }
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    const order = orders.find(o => o._id === orderId || o.id === orderId);
+    
+    // Check if order can be cancelled
+    if (!order) {
+      showToast('Order not found', 'error');
+      return;
+    }
+    
+    const status = order.status.toLowerCase();
+    if (status === 'shipped' || status === 'delivered' || status === 'in transit') {
+      showToast('Cannot cancel order - already shipped or delivered', 'error');
+      return;
+    }
+    
+    if (status === 'cancelled') {
+      showToast('Order is already cancelled', 'error');
+      return;
+    }
+    
+    // Show cancel modal
+    setCancelData({ orderId, reason: '' });
+    setShowCancelModal(true);
+  };
+
+  const submitCancelOrder = async () => {
+    if (!cancelData.reason.trim()) {
+      showToast('Please select a cancellation reason', 'error');
+      return;
+    }
+    
+    try {
+      await orderAPI.cancel(cancelData.orderId);
+      showToast('Order cancelled successfully. Refund will be processed within 3-5 business days.', 'success');
+      setShowCancelModal(false);
+      setCancelData({ orderId: null, reason: '' });
+      
+      // Refresh orders
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user._id) {
+        fetchOrders(user._id);
+      }
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      showToast('Failed to cancel order', 'error');
+    }
+  };
+
+  const handleRequestReturn = (orderId) => {
+    const order = orders.find(o => o._id === orderId || o.id === orderId);
+    
+    // Check if order can be returned
+    if (!order) {
+      showToast('Order not found', 'error');
+      return;
+    }
+    
+    const status = order.status.toLowerCase();
+    if (status !== 'delivered') {
+      showToast('Only delivered orders can be returned', 'error');
+      return;
+    }
+    
+    // Check if within 7 days
+    const deliveryDate = new Date(order.deliveredDate || order.date);
+    const daysSinceDelivery = Math.floor((new Date() - deliveryDate) / (1000 * 60 * 60 * 24));
+    
+    if (daysSinceDelivery > 7) {
+      showToast('Return period expired. Returns are only accepted within 7 days of delivery.', 'error');
+      return;
+    }
+    
+    // Show return modal
+    setReturnData({ orderId, reason: '', description: '', images: [] });
+    setShowReturnModal(true);
+  };
+
+  const submitReturnRequest = async () => {
+    if (!returnData.reason.trim()) {
+      showToast('Please select a return reason', 'error');
+      return;
+    }
+    
+    if (!returnData.description.trim()) {
+      showToast('Please provide a detailed description', 'error');
+      return;
+    }
+    
+    try {
+      // In a real app, this would call the backend API
+      // await orderAPI.requestReturn(returnData.orderId, returnData);
+      
+      showToast('Return request submitted successfully! The seller will review your request within 24 hours.', 'success');
+      setShowReturnModal(false);
+      setReturnData({ orderId: null, reason: '', description: '', images: [] });
+      
+      // Refresh orders
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user._id) {
+        fetchOrders(user._id);
+      }
+    } catch (error) {
+      console.error('Error submitting return request:', error);
+      showToast('Failed to submit return request', 'error');
     }
   };
 
@@ -244,40 +742,60 @@ function BuyerProfile() {
           <div className="menu-items">
             <button 
               className={activeTab === 'profile' ? 'active' : ''} 
-              onClick={() => setActiveTab('profile')}
+              onClick={() => {
+                console.log('Profile clicked');
+                setActiveTab('profile');
+              }}
+              style={{cursor: 'pointer', userSelect: 'none'}}
             >
               <FiUser /> Profile
             </button>
             <button 
               className={activeTab === 'orders' ? 'active' : ''} 
-              onClick={() => setActiveTab('orders')}
+              onClick={() => {
+                console.log('Orders clicked');
+                setActiveTab('orders');
+              }}
+              style={{cursor: 'pointer', userSelect: 'none'}}
             >
               <FiShoppingBag /> Orders
             </button>
             <button 
               className={activeTab === 'wishlist' ? 'active' : ''} 
-              onClick={() => setActiveTab('wishlist')}
+              onClick={() => {
+                console.log('Wishlist clicked');
+                setActiveTab('wishlist');
+              }}
+              style={{cursor: 'pointer', userSelect: 'none'}}
             >
               <FiHeart /> Wishlist
             </button>
             <button 
               className={activeTab === 'messages' ? 'active' : ''} 
-              onClick={() => setActiveTab('messages')}
+              onClick={() => {
+                console.log('Messages clicked');
+                setActiveTab('messages');
+              }}
+              style={{cursor: 'pointer', userSelect: 'none'}}
             >
               <FiMessageSquare /> Messages
             </button>
             <button 
               className={activeTab === 'settings' ? 'active' : ''} 
-              onClick={() => setActiveTab('settings')}
+              onClick={() => {
+                console.log('Settings clicked');
+                setActiveTab('settings');
+              }}
+              style={{cursor: 'pointer', userSelect: 'none'}}
             >
               <FiSettings /> Settings
             </button>
           </div>
           <div className="menu-footer">
-            <button onClick={() => navigate('/')} className="home-menu-btn">
+            <button onClick={() => navigate('/')} className="home-menu-btn" style={{cursor: 'pointer'}}>
               <FiHome /> Back to Home
             </button>
-            <button onClick={handleLogout} className="logout-menu-btn">
+            <button onClick={handleLogout} className="logout-menu-btn" style={{cursor: 'pointer'}}>
               <FiLogOut /> Logout
             </button>
           </div>
@@ -307,7 +825,14 @@ function BuyerProfile() {
 
             {/* Order Status Cards */}
             <div className="order-status-grid">
-              <div className="status-card">
+              <div 
+                className="status-card" 
+                onClick={() => {
+                  setActiveTab('orders');
+                  setOrderFilter('pending');
+                }}
+                style={{cursor: 'pointer'}}
+              >
                 <div className="status-icon-wrapper payment">
                   <FiShoppingBag className="status-icon" />
                 </div>
@@ -315,7 +840,14 @@ function BuyerProfile() {
                 <p className="status-count">2</p>
                 <span className="status-desc">Pending Payment</span>
               </div>
-              <div className="status-card">
+              <div 
+                className="status-card"
+                onClick={() => {
+                  setActiveTab('orders');
+                  setOrderFilter('processing');
+                }}
+                style={{cursor: 'pointer'}}
+              >
                 <div className="status-icon-wrapper shipping">
                   <FiPackage className="status-icon" />
                 </div>
@@ -323,7 +855,14 @@ function BuyerProfile() {
                 <p className="status-count">1</p>
                 <span className="status-desc">Processing</span>
               </div>
-              <div className="status-card">
+              <div 
+                className="status-card"
+                onClick={() => {
+                  setActiveTab('orders');
+                  setOrderFilter('shipped');
+                }}
+                style={{cursor: 'pointer'}}
+              >
                 <div className="status-icon-wrapper delivery">
                   <FiTruck className="status-icon" />
                 </div>
@@ -331,7 +870,14 @@ function BuyerProfile() {
                 <p className="status-count">3</p>
                 <span className="status-desc">In Transit</span>
               </div>
-              <div className="status-card">
+              <div 
+                className="status-card"
+                onClick={() => {
+                  setActiveTab('orders');
+                  setOrderFilter('delivered');
+                }}
+                style={{cursor: 'pointer'}}
+              >
                 <div className="status-icon-wrapper review">
                   <FiStar className="status-icon" />
                 </div>
@@ -345,11 +891,16 @@ function BuyerProfile() {
             <div className="profile-card">
               <div className="card-header">
                 <h3><FiHeart /> My Wishlist</h3>
-                <button className="view-all-btn" onClick={() => setActiveTab('wishlist')}>View All</button>
+                <button className="view-all-btn" onClick={() => setActiveTab('wishlist')} style={{cursor: 'pointer'}}>View All</button>
               </div>
               <div className="wishlist-preview">
                 {wishlist.slice(0, 3).map(item => (
-                  <div key={item.id} className="wishlist-preview-item">
+                  <div 
+                    key={item.id} 
+                    className="wishlist-preview-item"
+                    onClick={() => navigate(`/product/${item.id}`)}
+                    style={{cursor: 'pointer'}}
+                  >
                     <img src={item.image} alt={item.name} />
                     <p>{item.name}</p>
                     <span>Rs. {item.price.toLocaleString()}</span>
@@ -366,17 +917,35 @@ function BuyerProfile() {
                   <FiRefreshCw />
                   <div>
                     <h4>Return Request</h4>
-                    <p>Request a return for your order</p>
+                    <p>Request a return for delivered orders (within 7 days)</p>
                   </div>
-                  <button className="action-btn">Request</button>
+                  <button 
+                    className="action-btn"
+                    onClick={() => {
+                      setActiveTab('orders');
+                      setOrderFilter('delivered');
+                    }}
+                    style={{cursor: 'pointer'}}
+                  >
+                    Request
+                  </button>
                 </div>
                 <div className="action-item">
                   <FiX />
                   <div>
                     <h4>Cancel Order</h4>
-                    <p>Cancel your pending orders</p>
+                    <p>Cancel orders before they are shipped</p>
                   </div>
-                  <button className="action-btn">Cancel</button>
+                  <button 
+                    className="action-btn"
+                    onClick={() => {
+                      setActiveTab('orders');
+                      setOrderFilter('processing');
+                    }}
+                    style={{cursor: 'pointer'}}
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             </div>
@@ -388,7 +957,7 @@ function BuyerProfile() {
                 <div className="points-display">
                   <div className="points-circle">
                     <FiGift className="points-icon" />
-                    <span className="points-number">1,250</span>
+                    <span className="points-number">{loyaltyData ? loyaltyData.totalPoints : 1250}</span>
                     <span className="points-label">Points</span>
                   </div>
                 </div>
@@ -411,7 +980,13 @@ function BuyerProfile() {
                       <p>750 points earned</p>
                     </div>
                   </div>
-                  <button className="redeem-btn">
+                  <button 
+                    className="redeem-btn"
+                    onClick={() => {
+                      setShowRedeemModal(true);
+                    }}
+                    style={{cursor: 'pointer'}}
+                  >
                     <FiAward /> Redeem Points
                   </button>
                 </div>
@@ -427,8 +1002,52 @@ function BuyerProfile() {
               <h1>My Orders</h1>
             </div>
 
+            {/* Order Filter Tabs */}
+            <div className="order-filter-tabs">
+              <button 
+                className={orderFilter === 'all' ? 'active' : ''}
+                onClick={() => setOrderFilter('all')}
+              >
+                All Orders
+              </button>
+              <button 
+                className={orderFilter === 'pending' ? 'active' : ''}
+                onClick={() => setOrderFilter('pending')}
+              >
+                To Pay
+              </button>
+              <button 
+                className={orderFilter === 'processing' ? 'active' : ''}
+                onClick={() => setOrderFilter('processing')}
+              >
+                Processing
+              </button>
+              <button 
+                className={orderFilter === 'shipped' ? 'active' : ''}
+                onClick={() => setOrderFilter('shipped')}
+              >
+                Shipped
+              </button>
+              <button 
+                className={orderFilter === 'delivered' ? 'active' : ''}
+                onClick={() => setOrderFilter('delivered')}
+              >
+                Delivered
+              </button>
+            </div>
+
             <div className="orders-grid">
-              {orders.map(order => (
+              {orders
+                .filter(order => {
+                  if (orderFilter === 'all') return true;
+                  const status = order.status.toLowerCase();
+                  if (orderFilter === 'pending') return status === 'pending' || status === 'unpaid';
+                  if (orderFilter === 'processing') return status === 'processing' || status === 'confirmed';
+                  if (orderFilter === 'shipped') return status === 'shipped' || status === 'in transit';
+                  if (orderFilter === 'delivered') return status === 'delivered' || status === 'completed';
+                  return true;
+                })
+                .map(order => (
                 <div key={order.id} className="order-card">
                   <div className="order-header">
                     <div>
@@ -443,7 +1062,16 @@ function BuyerProfile() {
                   <div className="order-body">
                     <div className="order-info-row">
                       <span className="info-label">Items:</span>
-                      <span className="info-value">{order.items} items</span>
+                      <span className="info-value">
+                        {typeof order.items === 'number' 
+                          ? `${order.items} items` 
+                          : Array.isArray(order.items) 
+                            ? `${order.items.length} items`
+                            : Array.isArray(order.products)
+                              ? `${order.products.length} items`
+                              : '0 items'
+                        }
+                      </span>
                     </div>
                     <div className="order-info-row">
                       <span className="info-label">Total:</span>
@@ -475,16 +1103,54 @@ function BuyerProfile() {
                     >
                       View Details
                     </button>
-                    {order.status === 'Delivered' && (
-                      <button className="verify-btn">Verify Condition</button>
+                    {order.status === 'Delivered' && !order.conditionVerification?.verified && (
+                      <button 
+                        className="verify-btn"
+                        onClick={() => handleVerifyCondition(order._id || order.id)}
+                      >
+                        Verify Condition
+                      </button>
+                    )}
+                    {order.status === 'Delivered' && order.conditionVerification?.verified && (
+                      <>
+                        <span className="verified-badge">✓ Verified</span>
+                        <button 
+                          className="return-btn"
+                          onClick={() => handleRequestReturn(order._id || order.id)}
+                        >
+                          Request Return
+                        </button>
+                      </>
                     )}
                     {order.status === 'Processing' && (
-                      <button className="cancel-order-btn">Cancel Order</button>
+                      <button 
+                        className="cancel-order-btn"
+                        onClick={() => handleCancelOrder(order._id || order.id)}
+                      >
+                        Cancel Order
+                      </button>
                     )}
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Empty State */}
+            {orders.filter(order => {
+              if (orderFilter === 'all') return true;
+              const status = order.status.toLowerCase();
+              if (orderFilter === 'pending') return status === 'pending' || status === 'unpaid';
+              if (orderFilter === 'processing') return status === 'processing' || status === 'confirmed';
+              if (orderFilter === 'shipped') return status === 'shipped' || status === 'in transit';
+              if (orderFilter === 'delivered') return status === 'delivered' || status === 'completed';
+              return true;
+            }).length === 0 && (
+              <div style={{textAlign: 'center', padding: '60px 20px', color: '#999'}}>
+                <FiShoppingBag size={64} style={{marginBottom: '20px', opacity: 0.3}} />
+                <h3 style={{fontSize: '20px', marginBottom: '10px', color: '#666'}}>No orders found</h3>
+                <p>You don't have any orders in this category</p>
+              </div>
+            )}
 
             {/* Order Details Modal */}
             {showOrderDetails && selectedOrder && (
@@ -526,17 +1192,57 @@ function BuyerProfile() {
 
                     <div className="detail-section">
                       <h4>Products</h4>
-                      {selectedOrder.products.map((product, index) => (
-                        <div key={index} className="product-row">
-                          <span>{product.name} x {product.quantity}</span>
-                          <span>Rs. {product.price.toLocaleString()}</span>
-                        </div>
-                      ))}
+                      {Array.isArray(selectedOrder.products) && selectedOrder.products.length > 0 && selectedOrder.products.map((item, index) => {
+                        // Handle both product objects and item objects
+                        const productName = item.name || item.productName || 'Product';
+                        const productQty = item.quantity || 1;
+                        const productPrice = item.price || 0;
+                        
+                        return (
+                          <div key={index} className="product-row">
+                            <span>{productName} x {productQty}</span>
+                            <span>Rs. {productPrice.toLocaleString()}</span>
+                          </div>
+                        );
+                      })}
+                      {Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0 && selectedOrder.items.map((item, index) => {
+                        // Handle backend order items structure
+                        // Safely extract product name from nested object
+                        let productName = 'Product';
+                        if (item.productName) {
+                          productName = item.productName;
+                        } else if (item.product && typeof item.product === 'object' && item.product.name) {
+                          productName = item.product.name;
+                        } else if (typeof item.product === 'string') {
+                          productName = item.product;
+                        }
+                        
+                        const productQty = item.quantity || 1;
+                        const productPrice = item.price || item.subtotal || 0;
+                        
+                        return (
+                          <div key={`item-${index}`} className="product-row">
+                            <span>{productName} x {productQty}</span>
+                            <span>Rs. {productPrice.toLocaleString()}</span>
+                          </div>
+                        );
+                      })}
+                      {(!selectedOrder.products || selectedOrder.products.length === 0) && 
+                       (!selectedOrder.items || selectedOrder.items.length === 0) && (
+                        <p style={{color: '#666', fontSize: '14px'}}>No product details available</p>
+                      )}
                     </div>
 
                     <div className="detail-section">
                       <h4>Shipping Address</h4>
-                      <p>{selectedOrder.shippingAddress}</p>
+                      <p>
+                        {typeof selectedOrder.shippingAddress === 'string' 
+                          ? selectedOrder.shippingAddress
+                          : selectedOrder.shippingAddress && typeof selectedOrder.shippingAddress === 'object'
+                            ? `${selectedOrder.shippingAddress.fullName || ''}, ${selectedOrder.shippingAddress.phone || ''}, ${selectedOrder.shippingAddress.address || ''}, ${selectedOrder.shippingAddress.city || ''} ${selectedOrder.shippingAddress.postalCode || ''}`.trim()
+                            : 'No address provided'
+                        }
+                      </p>
                     </div>
 
                     <div className="detail-section">
@@ -558,21 +1264,62 @@ function BuyerProfile() {
             </div>
 
             <div className="wishlist-grid">
-              {wishlist.map(item => (
-                <div key={item.id} className="wishlist-card">
-                  <img src={item.image} alt={item.name} />
-                  <div className="wishlist-info">
-                    <h3>{item.name}</h3>
-                    <p className="price">Rs. {item.price.toLocaleString()}</p>
-                    <div className="wishlist-actions">
-                      <button className="add-cart-btn">Add to Cart</button>
-                      <button className="remove-btn">
-                        <FiX /> Remove
-                      </button>
+              {wishlist.length === 0 ? (
+                <div className="empty-wishlist" style={{gridColumn: '1 / -1', textAlign: 'center', padding: '60px 20px', color: '#999'}}>
+                  <FiHeart size={64} style={{marginBottom: '20px', opacity: 0.3}} />
+                  <h3 style={{fontSize: '20px', marginBottom: '10px', color: '#666'}}>Your wishlist is empty</h3>
+                  <p style={{marginBottom: '20px'}}>Add items you love to your wishlist</p>
+                  <button 
+                    onClick={() => navigate('/')}
+                    style={{
+                      padding: '12px 28px',
+                      background: '#00bcd4',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Start Shopping
+                  </button>
+                </div>
+              ) : (
+                wishlist.map(item => (
+                  <div key={item.id} className="wishlist-card">
+                    <img 
+                      src={item.image} 
+                      alt={item.name}
+                      onClick={() => navigate(`/product/${item.id}`)}
+                      style={{cursor: 'pointer'}}
+                    />
+                    <div className="wishlist-info">
+                      <h3 
+                        onClick={() => navigate(`/product/${item.id}`)}
+                        style={{cursor: 'pointer'}}
+                      >
+                        {item.name}
+                      </h3>
+                      <p className="price">Rs. {item.price.toLocaleString()}</p>
+                      <div className="wishlist-actions">
+                        <button 
+                          className="add-cart-btn"
+                          onClick={() => handleAddToCartFromWishlist(item)}
+                        >
+                          Add to Cart
+                        </button>
+                        <button 
+                          className="remove-btn"
+                          onClick={() => handleRemoveFromWishlist(item.id)}
+                        >
+                          <FiX /> Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}
@@ -644,12 +1391,15 @@ function BuyerProfile() {
                         onChange={(e) => setMessageText(e.target.value)}
                         onKeyPress={(e) => {
                           if (e.key === 'Enter' && messageText.trim()) {
-                            // Handle send message
-                            setMessageText('');
+                            handleSendMessage();
                           }
                         }}
                       />
-                      <button className="send-btn">
+                      <button 
+                        className="send-btn"
+                        onClick={handleSendMessage}
+                        disabled={!messageText.trim()}
+                      >
                         <FiSend />
                       </button>
                     </div>
@@ -886,6 +1636,296 @@ function BuyerProfile() {
               </div>
             </div>
 
+            {/* Password Change Modal */}
+            {showPasswordModal && (
+              <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
+                <div className="modal-content password-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>Change Password</h2>
+                    <button className="close-modal" onClick={() => setShowPasswordModal(false)}>
+                      <FiX />
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <div className="form-field">
+                      <label>Current Password</label>
+                      <input
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                        placeholder="Enter current password"
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label>New Password</label>
+                      <input
+                        type="password"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                        placeholder="Enter new password (min 6 characters)"
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label>Confirm New Password</label>
+                      <input
+                        type="password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                        placeholder="Confirm new password"
+                      />
+                    </div>
+                    <div className="modal-actions">
+                      <button className="save-btn" onClick={handlePasswordSubmit}>
+                        <FiSave /> Change Password
+                      </button>
+                      <button className="cancel-btn" onClick={() => setShowPasswordModal(false)}>
+                        <FiX /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Login Activity Modal */}
+            {showLoginActivityModal && (
+              <div className="modal-overlay" onClick={() => setShowLoginActivityModal(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>Login Activity</h2>
+                    <button className="close-modal" onClick={() => setShowLoginActivityModal(false)}>
+                      <FiX />
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <div className="activity-list">
+                      <div className="activity-item">
+                        <div className="activity-icon success">✓</div>
+                        <div className="activity-details">
+                          <h4>March 13, 2026 - 10:30 AM</h4>
+                          <p>Windows PC - Kathmandu, Nepal</p>
+                          <span className="activity-status">Current Session</span>
+                        </div>
+                      </div>
+                      <div className="activity-item">
+                        <div className="activity-icon success">✓</div>
+                        <div className="activity-details">
+                          <h4>March 12, 2026 - 3:45 PM</h4>
+                          <p>Mobile Device - Kathmandu, Nepal</p>
+                        </div>
+                      </div>
+                      <div className="activity-item">
+                        <div className="activity-icon success">✓</div>
+                        <div className="activity-details">
+                          <h4>March 11, 2026 - 9:15 AM</h4>
+                          <p>Windows PC - Kathmandu, Nepal</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="security-note">All sessions are secure. If you notice any suspicious activity, please change your password immediately.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Transaction History Modal */}
+            {showTransactionModal && (
+              <div className="modal-overlay" onClick={() => setShowTransactionModal(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>Transaction History</h2>
+                    <button className="close-modal" onClick={() => setShowTransactionModal(false)}>
+                      <FiX />
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <div className="transaction-list">
+                      <div className="transaction-item">
+                        <div className="transaction-icon">💳</div>
+                        <div className="transaction-details">
+                          <h4>Order #ORD-001</h4>
+                          <p>March 1, 2026</p>
+                        </div>
+                        <div className="transaction-amount">
+                          <span className="amount">Rs. 8,500</span>
+                          <span className="status completed">Completed</span>
+                        </div>
+                      </div>
+                      <div className="transaction-item">
+                        <div className="transaction-icon">💳</div>
+                        <div className="transaction-details">
+                          <h4>Order #ORD-002</h4>
+                          <p>Feb 28, 2026</p>
+                        </div>
+                        <div className="transaction-amount">
+                          <span className="amount">Rs. 5,200</span>
+                          <span className="status completed">Completed</span>
+                        </div>
+                      </div>
+                      <div className="transaction-item">
+                        <div className="transaction-icon">💳</div>
+                        <div className="transaction-details">
+                          <h4>Order #ORD-003</h4>
+                          <p>Feb 25, 2026</p>
+                        </div>
+                        <div className="transaction-amount">
+                          <span className="amount">Rs. 12,000</span>
+                          <span className="status processing">Processing</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="transaction-summary">
+                      <strong>Total Spent:</strong> <span>Rs. 25,700</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Methods Modal */}
+            {showPaymentMethodsModal && (
+              <div className="modal-overlay" onClick={() => setShowPaymentMethodsModal(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>Saved Payment Methods</h2>
+                    <button className="close-modal" onClick={() => setShowPaymentMethodsModal(false)}>
+                      <FiX />
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <div className="payment-methods-list">
+                      <div className="payment-method-item">
+                        <div className="card-icon">💳</div>
+                        <div className="card-details">
+                          <h4>Visa ending in 1234</h4>
+                          <p>Expires: 12/2027</p>
+                        </div>
+                        <button className="remove-card-btn">Remove</button>
+                      </div>
+                      <div className="payment-method-item">
+                        <div className="card-icon">💳</div>
+                        <div className="card-details">
+                          <h4>Mastercard ending in 5678</h4>
+                          <p>Expires: 08/2026</p>
+                        </div>
+                        <button className="remove-card-btn">Remove</button>
+                      </div>
+                    </div>
+                    <button className="add-payment-btn">+ Add New Payment Method</button>
+                    <p className="payment-note">You can also add or remove payment methods during checkout.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast.show && (
+              <div className={`toast toast-${toast.type}`}>
+                <span>{toast.message}</span>
+              </div>
+            )}
+
+            {/* Redeem Points Modal */}
+            {showRedeemModal && (
+              <div className="modal-overlay" onClick={() => setShowRedeemModal(false)}>
+                <div className="modal-content password-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>Redeem Loyalty Points</h2>
+                    <button className="close-modal" onClick={() => setShowRedeemModal(false)}>
+                      <FiX />
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <div className="redeem-info">
+                      <p>Available Points: <strong>{loyaltyData ? loyaltyData.totalPoints : 1250}</strong></p>
+                      <p>Conversion Rate: <strong>100 points = Rs. 10</strong></p>
+                    </div>
+                    <div className="form-field">
+                      <label>Points to Redeem</label>
+                      <input
+                        type="number"
+                        value={redeemAmount}
+                        onChange={(e) => setRedeemAmount(e.target.value)}
+                        placeholder="Enter points amount"
+                        min="1"
+                        max={loyaltyData ? loyaltyData.totalPoints : 1250}
+                      />
+                      {redeemAmount && !isNaN(redeemAmount) && (
+                        <p className="conversion-preview">
+                          You will receive: <strong>Rs. {(parseInt(redeemAmount) / 10).toFixed(2)}</strong>
+                        </p>
+                      )}
+                    </div>
+                    <div className="modal-actions">
+                      <button className="save-btn" onClick={handleRedeemPoints}>
+                        <FiGift /> Redeem Now
+                      </button>
+                      <button className="cancel-btn" onClick={() => setShowRedeemModal(false)}>
+                        <FiX /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Order Verification Modal */}
+            {showVerificationModal && selectedOrder && (
+              <div className="modal-overlay" onClick={() => setShowVerificationModal(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>Verify Order Condition</h2>
+                    <button className="close-modal" onClick={() => setShowVerificationModal(false)}>
+                      <FiX />
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <p style={{marginBottom: '20px', color: '#666'}}>
+                      Order: <strong>{selectedOrder.id}</strong>
+                    </p>
+                    <div className="verification-question">
+                      <label>Does the item match the seller's description?</label>
+                      <div className="verification-options">
+                        <button 
+                          className={`verification-btn ${verificationData.matchesDescription === true ? 'selected' : ''}`}
+                          onClick={() => setVerificationData({...verificationData, matchesDescription: true})}
+                        >
+                          ✓ Yes, it matches
+                        </button>
+                        <button 
+                          className={`verification-btn ${verificationData.matchesDescription === false ? 'selected' : ''}`}
+                          onClick={() => setVerificationData({...verificationData, matchesDescription: false})}
+                        >
+                          ✕ No, it doesn't match
+                        </button>
+                      </div>
+                    </div>
+                    <div className="form-field">
+                      <label>Additional Notes (Optional)</label>
+                      <textarea
+                        value={verificationData.customerNotes}
+                        onChange={(e) => setVerificationData({...verificationData, customerNotes: e.target.value})}
+                        placeholder="Any comments about the item condition..."
+                        rows="4"
+                        style={{width: '100%', padding: '12px', border: '1px solid #e0e0e0', borderRadius: '4px', fontFamily: 'Arial, sans-serif'}}
+                      />
+                    </div>
+                    {verificationData.matchesDescription === true && (
+                      <p className="bonus-note">🎁 You will earn 50 bonus loyalty points!</p>
+                    )}
+                    <div className="modal-actions">
+                      <button className="save-btn" onClick={submitVerification}>
+                        <FiSave /> Submit Verification
+                      </button>
+                      <button className="cancel-btn" onClick={() => setShowVerificationModal(false)}>
+                        <FiX /> Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="settings-card">
               <h3>Password & Security</h3>
               <div className="setting-item">
@@ -893,21 +1933,21 @@ function BuyerProfile() {
                   <h4>Change Password</h4>
                   <p>Update your password regularly to keep your account secure</p>
                 </div>
-                <button className="setting-btn">Change</button>
+                <button className="setting-btn" onClick={handleChangePassword}>Change</button>
               </div>
               <div className="setting-item">
                 <div>
                   <h4>Two-Factor Authentication</h4>
                   <p>Add an extra layer of security to your account</p>
                 </div>
-                <button className="setting-btn">Enable</button>
+                <button className="setting-btn" onClick={handleEnable2FA}>Enable</button>
               </div>
               <div className="setting-item">
                 <div>
                   <h4>Login Activity</h4>
                   <p>View recent login history and active sessions</p>
                 </div>
-                <button className="setting-btn">View Activity</button>
+                <button className="setting-btn" onClick={handleViewLoginActivity}>View Activity</button>
               </div>
             </div>
 
@@ -1003,7 +2043,7 @@ function BuyerProfile() {
                   <h4>Download My Data</h4>
                   <p>Get a copy of all your account data</p>
                 </div>
-                <button className="setting-btn">Download</button>
+                <button className="setting-btn" onClick={handleDownloadData}>Download</button>
               </div>
             </div>
 
@@ -1014,21 +2054,21 @@ function BuyerProfile() {
                   <h4>Saved Payment Methods</h4>
                   <p>Manage your saved cards and payment options</p>
                 </div>
-                <button className="setting-btn">Manage</button>
+                <button className="setting-btn" onClick={handleManagePaymentMethods}>Manage</button>
               </div>
               <div className="setting-item">
                 <div>
                   <h4>Billing Address</h4>
                   <p>Update your default billing address</p>
                 </div>
-                <button className="setting-btn">Edit</button>
+                <button className="setting-btn" onClick={() => setActiveTab('settings')}>Edit</button>
               </div>
               <div className="setting-item">
                 <div>
                   <h4>Transaction History</h4>
                   <p>View all your payment transactions</p>
                 </div>
-                <button className="setting-btn">View</button>
+                <button className="setting-btn" onClick={handleViewTransactionHistory}>View</button>
               </div>
             </div>
 
@@ -1076,19 +2116,231 @@ function BuyerProfile() {
                   <h4>Deactivate Account</h4>
                   <p>Temporarily disable your account</p>
                 </div>
-                <button className="setting-btn">Deactivate</button>
+                <button className="setting-btn" onClick={handleDeactivateAccount}>Deactivate</button>
               </div>
               <div className="setting-item">
                 <div>
                   <h4>Delete Account</h4>
                   <p>Permanently delete your account and all data</p>
                 </div>
-                <button className="setting-btn danger">Delete</button>
+                <button className="setting-btn danger" onClick={handleDeleteAccount}>Delete</button>
               </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`toast toast-${toast.type}`}>
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      {/* Return Request Modal */}
+      {showReturnModal && (
+        <div className="modal-overlay" onClick={() => setShowReturnModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Request Return</h2>
+              <button className="close-modal" onClick={() => setShowReturnModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{marginBottom: '20px', color: '#666', fontSize: '14px'}}>
+                Returns are accepted within 7 days of delivery. The seller will review your request within 24 hours.
+              </p>
+              <div className="form-field">
+                <label>Return Reason *</label>
+                <select
+                  value={returnData.reason}
+                  onChange={(e) => setReturnData({...returnData, reason: e.target.value})}
+                  style={{width: '100%', padding: '12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontFamily: 'Arial, sans-serif'}}
+                >
+                  <option value="">Select a reason</option>
+                  <option value="defective">Item is defective or damaged</option>
+                  <option value="wrong_item">Wrong item received</option>
+                  <option value="not_as_described">Item not as described</option>
+                  <option value="size_issue">Size or fit issue</option>
+                  <option value="quality">Quality not satisfactory</option>
+                  <option value="changed_mind">Changed my mind</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Detailed Description *</label>
+                <textarea
+                  value={returnData.description}
+                  onChange={(e) => setReturnData({...returnData, description: e.target.value})}
+                  placeholder="Please provide details about why you want to return this item..."
+                  rows="4"
+                  style={{width: '100%', padding: '12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontFamily: 'Arial, sans-serif'}}
+                />
+              </div>
+              <div className="info-box" style={{background: '#fff3e0', padding: '12px', borderRadius: '6px', marginTop: '16px'}}>
+                <p style={{margin: 0, fontSize: '13px', color: '#e65100'}}>
+                  <strong>Return Policy:</strong><br/>
+                  • Item must be unused and in original packaging<br/>
+                  • Return shipping may be charged based on reason<br/>
+                  • Refund will be processed within 5-7 business days after approval
+                </p>
+              </div>
+              <div className="modal-actions">
+                <button className="save-btn" onClick={submitReturnRequest}>
+                  <FiRefreshCw /> Submit Return Request
+                </button>
+                <button className="cancel-btn" onClick={() => setShowReturnModal(false)}>
+                  <FiX /> Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Order Modal */}
+      {showCancelModal && (
+        <div className="modal-overlay" onClick={() => setShowCancelModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Cancel Order</h2>
+              <button className="close-modal" onClick={() => setShowCancelModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{marginBottom: '20px', color: '#666', fontSize: '14px'}}>
+                You can only cancel orders before they are shipped. Once shipped, you'll need to request a return instead.
+              </p>
+              <div className="form-field">
+                <label>Cancellation Reason *</label>
+                <select
+                  value={cancelData.reason}
+                  onChange={(e) => setCancelData({...cancelData, reason: e.target.value})}
+                  style={{width: '100%', padding: '12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontFamily: 'Arial, sans-serif'}}
+                >
+                  <option value="">Select a reason</option>
+                  <option value="changed_mind">Changed my mind</option>
+                  <option value="found_better_price">Found a better price</option>
+                  <option value="ordered_by_mistake">Ordered by mistake</option>
+                  <option value="delivery_time">Delivery time too long</option>
+                  <option value="payment_issue">Payment issue</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className="info-box" style={{background: '#e8f5e9', padding: '12px', borderRadius: '6px', marginTop: '16px'}}>
+                <p style={{margin: 0, fontSize: '13px', color: '#2e7d32'}}>
+                  <strong>Refund Information:</strong><br/>
+                  • Full refund will be processed to your original payment method<br/>
+                  • Refund typically takes 3-5 business days<br/>
+                  • You'll receive an email confirmation once processed
+                </p>
+              </div>
+              <div className="modal-actions">
+                <button className="save-btn" onClick={submitCancelOrder} style={{background: '#f44336'}}>
+                  <FiX /> Cancel Order
+                </button>
+                <button className="cancel-btn" onClick={() => setShowCancelModal(false)}>
+                  Keep Order
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivate Account Modal */}
+      {showDeactivateModal && (
+        <div className="modal-overlay" onClick={() => setShowDeactivateModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Deactivate Your Account?</h2>
+              <button className="close-modal" onClick={() => setShowDeactivateModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="warning-box" style={{background: '#fff3e0', padding: '16px', borderRadius: '8px', marginBottom: '20px'}}>
+                <p style={{margin: '0 0 12px 0', fontSize: '15px', color: '#e65100', fontWeight: '600'}}>
+                  What happens when you deactivate:
+                </p>
+                <ul style={{margin: 0, paddingLeft: '20px', color: '#666', fontSize: '14px', lineHeight: '1.8'}}>
+                  <li>Your profile will be hidden</li>
+                  <li>You won't receive notifications</li>
+                  <li>Your orders will remain accessible</li>
+                  <li>You can reactivate anytime by logging in</li>
+                </ul>
+              </div>
+              <p style={{fontSize: '14px', color: '#666', marginBottom: '20px'}}>
+                Are you sure you want to continue?
+              </p>
+              <div className="modal-actions">
+                <button className="save-btn" onClick={confirmDeactivateAccount} style={{background: '#ff9800'}}>
+                  Yes, Deactivate
+                </button>
+                <button className="cancel-btn" onClick={() => setShowDeactivateModal(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{background: '#ffebee'}}>
+              <h2 style={{color: '#c62828'}}>⚠️ Permanent Account Deletion</h2>
+              <button className="close-modal" onClick={() => setShowDeleteModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="warning-box" style={{background: '#ffebee', padding: '16px', borderRadius: '8px', marginBottom: '20px', border: '2px solid #ef5350'}}>
+                <p style={{margin: '0 0 12px 0', fontSize: '15px', color: '#c62828', fontWeight: '600'}}>
+                  ⚠️ THIS ACTION CANNOT BE UNDONE!
+                </p>
+                <p style={{margin: '0 0 12px 0', fontSize: '14px', color: '#c62828', fontWeight: '600'}}>
+                  This will permanently delete:
+                </p>
+                <ul style={{margin: 0, paddingLeft: '20px', color: '#666', fontSize: '14px', lineHeight: '1.8'}}>
+                  <li>Your profile and personal information</li>
+                  <li>All order history</li>
+                  <li>Wishlist and favorites</li>
+                  <li>Messages and chat history</li>
+                  <li>Loyalty points</li>
+                </ul>
+              </div>
+              <div className="info-box" style={{background: '#e8f5e9', padding: '12px', borderRadius: '6px', marginBottom: '20px'}}>
+                <p style={{margin: 0, fontSize: '13px', color: '#2e7d32'}}>
+                  <strong>Grace Period:</strong> Your account will be scheduled for deletion in 30 days. You can cancel by logging in before that date.
+                </p>
+              </div>
+              <div className="form-field">
+                <label style={{color: '#c62828', fontWeight: '600'}}>Enter your password to confirm deletion *</label>
+                <input
+                  type="password"
+                  value={deleteConfirmPassword}
+                  onChange={(e) => setDeleteConfirmPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  style={{width: '100%', padding: '12px', border: '2px solid #ef5350', borderRadius: '6px', fontFamily: 'Arial, sans-serif'}}
+                />
+              </div>
+              <div className="modal-actions">
+                <button className="save-btn" onClick={confirmDeleteAccount} style={{background: '#f44336'}}>
+                  Delete My Account
+                </button>
+                <button className="cancel-btn" onClick={() => setShowDeleteModal(false)}>
+                  Keep My Account
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

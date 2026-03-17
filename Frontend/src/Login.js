@@ -5,7 +5,7 @@ import './Login.css';
 
 function Login() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('user');
+  const [activeTab, setActiveTab] = useState('customer');
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -66,10 +66,10 @@ function Login() {
         {/* Tab Buttons */}
         <div className="login-tabs">
           <button 
-            className={activeTab === 'user' ? 'active' : ''} 
-            onClick={() => setActiveTab('user')}
+            className={activeTab === 'customer' ? 'active' : ''} 
+            onClick={() => setActiveTab('customer')}
           >
-            User Login
+            Customer Login
           </button>
           <button 
             className={activeTab === 'seller' ? 'active' : ''} 

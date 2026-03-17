@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
-const User = require('../models/User');
+const Seller = require('../models/Seller');
+const { validatePaymentOptions } = require('../utils/paymentOptions');
+const { validateDiscount, calculateDiscountedPrice } = require('../utils/discount');
 
 // Get all approved products (for landing page)
 router.get('/', async (req, res) => {
@@ -50,7 +52,13 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
     
-    res.json(product);
+    // Calculate discounted price if discount is active
+    const productObj = product.toObject();
+    if (productObj.discount) {
+      productObj.discountedPrice = calculateDiscountedPrice(productObj.price, productObj.discount);
+    }
+    
+    res.json(productObj);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -70,13 +78,33 @@ router.post('/', async (req, res) => {
       stock,
       images,
       sellerId,
-      story
+      story,
+      paymentOptions,
+      discount
     } = req.body;
     
+    // Validate payment options
+    if (!validatePaymentOptions(paymentOptions)) {
+      return res.status(400).json({ 
+        message: 'Invalid payment options. Must provide 1-4 valid payment options from: cod, online, esewa, khalti, card' 
+      });
+    }
+    
+    // Validate discount if provided
+    if (discount) {
+      const discountValidation = validateDiscount(discount);
+      if (!discountValidation.isValid) {
+        return res.status(400).json({ 
+          message: 'Invalid discount configuration',
+          errors: discountValidation.errors
+        });
+      }
+    }
+    
     // Get seller info
-    const seller = await User.findById(sellerId);
-    if (!seller || seller.userType !== 'seller') {
-      return res.status(403).json({ message: 'Only sellers can create products' });
+    const seller = await Seller.findById(sellerId);
+    if (!seller) {
+      return res.status(403).json({ message: 'Seller not found' });
     }
     
     const product = new Product({
@@ -93,10 +121,16 @@ router.post('/', async (req, res) => {
       sellerName: seller.fullName,
       storeName: seller.storeName,
       story: story || '',
+      paymentOptions,
+      discount: discount || undefined,
       status: 'Approved' // Auto-approve for now, can be changed to 'Pending'
     });
     
     await product.save();
+    
+    // Update seller's total products count
+    seller.totalProducts = (seller.totalProducts || 0) + 1;
+    await seller.save();
     
     res.status(201).json({ message: 'Product created successfully', product });
   } catch (error) {
@@ -107,7 +141,7 @@ router.post('/', async (req, res) => {
 // Update product (seller only - their own products)
 router.put('/:id', async (req, res) => {
   try {
-    const { sellerId } = req.body;
+    const { sellerId, paymentOptions, discount } = req.body;
     
     const product = await Product.findById(req.params.id);
     
@@ -120,8 +154,26 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to update this product' });
     }
     
+    // Validate payment options if provided
+    if (paymentOptions !== undefined && !validatePaymentOptions(paymentOptions)) {
+      return res.status(400).json({ 
+        message: 'Invalid payment options. Must provide 1-4 valid payment options from: cod, online, esewa, khalti, card' 
+      });
+    }
+    
+    // Validate discount if provided
+    if (discount !== undefined && discount !== null) {
+      const discountValidation = validateDiscount(discount);
+      if (!discountValidation.isValid) {
+        return res.status(400).json({ 
+          message: 'Invalid discount configuration',
+          errors: discountValidation.errors
+        });
+      }
+    }
+    
     // Update fields
-    const updates = ['name', 'description', 'price', 'category', 'condition', 'size', 'brand', 'stock', 'images', 'story'];
+    const updates = ['name', 'description', 'price', 'category', 'condition', 'size', 'brand', 'stock', 'images', 'story', 'paymentOptions', 'discount'];
     updates.forEach(field => {
       if (req.body[field] !== undefined) {
         product[field] = req.body[field];
@@ -153,6 +205,13 @@ router.delete('/:id', async (req, res) => {
     }
     
     await Product.findByIdAndDelete(req.params.id);
+    
+    // Update seller's total products count
+    const seller = await Seller.findById(sellerId);
+    if (seller && seller.totalProducts > 0) {
+      seller.totalProducts -= 1;
+      await seller.save();
+    }
     
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {

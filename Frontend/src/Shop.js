@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FiSearch, FiUser, FiShoppingCart, FiHeart, FiArrowLeft, FiStar } from 'react-icons/fi';
 import './Shop.css';
 import { productAPI, cartAPI } from './services/api';
 
 function Shop() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const categoryParam = searchParams.get('category');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState([]);
   const [cart, setCart] = useState([]);
@@ -20,6 +23,40 @@ function Shop() {
   const [selectedColors, setSelectedColors] = useState([]);
   const [selectedPriceRange, setSelectedPriceRange] = useState([]);
   const [collapsedSections, setCollapsedSections] = useState({});
+  const [showCategoryCards, setShowCategoryCards] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const categoryCards = [
+    {
+      title: "MEN'S APPAREL",
+      image: "https://images.unsplash.com/photo-1617127365659-c47fa864d8bc?w=400",
+      subcategories: [
+        { name: "Men's Jacket", param: "mens-jacket" },
+        { name: "Men's Shirt", param: "mens-shirt" },
+        { name: "Men's Pants", param: "mens-pants" }
+      ]
+    },
+    {
+      title: "WOMEN'S APPAREL",
+      image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400",
+      subcategories: [
+        { name: "Women's Jacket", param: "womens-jacket" },
+        { name: "Women's Shirt", param: "womens-shirt" },
+        { name: "Women's Pants", param: "womens-pants" }
+      ]
+    },
+    {
+      title: "SHOP OUTLET",
+      image: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=400",
+      subcategories: [
+        { name: "Men's Outlet", param: "mens-outlet" },
+        { name: "Women's Outlet", param: "womens-outlet" },
+        { name: "Kids Outlet", param: "kids-outlet" }
+      ]
+    }
+  ];
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -34,12 +71,41 @@ function Shop() {
     if (savedFavorites) setFavorites(JSON.parse(savedFavorites));
 
     fetchProducts();
-  }, []);
+    
+    // Always show products with sidebar, never show category cards
+    setShowCategoryCards(false);
+    if (categoryParam) {
+      if (categoryParam.includes('mens')) {
+        setSelectedCategory('MEN');
+      } else if (categoryParam.includes('womens')) {
+        setSelectedCategory('WOMEN');
+      } else if (categoryParam.includes('kids')) {
+        setSelectedCategory('KIDS');
+      }
+    }
+  }, [categoryParam]);
 
-  const fetchProducts = async () => {
+  // Infinite scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 500) {
+        if (!loadingMore && hasMore) {
+          loadMoreProducts();
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loadingMore, hasMore]);
+
+  const loadMoreProducts = async () => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
     try {
-      setLoading(true);
-      const products = await productAPI.getAll({ limit: 100 });
+      const nextPage = page + 1;
+      const products = await productAPI.getAll({ limit: 20, page: nextPage });
       
       if (products && products.length > 0) {
         const mappedProducts = products.map(p => ({
@@ -53,9 +119,53 @@ function Shop() {
           seller: p.seller,
           sellerName: p.sellerName || 'Ayusha Malla',
           storeName: p.storeName || 'ankita',
-          category: p.category || 'Fashion'
+          category: p.category || 'Fashion',
+          paymentOptions: p.paymentOptions || [],
+          discount: p.discount,
+          discountedPrice: p.discountedPrice
+        }));
+        
+        setAllProducts(prev => [...prev, ...mappedProducts]);
+        setPage(nextPage);
+        
+        if (products.length < 20) {
+          setHasMore(false);
+        }
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading more products:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const products = await productAPI.getAll({ limit: 20, page: 1 });
+      
+      if (products && products.length > 0) {
+        const mappedProducts = products.map(p => ({
+          id: p._id,
+          name: p.name,
+          price: p.price,
+          image: p.images[0] || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+          rating: p.rating || (Math.random() * 1.5 + 3.5).toFixed(1),
+          reviews: p.reviews || Math.floor(Math.random() * 200 + 50),
+          condition: p.condition,
+          seller: p.seller,
+          sellerName: p.sellerName || 'Ayusha Malla',
+          storeName: p.storeName || 'ankita',
+          category: p.category || 'Fashion',
+          paymentOptions: p.paymentOptions || [],
+          discount: p.discount,
+          discountedPrice: p.discountedPrice
         }));
         setAllProducts(mappedProducts);
+        setPage(1);
+        setHasMore(products.length >= 20);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -69,33 +179,27 @@ function Shop() {
     const matchesCategory = selectedCategory === 'ALL' || 
       (selectedCategory === 'MEN' && product.name.toLowerCase().includes('men')) ||
       (selectedCategory === 'WOMEN' && product.name.toLowerCase().includes('women')) ||
-      (selectedCategory === 'KIDS' && product.name.toLowerCase().includes('kid')) ||
-      (selectedCategory === 'FASHION' && product.category === 'Fashion') ||
-      (selectedCategory === 'OTHER');
+      (selectedCategory === 'KIDS' && (product.name.toLowerCase().includes('kid') || product.name.toLowerCase().includes('boy') || product.name.toLowerCase().includes('girl'))) ||
+      (selectedCategory === 'SPORTS' && (product.name.toLowerCase().includes('sport') || product.name.toLowerCase().includes('track') || product.name.toLowerCase().includes('athletic'))) ||
+      (selectedCategory === 'VINTAGE' && product.name.toLowerCase().includes('vintage'));
     
-    const matchesGender = selectedGenders.length === 0 || selectedGenders.some(gender => 
-      product.name.toLowerCase().includes(gender.toLowerCase())
-    );
-    
-    const matchesSize = selectedSizes.length === 0;
-    
-    const matchesBrand = selectedBrands.length === 0;
-    
-    const matchesColor = selectedColors.length === 0 || selectedColors.some(color =>
-      product.name.toLowerCase().includes(color.toLowerCase())
-    );
-    
-    const matchesPrice = selectedPriceRange.length === 0 || selectedPriceRange.some(range => {
-      if (range === 'under1000') return product.price < 1000;
-      if (range === '1000-2500') return product.price >= 1000 && product.price <= 2500;
-      if (range === '2500-5000') return product.price >= 2500 && product.price <= 5000;
-      if (range === '5000-10000') return product.price >= 5000 && product.price <= 10000;
-      if (range === 'over10000') return product.price > 10000;
-      return true;
-    });
-    
-    return matchesSearch && matchesCategory && matchesGender && matchesSize && matchesBrand && matchesColor && matchesPrice;
+    return matchesSearch && matchesCategory;
   });
+
+  const handleCategoryClick = (category) => {
+    setSelectedCategory(category);
+    setShowCategoryCards(false);
+  };
+
+  const handleFilterTabClick = (filter) => {
+    setSelectedFilter(filter);
+    setShowCategoryCards(false);
+  };
+
+  const handleSubcategoryClick = (categoryParam) => {
+    navigate(`/shop?category=${categoryParam}`);
+    setShowCategoryCards(false);
+  };
 
   const toggleSection = (section) => {
     setCollapsedSections(prev => ({
@@ -134,6 +238,14 @@ function Shop() {
     );
   };
 
+  const isDiscountActive = (discount) => {
+    if (!discount || !discount.active) return false;
+    const now = new Date();
+    const start = new Date(discount.startDate);
+    const end = new Date(discount.endDate);
+    return now >= start && now <= end;
+  };
+
   const toggleFavorite = (productId) => {
     const newFavorites = favorites.includes(productId)
       ? favorites.filter(id => id !== productId)
@@ -149,13 +261,21 @@ function Shop() {
         try {
           await cartAPI.add(user._id, product.id, 1);
           const backendCart = await cartAPI.get(user._id);
-          const formattedCart = backendCart.items.map(item => ({
-            id: item.product._id || item.product,
-            name: item.product.name || item.productName,
-            price: item.product.price || item.price,
-            image: (item.product.images && item.product.images[0]) || item.productImage,
-            quantity: item.quantity
-          }));
+          const formattedCart = backendCart.items.map(item => {
+            const prod = item.product;
+            const effectivePrice = prod.discountedPrice || prod.price || item.price;
+            
+            return {
+              id: prod._id || prod,
+              name: prod.name || item.productName,
+              price: effectivePrice,
+              originalPrice: prod.price || item.price,
+              image: (prod.images && prod.images[0]) || item.productImage,
+              quantity: item.quantity,
+              discount: prod.discount,
+              discountedPrice: prod.discountedPrice
+            };
+          });
           
           setCart(formattedCart);
           localStorage.setItem('cart', JSON.stringify(formattedCart));
@@ -173,7 +293,13 @@ function Shop() {
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       } else {
-        newCart = [...cart, { ...product, quantity: 1 }];
+        const effectivePrice = product.discountedPrice || product.price;
+        newCart = [...cart, { 
+          ...product, 
+          quantity: 1,
+          price: effectivePrice,
+          originalPrice: product.price
+        }];
       }
 
       setCart(newCart);
@@ -192,127 +318,51 @@ function Shop() {
       <div className="filter-tabs">
         <button 
           className={selectedFilter === 'ALL' ? 'active' : ''} 
-          onClick={() => setSelectedFilter('ALL')}
+          onClick={() => handleFilterTabClick('ALL')}
         >
           ALL
         </button>
         <button 
           className={selectedFilter === 'NEW_ARRIVALS' ? 'active' : ''} 
-          onClick={() => setSelectedFilter('NEW_ARRIVALS')}
+          onClick={() => handleFilterTabClick('NEW_ARRIVALS')}
         >
           NEW ARRIVALS
         </button>
         <button 
           className={selectedFilter === 'TOP_RATED' ? 'active' : ''} 
-          onClick={() => setSelectedFilter('TOP_RATED')}
+          onClick={() => handleFilterTabClick('TOP_RATED')}
         >
           TOP RATED
         </button>
       </div>
 
       <div className="shop-container">
-        <aside className="sidebar">
-          <div className="filter-section">
-            <h3 onClick={() => toggleSection('gender')}>
-              <span className={`arrow ${collapsedSections.gender ? 'collapsed' : ''}`}>▼</span>
-              Gender
-            </h3>
-            {!collapsedSections.gender && (
-              <div className="filter-options">
-                <label>
-                  <input type="checkbox" checked={selectedGenders.includes("men")} onChange={() => handleGenderChange("men")} />
-                  <span>Men's</span><span className="count">(245)</span>
-                </label>
-                <label>
-                  <input type="checkbox" checked={selectedGenders.includes("women")} onChange={() => handleGenderChange("women")} />
-                  <span>Women's</span><span className="count">(189)</span>
-                </label>
-                <label>
-                  <input type="checkbox" checked={selectedGenders.includes("boy")} onChange={() => handleGenderChange("boy")} />
-                  <span>Boys</span><span className="count">(32)</span>
-                </label>
-                <label>
-                  <input type="checkbox" checked={selectedGenders.includes("girl")} onChange={() => handleGenderChange("girl")} />
-                  <span>Girls</span><span className="count">(28)</span>
-                </label>
-              </div>
-            )}
-          </div>
-
-          <div className="filter-section">
-            <h3 onClick={() => toggleSection('size')}>
-              <span className={`arrow ${collapsedSections.size ? 'collapsed' : ''}`}>▼</span>
-              Size
-            </h3>
-            {!collapsedSections.size && (
-              <div className="filter-options">
-                <label><input type="checkbox" checked={selectedSizes.includes("XS")} onChange={() => handleSizeChange("XS")} /><span>XS</span><span className="count">(45)</span></label>
-                <label><input type="checkbox" checked={selectedSizes.includes("S")} onChange={() => handleSizeChange("S")} /><span>S</span><span className="count">(128)</span></label>
-                <label><input type="checkbox" checked={selectedSizes.includes("M")} onChange={() => handleSizeChange("M")} /><span>M</span><span className="count">(156)</span></label>
-                <label><input type="checkbox" checked={selectedSizes.includes("L")} onChange={() => handleSizeChange("L")} /><span>L</span><span className="count">(142)</span></label>
-                <label><input type="checkbox" checked={selectedSizes.includes("XL")} onChange={() => handleSizeChange("XL")} /><span>XL</span><span className="count">(98)</span></label>
-                <label><input type="checkbox" checked={selectedSizes.includes("2XL")} onChange={() => handleSizeChange("2XL")} /><span>2XL</span><span className="count">(34)</span></label>
-              </div>
-            )}
-          </div>
-
-          <div className="filter-section">
-            <h3 onClick={() => toggleSection('brand')}>
-              <span className={`arrow ${collapsedSections.brand ? 'collapsed' : ''}`}>▼</span>
-              Brand
-            </h3>
-            {!collapsedSections.brand && (
-              <div className="filter-options scrollable">
-                <label><input type="checkbox" checked={selectedBrands.includes("Nike")} onChange={() => handleBrandChange("Nike")} /><span>Nike</span><span className="count">(42)</span></label>
-                <label><input type="checkbox" checked={selectedBrands.includes("Adidas")} onChange={() => handleBrandChange("Adidas")} /><span>Adidas</span><span className="count">(38)</span></label>
-                <label><input type="checkbox" checked={selectedBrands.includes("Puma")} onChange={() => handleBrandChange("Puma")} /><span>Puma</span><span className="count">(25)</span></label>
-                <label><input type="checkbox" checked={selectedBrands.includes("Reebok")} onChange={() => handleBrandChange("Reebok")} /><span>Reebok</span><span className="count">(18)</span></label>
-                <label><input type="checkbox" checked={selectedBrands.includes("Levi's")} onChange={() => handleBrandChange("Levi's")} /><span>Levi's</span><span className="count">(32)</span></label>
-                <label><input type="checkbox" checked={selectedBrands.includes("H&M")} onChange={() => handleBrandChange("H&M")} /><span>H&M</span><span className="count">(28)</span></label>
-                <label><input type="checkbox" checked={selectedBrands.includes("Zara")} onChange={() => handleBrandChange("Zara")} /><span>Zara</span><span className="count">(22)</span></label>
-                <label><input type="checkbox" checked={selectedBrands.includes("Gap")} onChange={() => handleBrandChange("Gap")} /><span>Gap</span><span className="count">(15)</span></label>
-              </div>
-            )}
-          </div>
-
-          <div className="filter-section">
-            <h3 onClick={() => toggleSection('color')}>
-              <span className={`arrow ${collapsedSections.color ? 'collapsed' : ''}`}>▼</span>
-              Color
-            </h3>
-            {!collapsedSections.color && (
-              <div className="filter-options">
-                <label><input type="checkbox" checked={selectedColors.includes("Black")} onChange={() => handleColorChange("Black")} /><span>Black</span><span className="count">(156)</span></label>
-                <label><input type="checkbox" checked={selectedColors.includes("Blue")} onChange={() => handleColorChange("Blue")} /><span>Blue</span><span className="count">(98)</span></label>
-                <label><input type="checkbox" checked={selectedColors.includes("White")} onChange={() => handleColorChange("White")} /><span>White</span><span className="count">(87)</span></label>
-                <label><input type="checkbox" checked={selectedColors.includes("Red")} onChange={() => handleColorChange("Red")} /><span>Red</span><span className="count">(45)</span></label>
-                <label><input type="checkbox" checked={selectedColors.includes("Green")} onChange={() => handleColorChange("Green")} /><span>Green</span><span className="count">(34)</span></label>
-                <label><input type="checkbox" checked={selectedColors.includes("Grey")} onChange={() => handleColorChange("Grey")} /><span>Grey</span><span className="count">(67)</span></label>
-              </div>
-            )}
-          </div>
-
-          <div className="filter-section">
-            <h3 onClick={() => toggleSection('price')}>
-              <span className={`arrow ${collapsedSections.price ? 'collapsed' : ''}`}>▼</span>
-              Price Range
-            </h3>
-            {!collapsedSections.price && (
-              <div className="filter-options">
-                <label><input type="checkbox" checked={selectedPriceRange.includes("under1000")} onChange={() => handlePriceRangeChange("under1000")} /><span>Under Rs. 1,000</span></label>
-                <label><input type="checkbox" checked={selectedPriceRange.includes("1000-2500")} onChange={() => handlePriceRangeChange("1000-2500")} /><span>Rs. 1,000 - 2,500</span></label>
-                <label><input type="checkbox" checked={selectedPriceRange.includes("2500-5000")} onChange={() => handlePriceRangeChange("2500-5000")} /><span>Rs. 2,500 - 5,000</span></label>
-                <label><input type="checkbox" checked={selectedPriceRange.includes("5000-10000")} onChange={() => handlePriceRangeChange("5000-10000")} /><span>Rs. 5,000 - 10,000</span></label>
-                <label><input type="checkbox" checked={selectedPriceRange.includes("over10000")} onChange={() => handlePriceRangeChange("over10000")} /><span>Over Rs. 10,000</span></label>
-              </div>
-            )}
-          </div>
-        </aside>
-
         <main className="shop-content">
           {loading ? (
             <div className="loading">
               <div className="spinner"></div>
+            </div>
+          ) : showCategoryCards ? (
+            <div className="category-cards-grid">
+              {categoryCards.map((card, index) => (
+                <div key={index} className="category-card">
+                  <div className="category-card-image">
+                    <img src={card.image} alt={card.title} />
+                  </div>
+                  <h3 className="category-card-title">{card.title}</h3>
+                  <div className="category-card-links">
+                    {card.subcategories.map((sub, idx) => (
+                      <div 
+                        key={idx} 
+                        className="category-link"
+                        onClick={() => handleSubcategoryClick(sub.param)}
+                      >
+                        {sub.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="product-grid">
@@ -327,17 +377,94 @@ function Shop() {
                         e.target.src = 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg';
                       }}
                     />
+                    {product.discount && isDiscountActive(product.discount) && (
+                      <div className="discount-badge">{product.discount.percentage}% OFF</div>
+                    )}
                   </div>
                   <div className="product-info">
                     <h3>{product.name}</h3>
-                    <p className="product-price">Rs. {product.price.toLocaleString()}</p>
+                    {product.discount && isDiscountActive(product.discount) ? (
+                      <div className="price-container">
+                        <p className="product-price discounted">Rs. {product.discountedPrice.toLocaleString()}</p>
+                        <p className="product-price original">Rs. {product.price.toLocaleString()}</p>
+                      </div>
+                    ) : (
+                      <p className="product-price">Rs. {product.price.toLocaleString()}</p>
+                    )}
+                    {product.discount && isDiscountActive(product.discount) && (
+                      <p className="discount-validity">
+                        Valid until {new Date(product.discount.endDate).toLocaleDateString()}
+                      </p>
+                    )}
+                    {product.paymentOptions && product.paymentOptions.length > 0 && (
+                      <div className="payment-icons">
+                        {product.paymentOptions.map((option) => {
+                          const icons = {
+                            cod: '💵',
+                            online: '💳',
+                            esewa: '🟢',
+                            khalti: '🟣',
+                            card: '💳'
+                          };
+                          return (
+                            <span key={option} className="payment-icon-small" title={option.toUpperCase()}>
+                              {icons[option] || '💳'}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
+          {loadingMore && (
+            <div className="loading-more">
+              <div className="spinner-small"></div>
+              <p>Loading more products...</p>
+            </div>
+          )}
         </main>
       </div>
+
+      <footer className="footer">
+        <div className="footer-section">
+          <h4>SHOP BY</h4>
+          <ul>
+            <li onClick={() => setSelectedCategory('MEN')} style={{cursor: 'pointer'}}>Men</li>
+            <li onClick={() => setSelectedCategory('WOMEN')} style={{cursor: 'pointer'}}>Women</li>
+            <li onClick={() => setSelectedCategory('KIDS')} style={{cursor: 'pointer'}}>Kids</li>
+            <li onClick={() => navigate('/shop')} style={{cursor: 'pointer'}}>Brands</li>
+            <li onClick={() => navigate('/shop')} style={{cursor: 'pointer'}}>On Sale</li>
+          </ul>
+        </div>
+        <div className="footer-section">
+          <h4>COMPANY INFO</h4>
+          <ul>
+            <li onClick={() => navigate('/about')} style={{cursor: 'pointer'}}>About Us</li>
+            <li onClick={() => navigate('/careers')} style={{cursor: 'pointer'}}>Careers</li>
+            <li onClick={() => navigate('/press')} style={{cursor: 'pointer'}}>Press</li>
+            <li onClick={() => navigate('/sustainability')} style={{cursor: 'pointer'}}>Sustainability</li>
+            <li onClick={() => navigate('/affiliates')} style={{cursor: 'pointer'}}>Affiliates Program</li>
+          </ul>
+        </div>
+        <div className="footer-section">
+          <h4>SUPPORT</h4>
+          <ul>
+            <li onClick={() => navigate('/faq')} style={{cursor: 'pointer'}}>F.A.Q</li>
+            <li onClick={() => navigate('/faq')} style={{cursor: 'pointer'}}>Shipping</li>
+            <li onClick={() => navigate('/faq')} style={{cursor: 'pointer'}}>Returns</li>
+            <li onClick={() => navigate('/order-status')} style={{cursor: 'pointer'}}>Order Status</li>
+            <li onClick={() => navigate('/payment-options')} style={{cursor: 'pointer'}}>Payment Options</li>
+            <li onClick={() => navigate('/contact')} style={{cursor: 'pointer'}}>Contact Us</li>
+          </ul>
+        </div>
+        <div className="footer-logo">
+          <img src="/logo.png" alt="Rebuy" style={{height: '80px', marginBottom: '3px'}} />
+          <p>THRIFT SHOP</p>
+        </div>
+      </footer>
     </div>
   );
 }

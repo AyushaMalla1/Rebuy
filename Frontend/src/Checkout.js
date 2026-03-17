@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiMapPin, FiCreditCard, FiPackage, FiCheck, FiX } from 'react-icons/fi';
 import './Checkout.css';
+import { orderAPI } from './services/api';
 
 function Checkout() {
   const navigate = useNavigate();
@@ -23,7 +24,38 @@ function Checkout() {
 
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    setCartItems(cart);
+    
+    // Normalize cart items to ensure consistent structure
+    const normalizedCart = cart.map(item => {
+      // Handle both frontend and backend cart item structures
+      if (item.product && typeof item.product === 'object') {
+        // Backend structure with nested product
+        return {
+          id: item.product._id || item.product,
+          name: item.product.name || item.productName || 'Product',
+          price: item.product.price || item.price || 0,
+          image: (item.product.images && item.product.images[0]) || item.productImage || item.image || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+          quantity: item.quantity || 1,
+          seller: item.product.seller || item.seller,
+          sellerName: item.product.sellerName || item.sellerName || 'Unknown Seller',
+          storeName: item.product.storeName || item.storeName || 'Thrift Store'
+        };
+      } else {
+        // Frontend structure (already normalized)
+        return {
+          id: item.id || item._id,
+          name: item.name || item.productName || 'Product',
+          price: item.price || 0,
+          image: item.image || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+          quantity: item.quantity || 1,
+          seller: item.seller,
+          sellerName: item.sellerName || 'Unknown Seller',
+          storeName: item.storeName || 'Thrift Store'
+        };
+      }
+    });
+    
+    setCartItems(normalizedCart);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     if (user.fullName) {
@@ -44,6 +76,36 @@ function Checkout() {
 
   const handleAddressSubmit = (e) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!shippingAddress.fullName.trim()) {
+      alert('Please enter your full name');
+      return;
+    }
+    
+    if (!shippingAddress.phone.trim()) {
+      alert('Please enter your phone number');
+      return;
+    }
+    
+    // Validate phone number format (Nepal format)
+    const phoneRegex = /^(\+977)?[9][6-9]\d{8}$/;
+    const cleanPhone = shippingAddress.phone.replace(/[\s-]/g, '');
+    if (!phoneRegex.test(cleanPhone)) {
+      alert('Please enter a valid phone number (e.g., 9812345678 or +9779812345678)');
+      return;
+    }
+    
+    if (!shippingAddress.address.trim()) {
+      alert('Please enter your address');
+      return;
+    }
+    
+    if (!shippingAddress.city.trim()) {
+      alert('Please enter your city');
+      return;
+    }
+    
     setStep(2);
   };
 
@@ -78,14 +140,13 @@ function Checkout() {
         tAmt: finalTotal,
         pid: `REBUY-${Date.now()}`,
         scd: 'YOUR_MERCHANT_CODE', // Replace with your actual merchant code
-        su: `${window.location.origin}/payment-success`,
+        su: `${window.location.origin}/payment-success?orderId=${Date.now()}`,
         fu: `${window.location.origin}/payment-failure`
       };
 
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = path;
-      form.target = '_blank';
 
       Object.keys(params).forEach(key => {
         const input = document.createElement('input');
@@ -96,11 +157,22 @@ function Checkout() {
       });
 
       document.body.appendChild(form);
+      
+      // Store order data before redirect
+      sessionStorage.setItem('pendingOrder', JSON.stringify({
+        cartItems,
+        shippingAddress,
+        paymentMethod,
+        subtotal: calculateTotal(),
+        shippingCost,
+        total: finalTotal
+      }));
+      
       form.submit();
       document.body.removeChild(form);
     } else {
       // Development mode - simulate payment
-      alert('eSewa Test Environment is unavailable.\n\nFor development: Payment will be simulated.\n\nFor production: Get eSewa merchant account from esewa.com.np and set isProduction = true');
+      console.log('Development Mode: Simulating eSewa payment');
       
       // Simulate successful payment after 2 seconds
       setTimeout(() => {
@@ -120,29 +192,71 @@ function Checkout() {
     completeOrder();
   };
 
-  const completeOrder = () => {
-    const order = {
-      id: Date.now(),
-      items: cartItems,
-      shippingAddress,
-      paymentMethod,
-      total: finalTotal,
-      date: new Date().toISOString(),
-      status: 'Processing',
-      paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Paid'
-    };
+  const completeOrder = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      // Prepare order data for backend
+      const orderData = {
+        customerId: user._id,
+        customerName: shippingAddress.fullName,
+        customerEmail: user.email,
+        customerPhone: shippingAddress.phone,
+        items: cartItems.map(item => ({
+          product: item.id,
+          productName: item.name,
+          productImage: item.image,
+          seller: item.seller,
+          sellerName: item.sellerName || 'Unknown Seller',
+          storeName: item.storeName || 'Thrift Store',
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.price * item.quantity
+        })),
+        shippingAddress,
+        paymentMethod,
+        subtotal: calculateTotal(),
+        shippingCost,
+        total: finalTotal,
+        customerNotes: ''
+      };
 
-    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-    orders.push(order);
-    localStorage.setItem('orders', JSON.stringify(orders));
+      // Create order in backend
+      const response = await orderAPI.create(orderData);
+      
+      // Save order to localStorage for immediate display
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      orders.push({
+        id: response.order._id,
+        items: cartItems,
+        shippingAddress,
+        paymentMethod,
+        total: finalTotal,
+        date: new Date().toISOString(),
+        status: 'Processing',
+        paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Paid',
+        trackingNumber: response.order.trackingNumber,
+        estimatedDelivery: response.order.estimatedDelivery
+      });
+      localStorage.setItem('orders', JSON.stringify(orders));
 
-    localStorage.setItem('cart', JSON.stringify([]));
+      // Clear cart
+      localStorage.setItem('cart', JSON.stringify([]));
 
-    setOrderPlaced(true);
+      setOrderPlaced(true);
 
-    setTimeout(() => {
-      navigate('/profile?tab=orders');
-    }, 3000);
+      // Show points earned
+      if (response.pointsEarned) {
+        alert(`Order placed successfully! You earned ${response.pointsEarned} loyalty points!`);
+      }
+
+      setTimeout(() => {
+        navigate('/profile?tab=orders');
+      }, 3000);
+    } catch (error) {
+      console.error('Error placing order:', error);
+      alert('Failed to place order. Please try again.');
+    }
   };
 
   if (orderPlaced) {
@@ -212,6 +326,9 @@ function Checkout() {
                       type="tel"
                       value={shippingAddress.phone}
                       onChange={(e) => setShippingAddress({...shippingAddress, phone: e.target.value})}
+                      placeholder="9812345678 or +9779812345678"
+                      pattern="(\+977)?[9][6-9]\d{8}"
+                      title="Enter a valid Nepal phone number"
                       required
                     />
                   </div>
@@ -367,7 +484,6 @@ function Checkout() {
                   <div className="review-card">
                     <p><strong>
                       {paymentMethod === 'esewa' && 'eSewa'}
-                      {paymentMethod === 'khalti' && 'Khalti'}
                       {paymentMethod === 'card' && 'Credit/Debit Card'}
                       {paymentMethod === 'cod' && 'Cash on Delivery'}
                     </strong></p>
@@ -390,14 +506,22 @@ function Checkout() {
               <h2>Order Summary</h2>
               
               <div className="summary-items">
-                {cartItems.map(item => (
-                  <div key={item.id} className="summary-item">
-                    <img src={item.image} alt={item.name} />
+                {Array.isArray(cartItems) && cartItems.map((item, index) => (
+                  <div key={item.id || index} className="summary-item">
+                    <img 
+                      src={item.image || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg'} 
+                      alt={item.name || item.productName || 'Product'}
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg';
+                      }}
+                    />
                     <div className="item-details">
-                      <h4>{item.name}</h4>
-                      <p>Qty: {item.quantity}</p>
+                      <h4>{item.name || item.productName || 'Product'}</h4>
+                      <p>Qty: {item.quantity || 1}</p>
                     </div>
-                    <span className="item-price">Rs. {(item.price * item.quantity).toLocaleString()}</span>
+                    <span className="item-price">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString()}</span>
                   </div>
                 ))}
               </div>

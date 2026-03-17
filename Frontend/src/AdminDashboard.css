@@ -27,9 +27,11 @@
 }
 
 .admin-sidebar .sidebar-logo {
-  height: 40px;
+  height: 50px;
   margin-bottom: 12px;
-  filter: brightness(0) invert(1);
+  display: block;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .admin-sidebar .sidebar-header h2 {

@@ -258,4 +258,31 @@ router.post('/:orderId/cancel', async (req, res) => {
   }
 });
 
+// Get orders for a specific seller
+router.get('/seller/:sellerId', async (req, res) => {
+  try {
+    const { sellerId } = req.params;
+    
+    // Find all orders that contain products from this seller
+    const orders = await Order.find({
+      'items.seller': sellerId
+    })
+    .populate('customer', 'fullName email')
+    .populate('items.product', 'name images')
+    .sort({ createdAt: -1 });
+    
+    res.json({ 
+      success: true, 
+      orders: orders || [] 
+    });
+  } catch (error) {
+    console.error('Error fetching seller orders:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+});
+
 module.exports = router;

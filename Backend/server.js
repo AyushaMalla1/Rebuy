@@ -42,6 +42,8 @@ const orderRoutes = require('./routes/orders');
 const loyaltyRoutes = require('./routes/loyalty');
 const reviewRoutes = require('./routes/reviews');
 const wishlistRoutes = require('./routes/wishlist');
+const sellerRoutes = require('./routes/sellers');
+const messageRoutes = require('./routes/messages');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -50,6 +52,8 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/loyalty', loyaltyRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/sellers', sellerRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

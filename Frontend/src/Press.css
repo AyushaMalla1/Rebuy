@@ -1,0 +1,256 @@
+.press-page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 20px;
+  font-family: 'Arial', sans-serif;
+}
+
+.press-hero {
+  text-align: center;
+  padding: 60px 20px;
+  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
+  color: white;
+  border-radius: 12px;
+  margin-bottom: 40px;
+}
+
+.press-hero h1 {
+  font-size: 48px;
+  margin: 0 0 16px 0;
+  font-weight: 700;
+}
+
+.press-hero p {
+  font-size: 20px;
+  margin: 0;
+  opacity: 0.95;
+}
+
+.press-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.press-kit {
+  margin-bottom: 60px;
+}
+
+.press-kit h2 {
+  text-align: center;
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 40px;
+}
+
+.kit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.kit-card {
+  background: white;
+  padding: 32px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+}
+
+.kit-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.kit-card svg {
+  color: #00bcd4;
+  margin-bottom: 16px;
+}
+
+.kit-card h3 {
+  font-size: 20px;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.kit-card p {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 20px 0;
+}
+
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #00bcd4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.download-btn:hover {
+  background: #0097a7;
+}
+
+.press-releases {
+  margin-bottom: 60px;
+}
+
+.press-releases h2 {
+  text-align: center;
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 40px;
+}
+
+.releases-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.release-card {
+  background: white;
+  padding: 28px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+}
+
+.release-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.release-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.release-category {
+  padding: 6px 12px;
+  background: #e0f7fa;
+  color: #00bcd4;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.release-date {
+  font-size: 14px;
+  color: #999;
+}
+
+.release-card h3 {
+  font-size: 22px;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.release-card p {
+  font-size: 15px;
+  color: #666;
+  margin: 0 0 20px 0;
+  line-height: 1.6;
+}
+
+.read-more-btn {
+  padding: 10px 24px;
+  background: white;
+  color: #00bcd4;
+  border: 2px solid #00bcd4;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.read-more-btn:hover {
+  background: #f0f9fa;
+}
+
+.media-contact {
+  margin-bottom: 40px;
+}
+
+.media-contact h2 {
+  text-align: center;
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 40px;
+}
+
+.contact-box {
+  background: white;
+  padding: 48px;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.contact-box svg {
+  color: #00bcd4;
+  margin-bottom: 20px;
+}
+
+.contact-box h3 {
+  font-size: 24px;
+  color: #333;
+  margin: 0 0 12px 0;
+}
+
+.contact-box p {
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 20px 0;
+}
+
+.email-link {
+  display: block;
+  font-size: 20px;
+  color: #00bcd4;
+  text-decoration: none;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.email-link:hover {
+  text-decoration: underline;
+}
+
+.contact-btn {
+  padding: 14px 32px;
+  background: #00bcd4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.contact-btn:hover {
+  background: #0097a7;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .press-hero h1 {
+    font-size: 32px;
+  }
+
+  .release-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

@@ -18,11 +18,11 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters']
+    minlength: [8, 'Password must be at least 8 characters']
   },
   userType: {
     type: String,
-    enum: ['customer', 'buyer', 'admin'],
+    enum: ['customer', 'buyer', 'seller', 'admin'],
     default: 'customer'
   },
   // Customer/Buyer specific fields
@@ -38,6 +38,32 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  deactivatedAt: {
+    type: Date,
+    default: null
+  },
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  twoFactorSecret: {
+    type: String,
+    default: ''
+  },
+  loginHistory: [{
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    ipAddress: String,
+    userAgent: String,
+    location: String
+  }],
   createdAt: {
     type: Date,
     default: Date.now

@@ -103,11 +103,32 @@ const orderSchema = new mongoose.Schema({
     },
     verifiedAt: Date,
     matchesDescription: {
-      type: Boolean,
+      type: String,
+      enum: ['yes', 'no', 'partially', null],
       default: null
     },
-    customerNotes: String,
-    images: [String]
+    conditionRating: {
+      type: Number,
+      min: 1,
+      max: 5
+    },
+    customerFeedback: String,
+    verificationImages: [String],
+    
+    // Dispute handling
+    disputeRaised: {
+      type: Boolean,
+      default: false
+    },
+    disputeReason: String,
+    disputeEvidence: [String],
+    disputeStatus: {
+      type: String,
+      enum: ['pending', 'resolved', 'rejected'],
+      default: null
+    },
+    disputeResolution: String,
+    resolvedAt: Date
   },
 
   // Timestamps for tracking

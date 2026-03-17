@@ -18,7 +18,7 @@ const sellerSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters']
+    minlength: [8, 'Password must be at least 8 characters']
   },
   phone: {
     type: String,
@@ -32,6 +32,10 @@ const sellerSchema = new mongoose.Schema({
   storeDescription: {
     type: String,
     default: ''
+  },
+  profileImage: {
+    type: String,
+    default: 'https://i.pravatar.cc/100'
   },
   address: {
     type: String,
@@ -60,6 +64,91 @@ const sellerSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Trust Score System
+  trustScore: {
+    score: {
+      type: Number,
+      default: 50,
+      min: 0,
+      max: 100
+    },
+    totalVerifications: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    positiveVerifications: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    partialVerifications: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    negativeVerifications: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    lastUpdated: {
+      type: Date,
+      default: Date.now
+    }
+  },
+  // Admin Approval Data
+  approvalData: {
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    approvedAt: {
+      type: Date,
+      default: null
+    },
+    rejectionReason: {
+      type: String,
+      default: ''
+    },
+    suspensionReason: {
+      type: String,
+      default: ''
+    },
+    adminNotes: {
+      type: String,
+      default: ''
+    }
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  deactivatedAt: {
+    type: Date,
+    default: null
+  },
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false
+  },
+  twoFactorSecret: {
+    type: String,
+    default: ''
+  },
+  backupCodes: [{
+    type: String
+  }],
+  loginHistory: [{
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    ipAddress: String,
+    userAgent: String,
+    location: String
+  }],
   createdAt: {
     type: Date,
     default: Date.now

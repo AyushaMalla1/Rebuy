@@ -53,6 +53,12 @@ function BecomeASeller() {
     setError('');
 
     try {
+      console.log('Attempting seller registration...', {
+        fullName: formData.fullName,
+        email: formData.email,
+        userType: 'seller'
+      });
+
       const response = await axios.post('http://localhost:5000/api/auth/signup', {
         fullName: formData.fullName,
         email: formData.email,
@@ -66,6 +72,8 @@ function BecomeASeller() {
         city: formData.city
       });
 
+      console.log('Registration response:', response.data);
+
       if (response.data.success) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -74,7 +82,19 @@ function BecomeASeller() {
         navigate('/seller/dashboard');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      console.error('Registration error:', err);
+      console.error('Error response:', err.response?.data);
+      
+      // More detailed error messages
+      if (err.code === 'ERR_NETWORK') {
+        setError('Cannot connect to server. Please ensure the backend is running on http://localhost:5000');
+      } else if (err.response?.status === 400) {
+        setError(err.response.data.message || 'Invalid registration data');
+      } else if (err.response?.status === 500) {
+        setError('Server error. Please check if MongoDB is running and connected.');
+      } else {
+        setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

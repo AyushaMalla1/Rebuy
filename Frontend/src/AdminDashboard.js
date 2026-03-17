@@ -153,7 +153,15 @@ function AdminDashboard() {
       {/* Sidebar */}
       <aside className="admin-sidebar">
         <div className="sidebar-header">
-          <img src="/logo.png" alt="Rebuy" className="sidebar-logo" />
+          <img 
+            src="/logo.png" 
+            alt="Rebuy" 
+            className="sidebar-logo"
+            onError={(e) => {
+              console.error('Logo failed to load');
+              e.target.style.display = 'none';
+            }}
+          />
           <h2>Admin Panel</h2>
         </div>
 

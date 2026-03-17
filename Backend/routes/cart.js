@@ -2,18 +2,38 @@ const express = require('express');
 const router = express.Router();
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const { calculateDiscountedPrice } = require('../utils/discount');
 
 // Get customer cart
 router.get('/:customerId', async (req, res) => {
   try {
     const cart = await Cart.findOne({ customer: req.params.customerId })
-      .populate('items.product', 'name price images stock seller sellerName storeName');
+      .populate('items.product', 'name price images stock seller sellerName storeName discount');
     
     if (!cart) {
       return res.json({ items: [] });
     }
     
-    res.json(cart);
+    // Calculate discounted prices for cart items
+    const cartWithDiscounts = {
+      ...cart.toObject(),
+      items: cart.items.map(item => {
+        const product = item.product;
+        if (product && product.discount) {
+          const discountedPrice = calculateDiscountedPrice(product.price, product.discount);
+          return {
+            ...item,
+            product: {
+              ...product,
+              discountedPrice
+            }
+          };
+        }
+        return item;
+      })
+    };
+    
+    res.json(cartWithDiscounts);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -83,9 +103,28 @@ router.post('/:customerId/add', async (req, res) => {
     }
     
     await cart.save();
-    await cart.populate('items.product', 'name price images stock seller sellerName storeName');
+    await cart.populate('items.product', 'name price images stock seller sellerName storeName discount');
     
-    res.json({ message: 'Item added to cart', cart });
+    // Calculate discounted prices for response
+    const cartWithDiscounts = {
+      ...cart.toObject(),
+      items: cart.items.map(item => {
+        const product = item.product;
+        if (product && product.discount) {
+          const discountedPrice = calculateDiscountedPrice(product.price, product.discount);
+          return {
+            ...item,
+            product: {
+              ...product,
+              discountedPrice
+            }
+          };
+        }
+        return item;
+      })
+    };
+    
+    res.json({ message: 'Item added to cart', cart: cartWithDiscounts });
   } catch (error) {
     console.error('Add to cart error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -133,9 +172,28 @@ router.patch('/:customerId/update', async (req, res) => {
     }
     
     await cart.save();
-    await cart.populate('items.product', 'name price images stock seller sellerName storeName');
+    await cart.populate('items.product', 'name price images stock seller sellerName storeName discount');
     
-    res.json({ message: 'Cart updated', cart });
+    // Calculate discounted prices for response
+    const cartWithDiscounts = {
+      ...cart.toObject(),
+      items: cart.items.map(item => {
+        const product = item.product;
+        if (product && product.discount) {
+          const discountedPrice = calculateDiscountedPrice(product.price, product.discount);
+          return {
+            ...item,
+            product: {
+              ...product,
+              discountedPrice
+            }
+          };
+        }
+        return item;
+      })
+    };
+    
+    res.json({ message: 'Cart updated', cart: cartWithDiscounts });
   } catch (error) {
     console.error('Update cart error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -155,9 +213,28 @@ router.delete('/:customerId/remove/:productId', async (req, res) => {
     );
     
     await cart.save();
-    await cart.populate('items.product', 'name price images stock seller sellerName storeName');
+    await cart.populate('items.product', 'name price images stock seller sellerName storeName discount');
     
-    res.json({ message: 'Item removed from cart', cart });
+    // Calculate discounted prices for response
+    const cartWithDiscounts = {
+      ...cart.toObject(),
+      items: cart.items.map(item => {
+        const product = item.product;
+        if (product && product.discount) {
+          const discountedPrice = calculateDiscountedPrice(product.price, product.discount);
+          return {
+            ...item,
+            product: {
+              ...product,
+              discountedPrice
+            }
+          };
+        }
+        return item;
+      })
+    };
+    
+    res.json({ message: 'Item removed from cart', cart: cartWithDiscounts });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
