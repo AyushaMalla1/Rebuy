@@ -14,81 +14,91 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Sample data
-  const [users, setUsers] = useState([
-    { id: 1, name: 'John Doe', email: 'john@example.com', type: 'User', status: 'Active', joined: '2024-01-15' },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com', type: 'Seller', status: 'Active', joined: '2024-01-20' },
-    { id: 3, name: 'Bob Wilson', email: 'bob@example.com', type: 'User', status: 'Inactive', joined: '2024-02-01' },
-  ]);
+  // State
+  const [users, setUsers] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [pendingSellers, setPendingSellers] = useState([]);
+  const [suspiciousActivities, setSuspiciousActivities] = useState([]);
+  const [adminStats, setAdminStats] = useState({
+    totalUsers: 0,
+    totalSellers: 0,
+    totalProducts: 0,
+    pendingProducts: 0,
+    totalOrders: 0,
+    totalRevenue: 0
+  });
 
-  const [products, setProducts] = useState([
-    { id: 1, name: 'Vintage Jacket', seller: 'Jane Smith', price: 8000, stock: 5, status: 'Approved' },
-    { id: 2, name: 'Hoodie', seller: 'Jane Smith', price: 5100, stock: 10, status: 'Approved' },
-    { id: 3, name: 'T-Shirt', seller: 'Jane Smith', price: 3000, stock: 15, status: 'Pending' },
-  ]);
+  React.useEffect(() => {
+    fetchAdminData();
+  }, []);
 
-  const [orders, setOrders] = useState([
-    { id: 1, customer: 'John Doe', product: 'Vintage Jacket', amount: 8000, status: 'Delivered', date: '2024-03-01' },
-    { id: 2, customer: 'Bob Wilson', product: 'Hoodie', amount: 5100, status: 'Shipped', date: '2024-03-02' },
-    { id: 3, customer: 'John Doe', product: 'T-Shirt', amount: 3000, status: 'Processing', date: '2024-03-03' },
-  ]);
+  const fetchAdminData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Authorization': `Bearer ${token}` };
 
-  // Pending Sellers for Approval
-  const [pendingSellers, setPendingSellers] = useState([
-    { 
-      id: 1, 
-      name: 'Sarah Johnson', 
-      email: 'sarah@example.com', 
-      storeName: 'Vintage Vibes',
-      phone: '+977 9812345678',
-      address: 'Kathmandu, Nepal',
-      appliedDate: '2024-03-04',
-      documents: 'Verified',
-      experience: '2 years'
-    },
-    { 
-      id: 2, 
-      name: 'Mike Chen', 
-      email: 'mike@example.com', 
-      storeName: 'Retro Fashion',
-      phone: '+977 9823456789',
-      address: 'Pokhara, Nepal',
-      appliedDate: '2024-03-05',
-      documents: 'Pending',
-      experience: '1 year'
-    },
-  ]);
+      const [statsRes, usersRes, sellersRes, productsRes, ordersRes] = await Promise.all([
+        fetch('http://localhost:5000/api/admin/stats', { headers }),
+        fetch('http://localhost:5000/api/admin/users', { headers }),
+        fetch('http://localhost:5000/api/admin/sellers/pending', { headers }),
+        fetch('http://localhost:5000/api/admin/products', { headers }),
+        fetch('http://localhost:5000/api/admin/orders', { headers })
+      ]);
 
-  // Fraud Detection Data
-  const [suspiciousActivities, setSuspiciousActivities] = useState([
-    { 
-      id: 1, 
-      user: 'Suspicious User 1', 
-      activity: 'Multiple failed payment attempts',
-      riskLevel: 'High',
-      date: '2024-03-04',
-      status: 'Under Review'
-    },
-    { 
-      id: 2, 
-      user: 'Suspicious User 2', 
-      activity: 'Unusual order pattern',
-      riskLevel: 'Medium',
-      date: '2024-03-05',
-      status: 'Monitoring'
-    },
-  ]);
+      const stats = await statsRes.json();
+      const usersData = await usersRes.json();
+      const sellersData = await sellersRes.json();
+      const productsData = await productsRes.json();
+      const ordersData = await ordersRes.json();
 
-  // Sales Analytics Data
-  const salesData = {
-    totalRevenue: 125000,
-    totalOrders: 450,
-    totalSellers: 28,
-    totalCustomers: 1250,
-    monthlyGrowth: 15.5,
-    topSellingCategory: 'Vintage Jackets',
-    averageOrderValue: 4500,
-    conversionRate: 3.2
+      if (stats.success) setAdminStats(stats.stats);
+      if (usersData.success) {
+        setUsers(usersData.users.map(u => ({
+          id: u._id,
+          name: u.fullName,
+          email: u.email,
+          type: u.userType === 'seller' ? 'Seller' : 'User',
+          status: u.isActive ? 'Active' : 'Inactive',
+          joined: new Date(u.createdAt).toLocaleDateString()
+        })));
+      }
+      if (sellersData.success) {
+        setPendingSellers(sellersData.sellers.map(s => ({
+          id: s._id,
+          name: s.fullName,
+          email: s.email,
+          storeName: s.storeName,
+          phone: s.phone,
+          address: s.address,
+          appliedDate: new Date(s.createdAt).toLocaleDateString(),
+          documents: 'Pending',
+          experience: 'Checking...'
+        })));
+      }
+      if (productsData.success) {
+        setProducts(productsData.products.map(p => ({
+          id: p._id,
+          name: p.name,
+          seller: p.seller?.name || p.sellerName || 'Unknown',
+          price: p.price,
+          stock: p.stock,
+          status: p.status
+        })));
+      }
+      if (ordersData.success) {
+        setOrders(ordersData.orders.map(o => ({
+          id: o._id,
+          customer: o.customerName,
+          product: o.items?.[0]?.productName + (o.items?.length > 1 ? ' + more' : '') || 'Items',
+          amount: o.total,
+          status: o.status,
+          date: new Date(o.orderDate).toLocaleDateString()
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching admin data:', error);
+    }
   };
 
   const handleLogout = () => {
@@ -97,9 +107,16 @@ function AdminDashboard() {
     navigate('/');
   };
 
-  const handleDeleteUser = (id) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(u => u.id !== id));
+  const handleDeleteUser = async (id) => {
+    if (window.confirm('Are you sure you want to deactivate this user?')) {
+      try {
+        await fetch(`http://localhost:5000/api/customers/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'deactivated' })
+        });
+        fetchAdminData();
+      } catch (err) { console.error(err); }
     }
   };
 
@@ -109,26 +126,45 @@ function AdminDashboard() {
     }
   };
 
-  const handleApproveSeller = (id) => {
+  const handleApproveSeller = async (id) => {
     if (window.confirm('Approve this seller application?')) {
-      const seller = pendingSellers.find(s => s.id === id);
-      alert(`${seller.name} has been approved as a seller!`);
-      setPendingSellers(pendingSellers.filter(s => s.id !== id));
+      try {
+        const row = pendingSellers.find(s => s.id === id);
+        await fetch(`http://localhost:5000/api/sellers/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'approved' })
+        });
+        alert(`${row.name} has been approved as a seller!`);
+        fetchAdminData();
+      } catch (err) { console.error(err); }
     }
   };
 
-  const handleRejectSeller = (id) => {
+  const handleRejectSeller = async (id) => {
     if (window.confirm('Reject this seller application?')) {
-      setPendingSellers(pendingSellers.filter(s => s.id !== id));
+      try {
+        await fetch(`http://localhost:5000/api/sellers/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'rejected' })
+        });
+        fetchAdminData();
+      } catch (err) { console.error(err); }
     }
   };
 
-  const handleBlockUser = (userId) => {
+  const handleBlockUser = async (userId) => {
     if (window.confirm('Block this user for suspicious activity?')) {
-      alert('User has been blocked!');
-      setSuspiciousActivities(suspiciousActivities.map(activity => 
-        activity.id === userId ? { ...activity, status: 'Blocked' } : activity
-      ));
+      try {
+        await fetch(`http://localhost:5000/api/customers/${userId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'suspended' })
+        });
+        alert('User has been blocked!');
+        fetchAdminData();
+      } catch (err) { console.error(err); }
     }
   };
 
@@ -141,12 +177,19 @@ function AdminDashboard() {
   };
 
   // Stats
-  const totalUsers = users.length;
-  const totalSellers = users.filter(u => u.type === 'Seller').length;
-  const totalProducts = products.length;
-  const totalOrders = orders.length;
-  const totalRevenue = orders.reduce((sum, o) => sum + o.amount, 0);
-  const pendingProducts = products.filter(p => p.status === 'Pending').length;
+  const { totalUsers, totalSellers, totalProducts, totalOrders, totalRevenue, pendingProducts } = adminStats;
+
+  // Sales Analytics Data
+  const salesData = {
+    totalRevenue: adminStats.totalRevenue,
+    totalOrders: adminStats.totalOrders,
+    totalSellers: adminStats.totalSellers,
+    totalCustomers: adminStats.totalUsers,
+    monthlyGrowth: 15.5,
+    topSellingCategory: 'Vintage',
+    averageOrderValue: adminStats.totalOrders > 0 ? (adminStats.totalRevenue / adminStats.totalOrders).toFixed(0) : 0,
+    conversionRate: 3.2
+  };
 
   return (
     <div className="admin-dashboard">

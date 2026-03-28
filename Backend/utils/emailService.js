@@ -121,6 +121,60 @@ const emailTemplates = {
         <p>Best regards,<br>Team Rebuy<br><em>Your Thrift Marketplace</em></p>
       </div>
     `
+  }),
+
+  passwordResetOTP: (data) => ({
+    subject: 'Password Reset OTP - Rebuy',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #00bcd4; margin: 0;">Rebuy</h1>
+          <p style="color: #64748b; margin: 5px 0;">Your Thrift Marketplace</p>
+        </div>
+        
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
+          <h2 style="color: white; margin: 0 0 10px 0;">Password Reset Request</h2>
+          <p style="color: rgba(255,255,255,0.9); margin: 0;">Your One-Time Password</p>
+        </div>
+
+        <p style="color: #334155; font-size: 16px;">Dear ${data.userName},</p>
+        <p style="color: #64748b; line-height: 1.6;">We received a request to reset your password. Use the OTP below to proceed with resetting your password:</p>
+        
+        <div style="background: #f8fafc; border: 2px dashed #cbd5e1; padding: 25px; border-radius: 8px; text-align: center; margin: 30px 0;">
+          <p style="color: #64748b; margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Your OTP Code</p>
+          <div style="font-size: 36px; font-weight: bold; color: #00bcd4; letter-spacing: 8px; font-family: 'Courier New', monospace;">
+            ${data.otp}
+          </div>
+          <p style="color: #94a3b8; margin: 10px 0 0 0; font-size: 13px;">This code will expire in 10 minutes</p>
+        </div>
+
+        <div style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px; margin: 25px 0;">
+          <p style="margin: 0; color: #e65100; font-size: 14px;">
+            <strong>⚠️ Security Notice:</strong> Never share this OTP with anyone. Rebuy staff will never ask for your OTP.
+          </p>
+        </div>
+
+        <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 25px 0;">
+          <p style="margin: 0 0 10px 0; color: #334155; font-weight: 600;">Didn't request this?</p>
+          <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">
+            If you didn't request a password reset, please ignore this email. Your password will remain unchanged. 
+            For security concerns, contact our support team immediately.
+          </p>
+        </div>
+
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+          <p style="color: #64748b; font-size: 14px; margin: 0;">Best regards,</p>
+          <p style="color: #334155; font-weight: 600; margin: 5px 0;">Team Rebuy</p>
+          <p style="color: #94a3b8; font-size: 13px; font-style: italic; margin: 0;">Where Style Meets Sustainability</p>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #f8fafc; border-radius: 8px; text-align: center;">
+          <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+            This is an automated email. Please do not reply to this message.
+          </p>
+        </div>
+      </div>
+    `
   })
 };
 

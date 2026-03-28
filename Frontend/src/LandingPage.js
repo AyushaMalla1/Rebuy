@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import './App.css';
-import { FiSearch, FiUser, FiShoppingCart, FiHeart, FiMenu, FiX, FiFilter } from 'react-icons/fi';
+import { FiSearch, FiUser, FiShoppingCart, FiHeart, FiMenu, FiX, FiFilter, FiArrowRight, FiTag } from 'react-icons/fi';
 import Chatbot from './components/Chatbot';
-import AdvancedSearch from './components/AdvancedSearch';
 import { productAPI, cartAPI, wishlistAPI } from './services/api';
 
 function LandingPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState({});
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [favorites, setFavorites] = useState([]);
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
@@ -171,6 +172,7 @@ function LandingPage() {
       (selectedCategory === 'KIDS' && product.name.toLowerCase().includes('kid')) ||
       (selectedCategory === 'SPORTSWEAR' && product.name.toLowerCase().includes('sport')) ||
       (selectedCategory === 'VINTAGE' && product.name.toLowerCase().includes('vintage'));
+    
     return matchesTab && matchesSearch && matchesCategory;
   });
 
@@ -347,9 +349,76 @@ function LandingPage() {
     e.preventDefault();
     if (!searchQuery.trim()) {
       setShowSearchResults(false);
+      // Scroll to products section to show filtered results
+      document.querySelector('.trending-products')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
+    setShowSuggestions(false);
+    // Show all products when searching
+    setShowAllProducts(true);
+    // Scroll to products section
+    document.querySelector('.trending-products')?.scrollIntoView({ behavior: 'smooth' });
+    // Also show the search results modal
     performSearch(searchQuery);
+  };
+
+  // Fetch search suggestions
+  const fetchSuggestions = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setSearchSuggestions({});
+      setShowSuggestions(false);
+      return;
+    }
+    
+    try {
+      const response = await productAPI.getSuggestions(query);
+      if (response.success) {
+        const formattedSuggestions = {
+          products: response.suggestions.products.map(p => ({
+            ...p,
+            type: 'product'
+          })),
+          collections: [
+            ...response.suggestions.categories.map(c => ({
+              name: c.name,
+              type: 'category'
+            })),
+            ...response.suggestions.brands.map(b => ({
+              name: b.name,
+              type: 'brand'
+            }))
+          ],
+          sellers: response.suggestions.sellers.map(s => ({
+            ...s,
+            type: 'seller'
+          }))
+        };
+        
+        setSearchSuggestions(formattedSuggestions);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+    }
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    fetchSuggestions(value);
+  };
+
+  // Handle suggestion click
+  const handleSuggestionClick = (suggestion) => {
+    setSearchQuery(suggestion.name);
+    setShowSuggestions(false);
+    
+    if (suggestion.type === 'category') {
+      handleCategoryClick(suggestion.name.toUpperCase());
+    } else {
+      performSearch(suggestion.name);
+    }
   };
 
   const performSearch = (query) => {
@@ -579,8 +648,37 @@ function LandingPage() {
               type="text" 
               placeholder="Search products, sellers, pages..." 
               value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
+              onChange={handleSearchChange}
+              onFocus={() => searchSuggestions.products?.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
             />
+            {searchQuery && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowSuggestions(false);
+                  setShowSearchResults(false);
+                }}
+                style={{
+                  position: 'absolute',
+                  right: '45px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#999',
+                  fontSize: '18px',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <FiX />
+              </button>
+            )}
             <button type="submit" className="search-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8"></circle>
@@ -588,6 +686,108 @@ function LandingPage() {
               </svg>
             </button>
           </form>
+          
+          {/* Search Suggestions Dropdown */}
+          {showSuggestions && (searchSuggestions.products?.length > 0 || searchSuggestions.collections?.length > 0 || searchSuggestions.sellers?.length > 0) && (
+            <div className="landing-search-suggestions">
+              {/* Products Section */}
+              {searchSuggestions.products && searchSuggestions.products.length > 0 && (
+                <div className="suggestions-section">
+                  <div className="suggestions-header">
+                    <span className="suggestions-title">PRODUCTS</span>
+                    <FiArrowRight className="suggestions-arrow" />
+                  </div>
+                  {searchSuggestions.products.map((product, index) => (
+                    <div
+                      key={`product-${index}`}
+                      className="suggestion-item product-suggestion"
+                      onClick={() => {
+                        navigate(`/product/${product._id}`);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      {product.image ? (
+                        <img 
+                          src={product.image} 
+                          alt={product.name}
+                          className="suggestion-product-image"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="suggestion-product-placeholder">
+                          <FiShoppingCart />
+                        </div>
+                      )}
+                      <div className="suggestion-details">
+                        <span className="suggestion-text">{product.name}</span>
+                        <div className="suggestion-meta">
+                          {product.category && (
+                            <span className="suggestion-category">{product.category}</span>
+                          )}
+                          {product.price && (
+                            <span className="suggestion-price">Rs. {product.price.toLocaleString()}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Collections Section */}
+              {searchSuggestions.collections && searchSuggestions.collections.length > 0 && (
+                <div className="suggestions-section">
+                  <div className="suggestions-header">
+                    <span className="suggestions-title">COLLECTIONS</span>
+                    <FiArrowRight className="suggestions-arrow" />
+                  </div>
+                  {searchSuggestions.collections.map((collection, index) => (
+                    <div
+                      key={`collection-${index}`}
+                      className="suggestion-item collection-suggestion"
+                      onClick={() => handleSuggestionClick(collection)}
+                    >
+                      <div className="suggestion-icon-wrapper">
+                        {collection.type === 'brand' ? <FiTag /> : <FiFilter />}
+                      </div>
+                      <div className="suggestion-details">
+                        <span className="suggestion-text">{collection.name}</span>
+                        <span className="suggestion-type">{collection.type}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Sellers Section */}
+              {searchSuggestions.sellers && searchSuggestions.sellers.length > 0 && (
+                <div className="suggestions-section">
+                  <div className="suggestions-header">
+                    <span className="suggestions-title">SELLERS</span>
+                    <FiArrowRight className="suggestions-arrow" />
+                  </div>
+                  {searchSuggestions.sellers.map((seller, index) => (
+                    <div
+                      key={`seller-${index}`}
+                      className="suggestion-item seller-suggestion"
+                      onClick={() => {
+                        setSearchQuery(seller.name);
+                        setShowSuggestions(false);
+                        performSearch(seller.name);
+                      }}
+                    >
+                      <div className="suggestion-icon-wrapper">
+                        <FiUser />
+                      </div>
+                      <span className="suggestion-text">{seller.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className={`header-right ${mobileMenuOpen ? 'mobile-open' : ''}`}>
@@ -972,39 +1172,23 @@ function LandingPage() {
           <div className="product-grid">
             {displayedProducts.map(product => (
             <div key={product.id} className="product-card" onClick={() => navigate(`/product/${product.id}`)}>
-              <div className="product-image-placeholder">
+              <div className="product-image-container">
                 <img 
                   src={product.image} 
                   alt={product.name} 
-                  style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                  className="product-image"
                   loading="lazy"
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.src = 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg';
                   }}
                 />
-                <FiHeart 
-                  className={`product-heart-icon ${favorites.includes(product.id) ? 'favorited' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(product.id);
-                  }}
-                />
               </div>
-              <h3>{product.name}</h3>
-              <div className="product-rating">
-                {'⭐'.repeat(Math.floor(product.rating))} {product.rating}
+              <div className="product-details">
+                <h3 className="product-title">{product.name}</h3>
+                <p className="product-size">Size: {product.size || 'M'}</p>
+                <p className="product-price">Rs{product.price.toLocaleString()}</p>
               </div>
-              <p>Rs. {product.price.toLocaleString()}</p>
-              <button 
-                className="add-to-cart-btn" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  addToCart(product);
-                }}
-              >
-                Add to Cart
-              </button>
             </div>
             ))}
           </div>

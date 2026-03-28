@@ -25,11 +25,17 @@ import {
   FaArchive,
   FaSearch,
   FaBullseye,
-  FaLightbulb
+  FaLightbulb,
+  FaEnvelope,
+  FaBoxOpen,
+  FaInfoCircle,
+  FaClock
 } from "react-icons/fa";
 import { HiTrendingUp } from "react-icons/hi";
 import { MdDashboard } from "react-icons/md";
 import { RevenueTrendChart, TopProductsChart, CategoryPerformanceChart, StockLevelsChart } from "./components/Charts";
+import HelpCenter from "./components/HelpCenter";
+import Chatbot from "./components/Chatbot";
 import "./SellerDashboard.css";
 
 const API_URL = 'http://localhost:5000/api';
@@ -73,6 +79,7 @@ function SellerDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [profileData, setProfileData] = useState({
     fullName: '',
     email: '',
@@ -108,6 +115,22 @@ function SellerDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [productsPerPage] = useState(10);
   const [showThreeDotMenu, setShowThreeDotMenu] = useState(null);
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState('All');
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [revenueDateRange, setRevenueDateRange] = useState('30');
+  const [selectedRevenueMetric, setSelectedRevenueMetric] = useState('revenue');
+  const [revenueStats, setRevenueStats] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    avgOrderValue: 0,
+    platformFees: 0,
+    netRevenue: 0,
+    growthRate: 0
+  });
+  const [showRestockModal, setShowRestockModal] = useState(false);
+  const [restockProduct, setRestockProduct] = useState(null);
+  const [restockQuantity, setRestockQuantity] = useState('');
 
   const handleProfileImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -133,7 +156,25 @@ function SellerDashboard() {
     fetchStats(user._id);
     fetchOrders(user._id);
     fetchMessages(user._id);
+    fetchNotifications();
   }, [navigate]);
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications) {
+        const notificationWrapper = document.querySelector('.notification-wrapper');
+        if (notificationWrapper && !notificationWrapper.contains(event.target)) {
+          setShowNotifications(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
 
   const fetchSellerData = async (sellerId) => {
     try {
@@ -284,32 +325,65 @@ function SellerDashboard() {
   };
 
   const prepareChartData = () => {
-    // Revenue trend (last 7 days) - calculate from actual orders
-    const last7Days = [];
-    const today = new Date();
-    
-    // Create array of last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
+    const now = new Date();
+    let startDate = new Date();
+    let daysToShow = parseInt(revenueDateRange) || 30;
+
+    if (revenueDateRange === 'all') {
+      startDate = new Date(0);
+      daysToShow = 365;
+    } else {
+      startDate.setDate(now.getDate() - daysToShow);
+    }
+
+    // Create array for the selected period
+    const chartDataPoints = [];
+    const interval = daysToShow > 90 ? Math.ceil(daysToShow / 30) : 1;
+
+    for (let i = daysToShow - 1; i >= 0; i -= interval) {
+      const date = new Date(now);
       date.setDate(date.getDate() - i);
       const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const dateStr = date.toISOString().split('T')[0];
       
-      // Calculate revenue for this day from orders
-      const dayRevenue = orders
-        .filter(order => {
-          const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
-          return orderDate === dateStr;
-        })
-        .reduce((sum, order) => sum + (order.total || 0), 0);
+      const dayOrders = orders.filter(order => {
+        const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
+        return orderDate === dateStr && (order.status === 'Delivered' || order.status === 'Processing' || order.status === 'Shipped');
+      });
+
+      let value = 0;
+      switch (selectedRevenueMetric) {
+        case 'revenue':
+          value = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+          break;
+        case 'orders':
+          value = dayOrders.length;
+          break;
+        case 'avg':
+          const totalRev = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+          value = dayOrders.length > 0 ? totalRev / dayOrders.length : 0;
+          break;
+        case 'fees':
+          const revenue = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+          value = revenue * 0.05;
+          break;
+        case 'net':
+          const gross = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+          value = gross * 0.95;
+          break;
+        default:
+          value = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+      }
       
-      last7Days.push({
-        day: dayName,
-        revenue: dayRevenue
+      chartDataPoints.push({
+        day: daysToShow <= 30 ? dayName : monthDay,
+        revenue: value,
+        orders: dayOrders.length
       });
     }
 
-    // Top products from actual products data
+    // Top products
     const topProducts = products
       .sort((a, b) => (b.sold || 0) - (a.sold || 0))
       .slice(0, 5)
@@ -318,7 +392,7 @@ function SellerDashboard() {
         sales: p.sold || 0
       }));
 
-    // Category performance from actual products
+    // Category performance
     const categoryMap = {};
     products.forEach(p => {
       if (categoryMap[p.category]) {
@@ -334,7 +408,7 @@ function SellerDashboard() {
     }));
 
     setChartData({
-      revenue: last7Days,
+      revenue: chartDataPoints.length > 0 ? chartDataPoints : [{ day: 'No data', revenue: 0, orders: 0 }],
       topProducts: topProducts.length > 0 ? topProducts : [{ name: 'No sales yet', sales: 0 }],
       categories: categories.length > 0 ? categories : [{ name: 'No data', value: 1 }]
     });
@@ -343,63 +417,145 @@ function SellerDashboard() {
   useEffect(() => {
     if (products.length > 0 || orders.length > 0) {
       prepareChartData();
-      generateNotifications();
     }
-  }, [products, orders]);
+    fetchNotifications();
+  }, [products, orders, revenueDateRange, selectedRevenueMetric]);
 
-  const generateNotifications = () => {
-    const notifs = [];
-    
-    // Low stock alerts
-    products.forEach(product => {
-      if (product.stock < 5 && product.stock > 0) {
-        notifs.push({
-          id: `low-stock-${product._id}`,
-          type: 'warning',
-          title: 'Low Stock Alert',
-          message: `${product.name} has only ${product.stock} items left`,
-          time: 'Just now',
-          read: false
-        });
-      }
-      if (product.stock === 0) {
-        notifs.push({
-          id: `out-stock-${product._id}`,
-          type: 'error',
-          title: 'Out of Stock',
-          message: `${product.name} is out of stock`,
-          time: 'Just now',
-          read: false
-        });
-      }
-    });
+  // Fetch notifications from backend
+  const fetchNotifications = async () => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || !user._id) return;
 
-    // New product added
-    if (products.length > 0) {
-      notifs.push({
-        id: 'welcome',
-        type: 'success',
-        title: 'Welcome to Seller Dashboard',
-        message: 'Your products are live and ready for customers',
-        time: '1 hour ago',
-        read: false
+    setLoadingNotifications(true);
+    try {
+      const response = await fetch(`${API_URL}/notifications/${user._id}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || !user._id) return;
+
+    try {
+      const response = await fetch(`${API_URL}/notifications/seller/${user._id}/read-all`, {
+        method: 'PATCH'
       });
+
+      if (response.ok) {
+        setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
     }
-
-    setNotifications(notifs);
-    setUnreadCount(notifs.filter(n => !n.read).length);
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
-    setUnreadCount(0);
+  const markAsRead = async (notificationId) => {
+    try {
+      const response = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        setNotifications(notifications.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
-  const markAsRead = (id) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
-    setUnreadCount(prev => Math.max(0, prev - 1));
+  const deleteNotification = async (notificationId, e) => {
+    // Stop event propagation to prevent notification click
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    try {
+      const response = await fetch(`${API_URL}/notifications/${notificationId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        const notification = notifications.find(n => n._id === notificationId);
+        setNotifications(notifications.filter(n => n._id !== notificationId));
+        if (notification && !notification.isRead) {
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
+
+  const getNotificationIcon = (type, severity) => {
+    if (type === 'order') return <FaShoppingCart />;
+    if (type === 'product') return <FaBoxOpen />;
+    if (type === 'message') return <FaEnvelope />;
+    if (type === 'stock') return <FaExclamationTriangle />;
+    if (type === 'system') return <FaInfoCircle />;
+    
+    // Fallback to severity
+    if (severity === 'error') return <FaTimesCircle />;
+    if (severity === 'warning') return <FaExclamationTriangle />;
+    if (severity === 'success') return <FaCheckCircle />;
+    return <FaBell />;
+  };
+
+  const formatNotificationTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const handleNotificationClick = async (notification) => {
+    // Mark as read
+    await markAsRead(notification._id);
+    
+    // Close notification dropdown
+    setShowNotifications(false);
+    
+    // Navigate based on notification type
+    switch (notification.type) {
+      case 'order':
+        setActiveTab('orders');
+        break;
+      case 'product':
+        setActiveTab('products');
+        break;
+      case 'message':
+        setActiveTab('inbox');
+        break;
+      case 'stock':
+        setActiveTab('products');
+        break;
+      case 'system':
+        setActiveTab('dashboard');
+        break;
+      default:
+        setActiveTab('dashboard');
+    }
   };
 
   const handleProfileUpdate = async (e) => {
@@ -459,6 +615,27 @@ function SellerDashboard() {
     // Reset to first page when search changes
     setCurrentPage(1);
   }, [searchQuery, products]);
+
+  // Filter orders based on search query and status filter
+  useEffect(() => {
+    let filtered = orders;
+
+    // Apply status filter
+    if (orderStatusFilter !== 'All') {
+      filtered = filtered.filter(order => order.status === orderStatusFilter);
+    }
+
+    // Apply search filter
+    if (orderSearchQuery.trim() !== '') {
+      filtered = filtered.filter(order =>
+        order._id.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+        order.customerName?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+        order.customerEmail?.toLowerCase().includes(orderSearchQuery.toLowerCase())
+      );
+    }
+
+    setFilteredOrders(filtered);
+  }, [orderSearchQuery, orderStatusFilter, orders]);
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
@@ -571,6 +748,72 @@ function SellerDashboard() {
     } catch (error) {
       console.error('Error updating product:', error);
       alert('Error updating product');
+    }
+  };
+
+  const handleRestockClick = (product) => {
+    setRestockProduct(product);
+    setRestockQuantity('');
+    setShowRestockModal(true);
+  };
+
+  const handleRestockSubmit = async (e) => {
+    e.preventDefault();
+    const user = JSON.parse(localStorage.getItem('user'));
+    
+    if (!restockQuantity || parseInt(restockQuantity) <= 0) {
+      alert('Please enter a valid quantity');
+      return;
+    }
+
+    try {
+      const newStock = restockProduct.stock + parseInt(restockQuantity);
+      
+      // Prepare update payload with all required fields
+      const updatePayload = {
+        name: restockProduct.name,
+        description: restockProduct.description,
+        price: parseFloat(restockProduct.price),
+        category: restockProduct.category,
+        condition: restockProduct.condition,
+        size: restockProduct.size,
+        brand: restockProduct.brand || 'Unbranded',
+        stock: newStock,
+        images: restockProduct.images,
+        story: restockProduct.story || '',
+        paymentOptions: restockProduct.paymentOptions || ['cod', 'online'],
+        sellerId: user._id
+      };
+
+      // Include discount if it exists
+      if (restockProduct.discount) {
+        updatePayload.discount = restockProduct.discount;
+      }
+
+      const response = await fetch(`${API_URL}/products/${restockProduct._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatePayload),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`Product restocked successfully! New stock: ${newStock} units`);
+        setShowRestockModal(false);
+        setRestockProduct(null);
+        setRestockQuantity('');
+        fetchProducts(user._id);
+        fetchStats(user._id);
+      } else {
+        console.error('Restock error:', data);
+        alert(data.message || 'Failed to restock product');
+      }
+    } catch (error) {
+      console.error('Error restocking product:', error);
+      alert('Error restocking product: ' + error.message);
     }
   };
 
@@ -850,6 +1093,196 @@ function SellerDashboard() {
     setNewProduct({ ...newProduct, images: newImages.length > 0 ? newImages : [''] });
   };
 
+  // Export orders to CSV
+  const handleExportOrders = () => {
+    if (filteredOrders.length === 0) {
+      alert('No orders to export');
+      return;
+    }
+
+    // Create CSV content
+    const headers = ['Order ID', 'Customer Name', 'Customer Email', 'Items', 'Total', 'Payment Method', 'Payment Status', 'Order Status', 'Date'];
+    const csvRows = [headers.join(',')];
+
+    filteredOrders.forEach(order => {
+      const row = [
+        `"${order._id}"`,
+        `"${order.customerName || 'N/A'}"`,
+        `"${order.customerEmail || 'N/A'}"`,
+        order.items.length,
+        order.total || 0,
+        `"${order.paymentMethod || 'N/A'}"`,
+        `"${order.paymentStatus || 'N/A'}"`,
+        `"${order.status}"`,
+        `"${new Date(order.createdAt).toLocaleDateString()}"`
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `orders_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Calculate revenue stats based on date range
+  useEffect(() => {
+    if (orders.length === 0) return;
+
+    const now = new Date();
+    let startDate = new Date();
+
+    switch (revenueDateRange) {
+      case '7':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case '30':
+        startDate.setDate(now.getDate() - 30);
+        break;
+      case '90':
+        startDate.setDate(now.getDate() - 90);
+        break;
+      case '365':
+        startDate.setDate(now.getDate() - 365);
+        break;
+      case 'all':
+        startDate = new Date(0);
+        break;
+      default:
+        startDate.setDate(now.getDate() - 30);
+    }
+
+    const filteredByDate = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= startDate && orderDate <= now;
+    });
+
+    const completedOrders = filteredByDate.filter(order => 
+      order.status === 'Delivered' || order.status === 'Processing' || order.status === 'Shipped'
+    );
+
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+    const totalOrders = completedOrders.length;
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const platformFees = totalRevenue * 0.05;
+    const netRevenue = totalRevenue - platformFees;
+
+    const daysDiff = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+    const previousStartDate = new Date(startDate);
+    previousStartDate.setDate(previousStartDate.getDate() - daysDiff);
+
+    const previousOrders = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= previousStartDate && orderDate < startDate &&
+             (order.status === 'Delivered' || order.status === 'Processing' || order.status === 'Shipped');
+    });
+
+    const previousRevenue = previousOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+    const growthRate = previousRevenue > 0 
+      ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 
+      : totalRevenue > 0 ? 100 : 0;
+
+    setRevenueStats({
+      totalRevenue,
+      totalOrders,
+      avgOrderValue,
+      platformFees,
+      netRevenue,
+      growthRate
+    });
+  }, [orders, revenueDateRange]);
+
+  // Export revenue report
+  const handleExportRevenue = () => {
+    if (orders.length === 0) {
+      alert('No revenue data to export');
+      return;
+    }
+
+    const now = new Date();
+    let startDate = new Date();
+
+    switch (revenueDateRange) {
+      case '7':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case '30':
+        startDate.setDate(now.getDate() - 30);
+        break;
+      case '90':
+        startDate.setDate(now.getDate() - 90);
+        break;
+      case '365':
+        startDate.setDate(now.getDate() - 365);
+        break;
+      case 'all':
+        startDate = new Date(0);
+        break;
+      default:
+        startDate.setDate(now.getDate() - 30);
+    }
+
+    const filteredByDate = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= startDate && orderDate <= now &&
+             (order.status === 'Delivered' || order.status === 'Processing' || order.status === 'Shipped');
+    });
+
+    const headers = ['Date', 'Order ID', 'Customer', 'Items', 'Gross Amount', 'Platform Fee (5%)', 'Net Amount', 'Status'];
+    const csvRows = [headers.join(',')];
+
+    csvRows.push('');
+    csvRows.push(`REVENUE REPORT - Last ${revenueDateRange === 'all' ? 'All Time' : revenueDateRange + ' Days'}`);
+    csvRows.push(`Generated on: ${new Date().toLocaleString()}`);
+    csvRows.push('');
+    csvRows.push(`Total Orders,${revenueStats.totalOrders}`);
+    csvRows.push(`Gross Revenue,Rs. ${revenueStats.totalRevenue.toFixed(2)}`);
+    csvRows.push(`Platform Fees,Rs. ${revenueStats.platformFees.toFixed(2)}`);
+    csvRows.push(`Net Revenue,Rs. ${revenueStats.netRevenue.toFixed(2)}`);
+    csvRows.push(`Average Order Value,Rs. ${revenueStats.avgOrderValue.toFixed(2)}`);
+    csvRows.push(`Growth Rate,${revenueStats.growthRate.toFixed(2)}%`);
+    csvRows.push('');
+    csvRows.push(headers.join(','));
+
+    filteredByDate.forEach(order => {
+      const grossAmount = order.total || 0;
+      const platformFee = grossAmount * 0.05;
+      const netAmount = grossAmount - platformFee;
+
+      const row = [
+        `"${new Date(order.createdAt).toLocaleDateString()}"`,
+        `"${order._id}"`,
+        `"${order.customerName || 'N/A'}"`,
+        order.items.length,
+        grossAmount.toFixed(2),
+        platformFee.toFixed(2),
+        netAmount.toFixed(2),
+        `"${order.status}"`
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    const rangeLabel = revenueDateRange === 'all' ? 'all_time' : `${revenueDateRange}_days`;
+    link.setAttribute('href', url);
+    link.setAttribute('download', `revenue_report_${rangeLabel}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const addImageField = () => {
     if (newProduct.images.length < 10) {
       setNewProduct({ ...newProduct, images: [...newProduct.images, ''] });
@@ -868,7 +1301,7 @@ function SellerDashboard() {
     <div className="seller-container">
       {/* SIDEBAR */}
       <div className="sidebar">
-        <img src="/logo.png" alt="Rebuy" style={{width: '120px', marginBottom: '8px'}} />
+        <img src="/logo.png" alt="Rebuy" className="sidebar-logo-img" />
         
         <div 
           className={`menu-item ${activeTab === 'dashboard' ? 'active' : ''}`}
@@ -917,11 +1350,17 @@ function SellerDashboard() {
         </div>
 
         <div className="bottom-menu">
-          <div className="menu-item" onClick={() => setActiveTab('settings')}>
-            <FaCog /> Settings
-          </div>
-          <div className="menu-item" onClick={() => setActiveTab('help')}>
+          <div 
+            className={`menu-item ${activeTab === 'help' ? 'active' : ''}`}
+            onClick={() => setActiveTab('help')}
+          >
             <FaQuestionCircle /> Help Center
+          </div>
+          <div 
+            className={`menu-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <FaCog /> Settings
           </div>
           <div className="menu-item logout" onClick={handleLogout}>
             <FaSignOutAlt /> Logout
@@ -943,6 +1382,7 @@ function SellerDashboard() {
               {activeTab === 'performance' && 'Performance Analytics'}
               {activeTab === 'profile' && 'Seller Profile'}
               {activeTab === 'settings' && 'Account Settings'}
+              {activeTab === 'help' && 'Help Center'}
             </h2>
             <p>
               {activeTab === 'dashboard' && 'Manage your store efficiently with real-time insights.'}
@@ -953,78 +1393,34 @@ function SellerDashboard() {
               {activeTab === 'performance' && 'Analyze your store performance metrics.'}
               {activeTab === 'profile' && 'Manage your account information'}
               {activeTab === 'settings' && 'Manage security and account preferences'}
+              {activeTab === 'help' && 'Get support and find answers to your questions'}
             </p>
           </div>
-          <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
-            <div style={{position: 'relative'}}>
+          <div className="header-actions">
+            <div className="notification-wrapper">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                style={{
-                  width: '40px',
-                  height: '50px',
-                  background: 'white',
-                  border:'2px solid #e5e7eb',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#6b7280',
-                  fontSize: '18px',
-                  position: 'relative'
-                }}
+                className="notification-btn"
                 title="Notifications"
               >
                 <FaBell />
                 {unreadCount > 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    width: '8px',
-                    height: '8px',
-                    background: '#ef4444',
-                    borderRadius: '50%'
-                  }}></span>
+                  <span className="notification-count-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
                 )}
               </button>
 
               {/* Notification Dropdown */}
               {showNotifications && (
-                <div style={{
-                  position: 'absolute',
-                  top: '60px',
-                  right: '0',
-                  width: '380px',
-                  background: 'white',
-                  borderRadius: '12px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                  zIndex: 1000,
-                  maxHeight: '500px',
-                  overflow: 'hidden'
-                }}>
+                <div className="notification-dropdown">
                   {/* Header */}
-                  <div style={{
-                    padding: '16px 20px',
-                    borderBottom: '1px solid #e5e7eb',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <h3 style={{fontSize: '16px', fontWeight: '700', color: '#1e293b', margin: 0}}>
+                  <div className="notification-header">
+                    <h3 className="notification-header-title">
                       Notifications {unreadCount > 0 && `(${unreadCount})`}
                     </h3>
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllAsRead}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#00bcd4',
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }}
+                        className="notification-mark-read"
                       >
                         Mark all as read
                       </button>
@@ -1032,57 +1428,54 @@ function SellerDashboard() {
                   </div>
 
                   {/* Notifications List */}
-                  <div style={{maxHeight: '400px', overflowY: 'auto'}}>
-                    {notifications.length === 0 ? (
-                      <div style={{padding: '40px 20px', textAlign: 'center'}}>
-                        <FaBell size={40} style={{color: '#cbd5e1', marginBottom: '12px'}} />
-                        <p style={{color: '#64748b', fontSize: '14px'}}>No notifications yet</p>
+                  <div className="notification-list">
+                    {loadingNotifications ? (
+                      <div className="notification-loading">
+                        <div className="notification-loading-spinner"></div>
+                        <p className="notification-loading-text">Loading notifications...</p>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="notification-empty">
+                        <div className="notification-empty-icon-wrapper">
+                          <FaBell size={36} />
+                        </div>
+                        <h4 className="notification-empty-title">All caught up!</h4>
+                        <p>You don't have any notifications right now</p>
                       </div>
                     ) : (
                       notifications.map(notif => (
                         <div
-                          key={notif.id}
-                          onClick={() => markAsRead(notif.id)}
-                          style={{
-                            padding: '16px 20px',
-                            borderBottom: '1px solid #f1f5f9',
-                            cursor: 'pointer',
-                            background: notif.read ? 'white' : '#f0f9ff',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                          onMouseOut={(e) => e.currentTarget.style.background = notif.read ? 'white' : '#f0f9ff'}
+                          key={notif._id}
+                          onClick={() => handleNotificationClick(notif)}
+                          className={`notification-item ${notif.isRead ? '' : 'unread'}`}
                         >
-                          <div style={{display: 'flex', gap: '12px'}}>
-                            <div style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              marginTop: '6px',
-                              background: notif.type === 'error' ? '#ef4444' : 
-                                         notif.type === 'warning' ? '#f59e0b' : '#10b981',
-                              flexShrink: 0
-                            }}></div>
-                            <div style={{flex: 1}}>
-                              <h4 style={{
-                                fontSize: '14px',
-                                fontWeight: '600',
-                                color: '#1e293b',
-                                marginBottom: '4px'
-                              }}>
+                          <div className="notification-content">
+                            <div className={`notification-icon-wrapper ${notif.severity}`}>
+                              {getNotificationIcon(notif.type, notif.severity)}
+                            </div>
+                            <div className="notification-body">
+                              <h4 className="notification-title">
                                 {notif.title}
+                                <span className={`notification-type-badge ${notif.type}`}>
+                                  {notif.type}
+                                </span>
                               </h4>
-                              <p style={{
-                                fontSize: '13px',
-                                color: '#64748b',
-                                marginBottom: '6px',
-                                lineHeight: '1.4'
-                              }}>
+                              <p className="notification-message">
                                 {notif.message}
                               </p>
-                              <span style={{fontSize: '12px', color: '#94a3b8'}}>
-                                {notif.time}
-                              </span>
+                              <div className="notification-footer">
+                                <span className="notification-time">
+                                  <FaClock size={10} />
+                                  {formatNotificationTime(notif.createdAt)}
+                                </span>
+                                <button
+                                  onClick={(e) => deleteNotification(notif._id, e)}
+                                  className="notification-delete-btn"
+                                >
+                                  <FaTrash size={10} />
+                                  Delete
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1096,12 +1489,7 @@ function SellerDashboard() {
               <img
                 src={profileImage || 'https://i.pravatar.cc/40'}
                 alt="user"
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
+                className="user-avatar"
               />
               <div>
                 <strong>{sellerData?.storeName || sellerData?.fullName || 'Seller'}</strong>
@@ -1187,24 +1575,13 @@ function SellerDashboard() {
 
             {/* STOCK LEVELS CHART */}
             {products.length > 0 && (
-              <div style={{
-                background: '#ffffff',
-                padding: '32px',
-                borderRadius: '20px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                marginBottom: '30px'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '24px'
-                }}>
+              <div className="stock-levels-container">
+                <div className="stock-levels-header">
                   <div>
-                    <h3 style={{fontSize: '20px', fontWeight: '700', color: '#1e293b', marginBottom: '4px'}}>
+                    <h3 className="stock-levels-title">
                       Stock Levels Overview
                     </h3>
-                    <p style={{fontSize: '14px', color: '#64748b'}}>
+                    <p className="stock-levels-subtitle">
                       Monitor your inventory distribution across all products
                     </p>
                   </div>
@@ -1212,22 +1589,13 @@ function SellerDashboard() {
 
                 {/* Stock Alert - Moved to Top */}
                 {products.filter(p => p.stock <= 20).length > 0 && (
-                  <div style={{
-                    padding: '16px 20px',
-                    background: '#fef3c7',
-                    borderRadius: '12px',
-                    border: '2px solid #fbbf24',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    marginBottom: '24px'
-                  }}>
-                    <FaExclamationTriangle style={{color: '#92400e', fontSize: '20px', flexShrink: 0}} />
+                  <div className="stock-alert">
+                    <FaExclamationTriangle className="stock-alert-icon" />
                     <div>
-                      <h4 style={{fontSize: '14px', fontWeight: '600', color: '#78350f', margin: '0 0 4px 0'}}>
+                      <h4 className="stock-alert-title">
                         Stock Alert
                       </h4>
-                      <p style={{fontSize: '13px', color: '#92400e', margin: 0}}>
+                      <p className="stock-alert-message">
                         You have {products.filter(p => p.stock <= 20).length} product(s) with low or no stock. 
                         Consider restocking to avoid missing sales opportunities.
                       </p>
@@ -1235,47 +1603,22 @@ function SellerDashboard() {
                   </div>
                 )}
 
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '20px',
-                  marginBottom: '24px'
-                }}>
+                <div className="stock-cards-grid">
                   {/* Active Stock */}
                   <div 
                     onClick={() => setActiveTab('products')}
-                    style={{
-                      padding: '20px',
-                      background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                      borderRadius: '12px',
-                      border: '2px solid #34d399',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s, box-shadow 0.2s'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(52, 211, 153, 0.3)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
+                    className="stock-card active"
                   >
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      marginBottom: '8px'
-                    }}>
-                      <FaCheckCircle style={{color: '#065f46', fontSize: '24px'}} />
-                      <h4 style={{fontSize: '14px', fontWeight: '600', color: '#065f46', margin: 0}}>
+                    <div className="stock-card-header">
+                      <FaCheckCircle className="stock-card-icon active" />
+                      <h4 className="stock-card-label active">
                         Active Stock
                       </h4>
                     </div>
-                    <h2 style={{fontSize: '32px', fontWeight: '700', color: '#064e3b', margin: '8px 0'}}>
+                    <h2 className="stock-card-count active">
                       {products.filter(p => p.stock > 20).length}
                     </h2>
-                    <p style={{fontSize: '13px', color: '#059669'}}>
+                    <p className="stock-card-description active">
                       Products with 20+ units
                     </p>
                   </div>
@@ -1283,38 +1626,18 @@ function SellerDashboard() {
                   {/* Low Stock */}
                   <div 
                     onClick={() => setActiveTab('products')}
-                    style={{
-                      padding: '20px',
-                      background: 'linear-gradient(135deg, #fed7aa 0%, #fdba74 100%)',
-                      borderRadius: '12px',
-                      border: '2px solid #fb923c',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s, box-shadow 0.2s'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(251, 146, 60, 0.3)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
+                    className="stock-card low"
                   >
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      marginBottom: '8px'
-                    }}>
-                      <FaExclamationTriangle style={{color: '#9a3412', fontSize: '24px'}} />
-                      <h4 style={{fontSize: '14px', fontWeight: '600', color: '#9a3412', margin: 0}}>
+                    <div className="stock-card-header">
+                      <FaExclamationTriangle className="stock-card-icon low" />
+                      <h4 className="stock-card-label low">
                         Low Stock
                       </h4>
                     </div>
-                    <h2 style={{fontSize: '32px', fontWeight: '700', color: '#7c2d12', margin: '8px 0'}}>
+                    <h2 className="stock-card-count low">
                       {products.filter(p => p.stock > 0 && p.stock <= 20).length}
                     </h2>
-                    <p style={{fontSize: '13px', color: '#c2410c'}}>
+                    <p className="stock-card-description low">
                       Products with 1-20 units
                     </p>
                   </div>
@@ -1322,38 +1645,18 @@ function SellerDashboard() {
                   {/* Out of Stock */}
                   <div 
                     onClick={() => setActiveTab('products')}
-                    style={{
-                      padding: '20px',
-                      background: 'linear-gradient(135deg, #fecaca 0%, #fca5a5 100%)',
-                      borderRadius: '12px',
-                      border: '2px solid #f87171',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s, box-shadow 0.2s'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 24px rgba(248, 113, 113, 0.3)';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
+                    className="stock-card out"
                   >
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      marginBottom: '8px'
-                    }}>
-                      <FaTimesCircle style={{color: '#991b1b', fontSize: '24px'}} />
-                      <h4 style={{fontSize: '14px', fontWeight: '600', color: '#991b1b', margin: 0}}>
+                    <div className="stock-card-header">
+                      <FaTimesCircle className="stock-card-icon out" />
+                      <h4 className="stock-card-label out">
                         Out of Stock
                       </h4>
                     </div>
-                    <h2 style={{fontSize: '32px', fontWeight: '700', color: '#7f1d1d', margin: '8px 0'}}>
+                    <h2 className="stock-card-count out">
                       {products.filter(p => p.stock === 0).length}
                     </h2>
-                    <p style={{fontSize: '13px', color: '#dc2626'}}>
+                    <p className="stock-card-description out">
                       Products need restocking
                     </p>
                   </div>
@@ -1391,44 +1694,19 @@ function SellerDashboard() {
         {/* PRODUCTS TAB */}
         {activeTab === 'products' && (
           <div className="products-section">
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', gap: '10px'}}>
-              <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', margin: 0, whiteSpace: 'nowrap'}}>My Products</h3>
+            <div className="products-header">
+              <h3 className="products-title">My Products</h3>
               
-              <div style={{flex: 1, maxWidth: '500px', position: 'relative'}}>
+              <div className="search-container">
                 <input
                   type="text"
                   placeholder="Search by product name or SKU..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px 12px 45px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    transition: 'all 0.2s',
-                    background: '#f9fafb'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#00bcd4';
-                    e.target.style.background = '#ffffff';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.background = '#f9fafb';
-                  }}
+                  className="search-input"
                 />
                 <svg 
-                  style={{
-                    position: 'absolute',
-                    left: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#9ca3af',
-                    width: '18px',
-                    height: '18px'
-                  }}
+                  className="search-icon"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1439,23 +1717,7 @@ function SellerDashboard() {
               
               <button 
                 onClick={() => setShowAddProduct(!showAddProduct)}
-                style={{
-                  background: '#00bcd4',
-                  color: 'white',
-                  border: 'none',
-                  padding: '12px 24px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#0097a7'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#00bcd4'}
+                className="add-product-btn"
               >
                 <FaPlus /> Add Product
               </button>
@@ -1463,30 +1725,24 @@ function SellerDashboard() {
 
             {/* ADD PRODUCT FORM */}
             {showAddProduct && (
-              <div style={{
-                background: '#ffffff',
-                padding: '32px',
-                borderRadius: '20px',
-                marginBottom: '30px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-              }}>
-                <h3 style={{marginBottom: '24px', fontSize: '20px'}}>Add New Product</h3>
+              <div className="product-form-container">
+                <h3 className="product-form-title">Add New Product</h3>
                 <form onSubmit={handleAddProduct}>
-                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px'}}>
+                  <div className="form-grid-2">
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Product Name *</label>
+                      <label className="form-label">Product Name *</label>
                       <input
                         type="text"
                         value={newProduct.name}
                         onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
                         required
-                        style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                        className="form-input"
                       />
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>
+                      <label className="form-label">
                         SKU (Optional)
-                        <span style={{fontSize: '12px', fontWeight: '400', color: '#64748b', marginLeft: '8px'}}>
+                        <span className="form-label-hint">
                           Auto-generated if left empty
                         </span>
                       </label>
@@ -1495,42 +1751,42 @@ function SellerDashboard() {
                         value={newProduct.sku || ''}
                         onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
                         placeholder="e.g., ME-1234-N"
-                        style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace'}}
+                        className="form-input form-input-mono"
                       />
                     </div>
                   </div>
 
-                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px'}}>
+                  <div className="form-grid-2">
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Price (Rs.) *</label>
+                      <label className="form-label">Price (Rs.) *</label>
                       <input
                         type="number"
                         value={newProduct.price}
                         onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
                         required
-                        style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                        className="form-input"
                       />
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Stock *</label>
+                      <label className="form-label">Stock *</label>
                       <input
                         type="number"
                         value={newProduct.stock}
                         onChange={(e) => setNewProduct({...newProduct, stock: e.target.value})}
                         required
-                        style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                        className="form-input"
                       />
                     </div>
                   </div>
 
-                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '20px'}}>
+                  <div className="form-grid-3">
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Category *</label>
+                      <label className="form-label">Category *</label>
                       <select
                         value={newProduct.category}
                         onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
                         required
-                        style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                        className="form-select"
                       >
                         <option value="">Select Category</option>
                         <option value="Men's Collection">Men's Collection</option>
@@ -1542,12 +1798,12 @@ function SellerDashboard() {
                       </select>
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Condition *</label>
+                      <label className="form-label">Condition *</label>
                       <select
                         value={newProduct.condition}
                         onChange={(e) => setNewProduct({...newProduct, condition: e.target.value})}
                         required
-                        style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                        className="form-select"
                       >
                         <option value="New">New</option>
                         <option value="Like New">Like New</option>
@@ -1556,142 +1812,88 @@ function SellerDashboard() {
                       </select>
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Size</label>
+                      <label className="form-label">Size</label>
                       <input
                         type="text"
                         value={newProduct.size}
                         onChange={(e) => setNewProduct({...newProduct, size: e.target.value})}
                         placeholder="e.g., M, L, XL"
-                        style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                        className="form-input"
                       />
                     </div>
                   </div>
 
-                  <div style={{marginBottom: '20px'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Brand</label>
+                  <div className="form-group">
+                    <label className="form-label">Brand</label>
                     <input
                       type="text"
                       value={newProduct.brand}
                       onChange={(e) => setNewProduct({...newProduct, brand: e.target.value})}
                       placeholder="e.g., Nike, Adidas, Zara"
-                      style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                      className="form-input"
                     />
                   </div>
 
-                  <div style={{marginBottom: '20px'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Description *</label>
+                  <div className="form-group">
+                    <label className="form-label">Description *</label>
                     <textarea
                       value={newProduct.description}
                       onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
                       required
                       rows="4"
-                      style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', resize: 'vertical'}}
+                      className="form-textarea"
                     />
                   </div>
 
-                  <div style={{marginBottom: '20px'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Product Story</label>
+                  <div className="form-group">
+                    <label className="form-label">Product Story</label>
                     <textarea
                       value={newProduct.story}
                       onChange={(e) => setNewProduct({...newProduct, story: e.target.value})}
                       rows="3"
                       placeholder="Share the story behind this item..."
-                      style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', resize: 'vertical'}}
+                      className="form-textarea"
                     />
                   </div>
 
-                  <div style={{marginBottom: '20px'}}>
-                    <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Product Images (Max 10)</label>
+                  <div className="image-upload-section">
+                    <label className="form-label">Product Images (Max 10)</label>
                     
                     {/* File Upload Button */}
-                    <div style={{marginBottom: '16px'}}>
+                    <div className="image-upload-wrapper">
                       <input
                         type="file"
                         accept="image/*"
                         multiple
                         onChange={handleFileUpload}
-                        style={{display: 'none'}}
+                        className="image-upload-input"
                         id="image-upload"
                       />
                       <label
                         htmlFor="image-upload"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          padding: '12px 20px',
-                          background: '#f3f4f6',
-                          color: '#374151',
-                          border: '2px dashed #d1d5db',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = '#e5e7eb';
-                          e.currentTarget.style.borderColor = '#9ca3af';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = '#f3f4f6';
-                          e.currentTarget.style.borderColor = '#d1d5db';
-                        }}
+                        className="image-upload-label-dashed"
                       >
                         <FaPlus /> Upload Images
                       </label>
-                      <span style={{marginLeft: '12px', fontSize: '13px', color: '#6b7280'}}>
+                      <span className="image-count-text">
                         {newProduct.images.filter(img => img !== '').length} / 10 images
                       </span>
                     </div>
 
                     {/* Image Preview Grid */}
                     {newProduct.images.filter(img => img !== '').length > 0 && (
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                        gap: '12px',
-                        marginBottom: '16px'
-                      }}>
+                      <div className="image-preview-grid">
                         {newProduct.images.filter(img => img !== '').map((img, index) => (
-                          <div key={index} style={{
-                            position: 'relative',
-                            paddingTop: '100%',
-                            borderRadius: '8px',
-                            overflow: 'hidden',
-                            border: '2px solid #e5e7eb'
-                          }}>
+                          <div key={index} className="image-preview-item-bordered">
                             <img
                               src={img}
                               alt={`Product ${index + 1}`}
-                              style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover'
-                              }}
+                              className="image-preview-img"
                             />
                             <button
                               type="button"
                               onClick={() => removeImage(index)}
-                              style={{
-                                position: 'absolute',
-                                top: '4px',
-                                right: '4px',
-                                background: '#ef4444',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '50%',
-                                width: '24px',
-                                height: '24px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                fontSize: '12px'
-                              }}
+                              className="image-remove-btn-small"
                             >
                               ×
                             </button>
@@ -1701,35 +1903,17 @@ function SellerDashboard() {
                     )}
                   </div>
 
-                  <div style={{display: 'flex', gap: '12px'}}>
+                  <div className="form-buttons">
                     <button
                       type="submit"
-                      style={{
-                        background: 'linear-gradient(135deg, #00bcd4 0%, #0097a7 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '14px 32px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        fontSize: '15px',
-                        fontWeight: '700'
-                      }}
+                      className="form-btn-submit"
                     >
                       Add Product
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowAddProduct(false)}
-                      style={{
-                        background: '#f1f5f9',
-                        color: '#475569',
-                        border: 'none',
-                        padding: '14px 32px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        fontSize: '15px',
-                        fontWeight: '700'
-                      }}
+                      className="form-btn-cancel"
                     >
                       Cancel
                     </button>
@@ -1739,138 +1923,99 @@ function SellerDashboard() {
             )}
 
             {/* PRODUCTS LIST */}
-            <div style={{
-              background: '#ffffff',
-              borderRadius: '20px',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-            }}>
+            <div className="products-list-container">
               {filteredProducts.length === 0 && searchQuery === '' ? (
-                <div style={{textAlign: 'center', padding: '60px 20px'}}>
-                  <FaBox size={64} style={{color: '#cbd5e1', marginBottom: '20px'}} />
-                  <h3 style={{color: '#64748b', marginBottom: '10px'}}>No Products Yet</h3>
-                  <p style={{color: '#94a3b8'}}>Add your first product to get started!</p>
+                <div className="products-empty">
+                  <FaBox size={64} className="products-empty-icon" />
+                  <h3 className="products-empty-title">No Products Yet</h3>
+                  <p className="products-empty-text">Add your first product to get started!</p>
                 </div>
               ) : filteredProducts.length === 0 && searchQuery !== '' ? (
-                <div style={{textAlign: 'center', padding: '60px 20px'}}>
-                  <FaBox size={64} style={{color: '#cbd5e1', marginBottom: '20px'}} />
-                  <h3 style={{color: '#64748b', marginBottom: '10px'}}>No Products Found</h3>
-                  <p style={{color: '#94a3b8'}}>Try searching with different keywords</p>
+                <div className="products-empty">
+                  <FaBox size={64} className="products-empty-icon" />
+                  <h3 className="products-empty-title">No Products Found</h3>
+                  <p className="products-empty-text">Try searching with different keywords</p>
                 </div>
               ) : (
-                <div style={{overflowX: 'auto'}}>
-                  <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                <div className="products-table-wrapper">
+                  <table className="products-table">
                     <thead>
-                      <tr style={{borderBottom: '2px solid #f1f5f9'}}>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Image</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Product</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Category</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Price</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Stock Status</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Approval</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Actions</th>
+                      <tr>
+                        <th>Image</th>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Stock Status</th>
+                        <th>Approval</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {currentProducts.map((product) => {
                         const stockStatus = getStockStatusBadge(product.stock);
                         return (
-                        <tr key={product._id} style={{borderBottom: '1px solid #f1f5f9'}}>
-                          <td style={{padding: '16px'}}>
+                        <tr key={product._id}>
+                          <td>
                             <img 
                               src={product.images?.[0] || 'https://via.placeholder.com/60'} 
                               alt={product.name}
-                              style={{width: '60px', height: '60px', objectFit: 'cover', borderRadius: '12px'}}
+                              className="product-image"
                             />
                           </td>
-                          <td style={{padding: '16px'}}>
+                          <td>
                             <div>
-                              <div style={{fontWeight: '600', color: '#1e293b', marginBottom: '4px'}}>{product.name}</div>
-                              <div style={{fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace'}}>
+                              <div className="product-name-cell">{product.name}</div>
+                              <div className="product-sku">
                                 SKU: {product.sku || 'N/A'}
                               </div>
                             </div>
                           </td>
-                          <td style={{padding: '16px', color: '#64748b'}}>{product.category}</td>
-                          <td style={{padding: '16px', fontWeight: '700', color: '#10b981'}}>Rs. {product.price?.toLocaleString()}</td>
-                          <td style={{padding: '16px'}}>
-                            <div style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
-                              <span style={{
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                fontSize: '13px',
-                                fontWeight: '600',
-                                background: stockStatus.bg,
-                                color: stockStatus.color,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                width: 'fit-content'
-                              }}>
+                          <td className="product-category">{product.category}</td>
+                          <td className="product-price">Rs. {product.price?.toLocaleString()}</td>
+                          <td>
+                            <div className="product-stock-cell">
+                              <span className={`stock-badge ${product.stock === 0 ? 'out-of-stock' : product.stock <= 20 ? 'low-stock' : 'active-stock'}`}>
                                 <span>{stockStatus.icon}</span>
                                 {stockStatus.label}
                               </span>
-                              <span style={{fontSize: '12px', color: '#64748b'}}>
+                              <span className="stock-units">
                                 {product.stock} units
                               </span>
+                              {product.stock === 0 && (
+                                <button
+                                  onClick={() => handleRestockClick(product)}
+                                  className="restock-btn"
+                                  title="Restock Product"
+                                >
+                                  <FaPlus /> Restock
+                                </button>
+                              )}
                             </div>
                           </td>
-                          <td style={{padding: '16px'}}>
-                            <span style={{
-                              padding: '6px 12px',
-                              borderRadius: '8px',
-                              fontSize: '13px',
-                              fontWeight: '600',
-                              background: product.status === 'Approved' ? '#d1fae5' : product.status === 'Pending' ? '#fef3c7' : '#fee2e2',
-                              color: product.status === 'Approved' ? '#065f46' : product.status === 'Pending' ? '#92400e' : '#991b1b'
-                            }}>
+                          <td>
+                            <span className={`approval-badge ${product.status === 'Approved' ? 'approved' : product.status === 'Pending' ? 'pending' : 'rejected'}`}>
                               {product.status}
                             </span>
                           </td>
-                          <td style={{padding: '16px'}}>
-                            <div style={{display: 'flex', gap: '8px', position: 'relative'}}>
+                          <td>
+                            <div className="product-actions">
                               <button
                                 onClick={() => handleEditProduct(product)}
-                                style={{
-                                  padding: '8px 12px',
-                                  background: '#dbeafe',
-                                  color: '#1e40af',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  fontSize: '14px'
-                                }}
+                                className="product-action-btn edit"
                                 title="Edit Product"
                               >
                                 <FaEdit />
                               </button>
                               <button
                                 onClick={() => handleDeleteProduct(product._id)}
-                                style={{
-                                  padding: '8px 12px',
-                                  background: '#fee2e2',
-                                  color: '#991b1b',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  fontSize: '14px'
-                                }}
+                                className="product-action-btn delete"
                                 title="Delete Product"
                               >
                                 <FaTrash />
                               </button>
                               <button
                                 onClick={() => setShowThreeDotMenu(showThreeDotMenu === product._id ? null : product._id)}
-                                style={{
-                                  padding: '8px 12px',
-                                  background: '#f1f5f9',
-                                  color: '#64748b',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  fontSize: '14px',
-                                  fontWeight: '700'
-                                }}
+                                className="product-action-btn more"
                                 title="More Options"
                               >
                                 ⋮
@@ -1878,99 +2023,28 @@ function SellerDashboard() {
                               
                               {/* Three-dot dropdown menu */}
                               {showThreeDotMenu === product._id && (
-                                <div style={{
-                                  position: 'absolute',
-                                  top: '100%',
-                                  right: '0',
-                                  marginTop: '8px',
-                                  background: 'white',
-                                  borderRadius: '12px',
-                                  boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                                  zIndex: 100,
-                                  minWidth: '180px',
-                                  overflow: 'hidden'
-                                }}>
+                                <div className="three-dot-menu">
                                   <button
                                     onClick={() => handleThreeDotAction('duplicate', product)}
-                                    style={{
-                                      width: '100%',
-                                      padding: '12px 16px',
-                                      background: 'white',
-                                      border: 'none',
-                                      textAlign: 'left',
-                                      cursor: 'pointer',
-                                      fontSize: '14px',
-                                      color: '#475569',
-                                      transition: 'background 0.2s',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                                    onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                                    className="three-dot-menu-item"
                                   >
                                     <FaCopy /> Duplicate Product
                                   </button>
                                   <button
                                     onClick={() => handleThreeDotAction('featured', product)}
-                                    style={{
-                                      width: '100%',
-                                      padding: '12px 16px',
-                                      background: 'white',
-                                      border: 'none',
-                                      textAlign: 'left',
-                                      cursor: 'pointer',
-                                      fontSize: '14px',
-                                      color: '#475569',
-                                      transition: 'background 0.2s',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                                    onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                                    className="three-dot-menu-item"
                                   >
                                     <FaStar /> Mark as Featured
                                   </button>
                                   <button
                                     onClick={() => handleThreeDotAction('analytics', product)}
-                                    style={{
-                                      width: '100%',
-                                      padding: '12px 16px',
-                                      background: 'white',
-                                      border: 'none',
-                                      textAlign: 'left',
-                                      cursor: 'pointer',
-                                      fontSize: '14px',
-                                      color: '#475569',
-                                      transition: 'background 0.2s',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                                    onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                                    className="three-dot-menu-item"
                                   >
                                     <FaChartPie /> View Analytics
                                   </button>
                                   <button
                                     onClick={() => handleThreeDotAction('archive', product)}
-                                    style={{
-                                      width: '100%',
-                                      padding: '12px 16px',
-                                      background: 'white',
-                                      border: 'none',
-                                      textAlign: 'left',
-                                      cursor: 'pointer',
-                                      fontSize: '14px',
-                                      color: '#ef4444',
-                                      transition: 'background 0.2s',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '10px'
-                                    }}
-                                    onMouseOver={(e) => e.currentTarget.style.background = '#fef2f2'}
-                                    onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                                    className="three-dot-menu-item danger"
                                   >
                                     <FaArchive /> Archive Product
                                   </button>
@@ -1987,31 +2061,16 @@ function SellerDashboard() {
 
               {/* Pagination */}
               {filteredProducts.length > 0 && (
-                <div style={{
-                  marginTop: '24px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '20px 0'
-                }}>
-                  <div style={{fontSize: '14px', color: '#64748b'}}>
+                <div className="pagination-container">
+                  <div className="pagination-info">
                     Showing {indexOfFirstProduct + 1}-{Math.min(indexOfLastProduct, filteredProducts.length)} of {filteredProducts.length} products
                   </div>
                   
-                  <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                  <div className="pagination-buttons">
                     <button
                       onClick={() => paginate(currentPage - 1)}
                       disabled={currentPage === 1}
-                      style={{
-                        padding: '8px 16px',
-                        background: currentPage === 1 ? '#f1f5f9' : '#00bcd4',
-                        color: currentPage === 1 ? '#94a3b8' : 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '600'
-                      }}
+                      className={`pagination-btn-prev ${currentPage === 1 ? 'disabled' : ''}`}
                     >
                       Previous
                     </button>
@@ -2028,18 +2087,7 @@ function SellerDashboard() {
                           <button
                             key={pageNumber}
                             onClick={() => paginate(pageNumber)}
-                            style={{
-                              padding: '8px 12px',
-                              background: currentPage === pageNumber ? '#00bcd4' : 'white',
-                              color: currentPage === pageNumber ? 'white' : '#64748b',
-                              border: '2px solid',
-                              borderColor: currentPage === pageNumber ? '#00bcd4' : '#e5e7eb',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              minWidth: '40px'
-                            }}
+                            className={`pagination-page-number ${currentPage === pageNumber ? 'active' : ''}`}
                           >
                             {pageNumber}
                           </button>
@@ -2048,7 +2096,7 @@ function SellerDashboard() {
                         pageNumber === currentPage - 2 ||
                         pageNumber === currentPage + 2
                       ) {
-                        return <span key={pageNumber} style={{color: '#94a3b8'}}>...</span>;
+                        return <span key={pageNumber} className="pagination-ellipsis">...</span>;
                       }
                       return null;
                     })}
@@ -2056,16 +2104,7 @@ function SellerDashboard() {
                     <button
                       onClick={() => paginate(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      style={{
-                        padding: '8px 16px',
-                        background: currentPage === totalPages ? '#f1f5f9' : '#00bcd4',
-                        color: currentPage === totalPages ? '#94a3b8' : 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '600'
-                      }}
+                      className={`pagination-btn-next ${currentPage === totalPages ? 'disabled' : ''}`}
                     >
                       Next
                     </button>
@@ -2075,112 +2114,46 @@ function SellerDashboard() {
             </div>
 
             {/* Tips Section */}
-            <div style={{marginTop: '32px'}}>
-              <h3 style={{
-                fontSize: '20px', 
-                fontWeight: '700', 
-                color: '#1e293b', 
-                marginBottom: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px'
-              }}>
-                <FaLightbulb style={{color: '#fbbf24'}} /> Pro Tips for Better Sales
+            <div className="pro-tips-wrapper">
+              <h3 className="pro-tips-header">
+                <FaLightbulb className="pro-tips-icon" /> Pro Tips for Better Sales
               </h3>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                gap: '20px'
-              }}>
+              <div className="pro-tips-grid">
                 {/* Tip 1: Stock Updates */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                  padding: '24px',
-                  borderRadius: '16px',
-                  border: '2px solid #7dd3fc'
-                }}>
-                  <div style={{
-                    fontSize: '40px',
-                    marginBottom: '12px',
-                    color: '#0284c7'
-                  }}>
+                <div className="pro-tip-card blue">
+                  <div className="pro-tip-icon blue">
                     <FaBox />
                   </div>
-                  <h4 style={{
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    color: '#0c4a6e',
-                    marginBottom: '8px'
-                  }}>
+                  <h4 className="pro-tip-title blue">
                     Keep Stock Updated
                   </h4>
-                  <p style={{
-                    fontSize: '14px',
-                    color: '#075985',
-                    lineHeight: '1.6'
-                  }}>
+                  <p className="pro-tip-text blue">
                     Regularly update your stock to avoid customer cancellations and order penalties. Out-of-stock items hurt your seller rating.
                   </p>
                 </div>
 
                 {/* Tip 2: Smart Categorization */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                  padding: '24px',
-                  borderRadius: '16px',
-                  border: '2px solid #fbbf24'
-                }}>
-                  <div style={{
-                    fontSize: '40px',
-                    marginBottom: '12px',
-                    color: '#f59e0b'
-                  }}>
+                <div className="pro-tip-card yellow">
+                  <div className="pro-tip-icon yellow">
                     <FaBullseye />
                   </div>
-                  <h4 style={{
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    color: '#78350f',
-                    marginBottom: '8px'
-                  }}>
+                  <h4 className="pro-tip-title yellow">
                     Smart Categorization
                   </h4>
-                  <p style={{
-                    fontSize: '14px',
-                    color: '#92400e',
-                    lineHeight: '1.6'
-                  }}>
+                  <p className="pro-tip-text yellow">
                     Items with clear categories and attributes see 20% higher conversion rates. Choose the most accurate category for your products.
                   </p>
                 </div>
 
                 {/* Tip 3: SEO Optimized Titles */}
-                <div style={{
-                  background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
-                  padding: '24px',
-                  borderRadius: '16px',
-                  border: '2px solid #34d399'
-                }}>
-                  <div style={{
-                    fontSize: '40px',
-                    marginBottom: '12px',
-                    color: '#10b981'
-                  }}>
+                <div className="pro-tip-card green">
+                  <div className="pro-tip-icon green">
                     <FaSearch />
                   </div>
-                  <h4 style={{
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    color: '#064e3b',
-                    marginBottom: '8px'
-                  }}>
+                  <h4 className="pro-tip-title green">
                     SEO Optimized Titles
                   </h4>
-                  <p style={{
-                    fontSize: '14px',
-                    color: '#065f46',
-                    lineHeight: '1.6'
-                  }}>
+                  <p className="pro-tip-text green">
                     Include keywords in your product names to improve search visibility in-app. Use brand names, colors, and key features.
                   </p>
                 </div>
@@ -2192,108 +2165,165 @@ function SellerDashboard() {
         {/* ORDERS TAB */}
         {activeTab === 'orders' && (
           <div className="products-section">
-            <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '30px'}}>Order Management</h3>
+            <div className="orders-header">
+              <h3 className="orders-title">Order Management</h3>
+              
+              <div className="orders-controls">
+                <div className="order-search-container">
+                  <input
+                    type="text"
+                    placeholder="Search by Order ID, Customer Name..."
+                    value={orderSearchQuery}
+                    onChange={(e) => setOrderSearchQuery(e.target.value)}
+                    className="search-input"
+                  />
+                  <svg 
+                    className="search-icon"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                <button 
+                  onClick={handleExportOrders}
+                  className="export-btn"
+                  disabled={filteredOrders.length === 0}
+                >
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export
+                </button>
+              </div>
+            </div>
+
+            {/* Status Filter Tabs */}
+            <div className="order-status-tabs">
+              <button
+                onClick={() => setOrderStatusFilter('All')}
+                className={`order-status-tab ${orderStatusFilter === 'All' ? 'active' : ''}`}
+              >
+                <FaShoppingCart />
+                All
+                <span className="order-count-badge">{orders.length}</span>
+              </button>
+              <button
+                onClick={() => setOrderStatusFilter('Pending')}
+                className={`order-status-tab ${orderStatusFilter === 'Pending' ? 'active' : ''}`}
+              >
+                <FaClock />
+                Pending
+                <span className="order-count-badge">{orders.filter(o => o.status === 'Pending').length}</span>
+              </button>
+              <button
+                onClick={() => setOrderStatusFilter('Processing')}
+                className={`order-status-tab ${orderStatusFilter === 'Processing' ? 'active' : ''}`}
+              >
+                <FaCheckCircle />
+                Confirmed
+                <span className="order-count-badge">{orders.filter(o => o.status === 'Processing').length}</span>
+              </button>
+              <button
+                onClick={() => setOrderStatusFilter('Shipped')}
+                className={`order-status-tab ${orderStatusFilter === 'Shipped' ? 'active' : ''}`}
+              >
+                <FaBoxOpen />
+                Shipped
+                <span className="order-count-badge">{orders.filter(o => o.status === 'Shipped').length}</span>
+              </button>
+              <button
+                onClick={() => setOrderStatusFilter('Delivered')}
+                className={`order-status-tab ${orderStatusFilter === 'Delivered' ? 'active' : ''}`}
+              >
+                <FaCheckCircle />
+                Completed
+                <span className="order-count-badge">{orders.filter(o => o.status === 'Delivered').length}</span>
+              </button>
+              <button
+                onClick={() => setOrderStatusFilter('Cancelled')}
+                className={`order-status-tab ${orderStatusFilter === 'Cancelled' ? 'active' : ''}`}
+              >
+                <FaTimesCircle />
+                Cancelled
+                <span className="order-count-badge">{orders.filter(o => o.status === 'Cancelled').length}</span>
+              </button>
+            </div>
             
             {loadingOrders ? (
-              <div style={{textAlign: 'center', padding: '60px'}}>
+              <div className="orders-loading">
                 <h3>Loading orders...</h3>
               </div>
-            ) : orders.length === 0 ? (
-              <div style={{
-                background: '#ffffff',
-                padding: '60px',
-                borderRadius: '20px',
-                textAlign: 'center',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-              }}>
-                <FaShoppingCart size={64} style={{color: '#cbd5e1', marginBottom: '20px'}} />
-                <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '10px'}}>No Orders Yet</h3>
-                <p style={{color: '#64748b', fontSize: '15px'}}>Orders from customers will appear here</p>
+            ) : filteredOrders.length === 0 && orders.length === 0 ? (
+              <div className="orders-empty">
+                <FaShoppingCart size={64} className="orders-empty-icon" />
+                <h3 className="orders-empty-title">No Orders Yet</h3>
+                <p className="orders-empty-text">Orders from customers will appear here</p>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="orders-empty">
+                <FaShoppingCart size={64} className="orders-empty-icon" />
+                <h3 className="orders-empty-title">No Orders Found</h3>
+                <p className="orders-empty-text">Try adjusting your filters or search query</p>
               </div>
             ) : (
-              <div style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                padding: '24px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-              }}>
-                <div style={{overflowX: 'auto'}}>
-                  <table style={{width: '100%', borderCollapse: 'collapse'}}>
+              <div className="orders-table-container">
+                <div className="orders-table-wrapper">
+                  <table className="orders-table">
                     <thead>
-                      <tr style={{borderBottom: '2px solid #f1f5f9'}}>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Order ID</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Customer</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Items</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Total</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Payment</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Status</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Date</th>
-                        <th style={{padding: '16px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase'}}>Actions</th>
+                      <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Payment</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {orders.map((order) => (
-                        <tr key={order._id} style={{borderBottom: '1px solid #f1f5f9'}}>
-                          <td style={{padding: '16px', fontWeight: '600', color: '#1e293b', fontSize: '13px'}}>
-                            #{order._id.slice(-8).toUpperCase()}
-                          </td>
-                          <td style={{padding: '16px'}}>
-                            <div>
-                              <div style={{fontWeight: '600', color: '#1e293b', fontSize: '14px'}}>{order.customerName}</div>
-                              <div style={{fontSize: '12px', color: '#64748b'}}>{order.customerEmail}</div>
+                      {filteredOrders.map((order) => (
+                        <tr key={order._id}>
+                          <td>
+                            <div className="order-id">
+                              #{order._id.slice(-8).toUpperCase()}
                             </div>
                           </td>
-                          <td style={{padding: '16px', color: '#64748b'}}>
+                          <td>
+                            <div>
+                              <div className="order-customer-name">{order.customerName}</div>
+                              <div className="order-customer-email">{order.customerEmail}</div>
+                            </div>
+                          </td>
+                          <td className="order-items">
                             {order.items.length} item{order.items.length > 1 ? 's' : ''}
                           </td>
-                          <td style={{padding: '16px', fontWeight: '700', color: '#10b981', fontSize: '15px'}}>
+                          <td className="order-total">
                             Rs. {order.total?.toLocaleString()}
                           </td>
-                          <td style={{padding: '16px'}}>
-                            <div style={{fontSize: '13px', color: '#64748b', textTransform: 'uppercase'}}>
+                          <td>
+                            <div className="order-payment-method">
                               {order.paymentMethod}
                             </div>
-                            <span style={{
-                              display: 'inline-block',
-                              marginTop: '4px',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
-                              fontSize: '11px',
-                              fontWeight: '600',
-                              background: order.paymentStatus === 'Paid' ? '#d1fae5' : '#fef3c7',
-                              color: order.paymentStatus === 'Paid' ? '#065f46' : '#92400e'
-                            }}>
+                            <span className={`order-payment-badge ${order.paymentStatus === 'Paid' ? 'paid' : 'pending'}`}>
                               {order.paymentStatus}
                             </span>
                           </td>
-                          <td style={{padding: '16px'}}>
+                          <td>
                             <select
                               value={order.status}
                               onChange={(e) => handleOrderStatusUpdate(order._id, e.target.value)}
                               disabled={order.status === 'Delivered' || order.status === 'Cancelled'}
-                              style={{
-                                padding: '8px 12px',
-                                borderRadius: '8px',
-                                fontSize: '13px',
-                                fontWeight: '600',
-                                border: '2px solid',
-                                cursor: order.status === 'Delivered' || order.status === 'Cancelled' ? 'not-allowed' : 'pointer',
-                                background: 
-                                  order.status === 'Delivered' ? '#d1fae5' :
-                                  order.status === 'Shipped' ? '#dbeafe' :
-                                  order.status === 'Processing' ? '#fef3c7' :
-                                  order.status === 'Cancelled' ? '#fee2e2' : '#f1f5f9',
-                                borderColor:
-                                  order.status === 'Delivered' ? '#10b981' :
-                                  order.status === 'Shipped' ? '#3b82f6' :
-                                  order.status === 'Processing' ? '#f59e0b' :
-                                  order.status === 'Cancelled' ? '#ef4444' : '#94a3b8',
-                                color:
-                                  order.status === 'Delivered' ? '#065f46' :
-                                  order.status === 'Shipped' ? '#1e40af' :
-                                  order.status === 'Processing' ? '#92400e' :
-                                  order.status === 'Cancelled' ? '#991b1b' : '#64748b'
-                              }}
+                              className={`order-status-select ${order.status.toLowerCase()}`}
                             >
                               <option value="Pending">Pending</option>
                               <option value="Processing">Processing</option>
@@ -2302,40 +2332,22 @@ function SellerDashboard() {
                               <option value="Cancelled">Cancelled</option>
                             </select>
                           </td>
-                          <td style={{padding: '16px', color: '#64748b', fontSize: '13px'}}>
+                          <td className="order-date">
                             {new Date(order.createdAt).toLocaleDateString()}
                           </td>
-                          <td style={{padding: '16px'}}>
-                            <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
+                          <td>
+                            <div className="order-actions">
                               {order.status === 'Pending' && (
                                 <>
                                   <button
                                     onClick={() => handleOrderStatusUpdate(order._id, 'Processing')}
-                                    style={{
-                                      padding: '6px 12px',
-                                      background: '#fef3c7',
-                                      color: '#92400e',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      fontSize: '12px',
-                                      fontWeight: '600'
-                                    }}
+                                    className="order-action-btn approve"
                                   >
                                     Approve
                                   </button>
                                   <button
                                     onClick={() => handleOrderStatusUpdate(order._id, 'Cancelled')}
-                                    style={{
-                                      padding: '6px 12px',
-                                      background: '#fee2e2',
-                                      color: '#991b1b',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      fontSize: '12px',
-                                      fontWeight: '600'
-                                    }}
+                                    className="order-action-btn cancel"
                                   >
                                     Cancel
                                   </button>
@@ -2344,16 +2356,7 @@ function SellerDashboard() {
                               {order.status === 'Processing' && (
                                 <button
                                   onClick={() => handleOrderStatusUpdate(order._id, 'Shipped')}
-                                  style={{
-                                    padding: '6px 12px',
-                                    background: '#dbeafe',
-                                    color: '#1e40af',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    fontWeight: '600'
-                                  }}
+                                  className="order-action-btn ship"
                                 >
                                   Mark as Shipped
                                 </button>
@@ -2361,22 +2364,13 @@ function SellerDashboard() {
                               {order.status === 'Shipped' && (
                                 <button
                                   onClick={() => handleOrderStatusUpdate(order._id, 'Delivered')}
-                                  style={{
-                                    padding: '6px 12px',
-                                    background: '#d1fae5',
-                                    color: '#065f46',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    fontSize: '12px',
-                                    fontWeight: '600'
-                                  }}
+                                  className="order-action-btn deliver"
                                 >
                                   Mark as Delivered
                                 </button>
                               )}
                               {(order.status === 'Delivered' || order.status === 'Cancelled') && (
-                                <span style={{fontSize: '12px', color: '#94a3b8', fontStyle: 'italic'}}>
+                                <span className="order-no-actions">
                                   No actions available
                                 </span>
                               )}
@@ -2395,65 +2389,44 @@ function SellerDashboard() {
         {/* INBOX TAB */}
         {activeTab === 'inbox' && (
           <div className="products-section">
-            <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '30px'}}>
+            <h3 className="inbox-title">
               Customer Messages {unreadMessages > 0 && `(${unreadMessages} unread)`}
             </h3>
             
             {loadingMessages ? (
-              <div style={{textAlign: 'center', padding: '60px'}}>
+              <div className="messages-loading">
                 <h3>Loading messages...</h3>
               </div>
             ) : messages.length === 0 ? (
-              <div style={{
-                background: '#ffffff',
-                padding: '60px',
-                borderRadius: '20px',
-                textAlign: 'center',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-              }}>
-                <FaBell size={64} style={{color: '#cbd5e1', marginBottom: '20px'}} />
-                <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '10px'}}>No Messages Yet</h3>
-                <p style={{color: '#64748b', fontSize: '15px'}}>Customer inquiries will appear here</p>
+              <div className="inbox-empty">
+                <FaBell size={64} className="inbox-empty-icon" />
+                <h3 className="inbox-empty-title">No Messages Yet</h3>
+                <p className="inbox-empty-text">Customer inquiries will appear here</p>
               </div>
             ) : (
-              <div style={{display: 'grid', gap: '20px'}}>
+              <div className="messages-grid">
                 {messages.map((msg) => (
                   <div
                     key={msg._id}
-                    style={{
-                      background: '#ffffff',
-                      borderRadius: '16px',
-                      padding: '24px',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                      border: msg.read ? '2px solid #f1f5f9' : '2px solid #00bcd4',
-                      position: 'relative'
-                    }}
+                    className={`message-card ${msg.read ? '' : 'unread'}`}
                   >
                     {!msg.read && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '24px',
-                        right: '24px',
-                        width: '12px',
-                        height: '12px',
-                        background: '#00bcd4',
-                        borderRadius: '50%'
-                      }}></div>
+                      <div className="message-unread-badge"></div>
                     )}
                     
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px'}}>
-                      <div style={{flex: 1}}>
-                        <h4 style={{fontSize: '18px', fontWeight: '700', color: '#1e293b', marginBottom: '8px'}}>
+                    <div className="message-header">
+                      <div className="message-header-content">
+                        <h4 className="message-subject">
                           {msg.subject}
                         </h4>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap'}}>
-                          <span style={{fontSize: '14px', color: '#64748b'}}>
+                        <div className="message-meta">
+                          <span className="message-from">
                             From: <strong>{msg.senderInfo?.fullName || 'Customer'}</strong>
                           </span>
-                          <span style={{fontSize: '14px', color: '#94a3b8'}}>
+                          <span className="message-email">
                             {msg.senderInfo?.email}
                           </span>
-                          <span style={{fontSize: '13px', color: '#94a3b8'}}>
+                          <span className="message-time">
                             {new Date(msg.createdAt).toLocaleString()}
                           </span>
                         </div>
@@ -2461,104 +2434,49 @@ function SellerDashboard() {
                     </div>
 
                     {msg.productId && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px',
-                        background: '#f8fafc',
-                        borderRadius: '10px',
-                        marginBottom: '16px'
-                      }}>
+                      <div className="message-product">
                         {msg.productId.images && msg.productId.images[0] && (
                           <img
                             src={msg.productId.images[0]}
                             alt={msg.productId.name}
-                            style={{
-                              width: '50px',
-                              height: '50px',
-                              objectFit: 'cover',
-                              borderRadius: '8px'
-                            }}
+                            className="message-product-image"
                           />
                         )}
                         <div>
-                          <div style={{fontSize: '13px', color: '#64748b', marginBottom: '2px'}}>
+                          <div className="message-product-label">
                             Regarding product:
                           </div>
-                          <div style={{fontSize: '14px', fontWeight: '600', color: '#1e293b'}}>
+                          <div className="message-product-name">
                             {msg.productId.name}
                           </div>
                         </div>
                       </div>
                     )}
 
-                    <div style={{
-                      padding: '16px',
-                      background: '#f8fafc',
-                      borderRadius: '10px',
-                      marginBottom: '16px',
-                      borderLeft: '4px solid #00bcd4'
-                    }}>
-                      <p style={{fontSize: '14px', color: '#475569', lineHeight: '1.6', margin: 0}}>
+                    <div className="message-body">
+                      <p className="message-text">
                         {msg.message}
                       </p>
                     </div>
 
-                    <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
+                    <div className="message-actions">
                       {!msg.read && (
                         <button
                           onClick={() => handleMarkAsRead(msg._id)}
-                          style={{
-                            padding: '10px 20px',
-                            background: '#00bcd4',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = '#0097a7'}
-                          onMouseOut={(e) => e.currentTarget.style.background = '#00bcd4'}
+                          className="message-btn read"
                         >
                           Mark as Read
                         </button>
                       )}
                       <button
                         onClick={() => window.location.href = `mailto:${msg.senderInfo?.email}?subject=Re: ${msg.subject}`}
-                        style={{
-                          padding: '10px 20px',
-                          background: '#10b981',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#059669'}
-                        onMouseOut={(e) => e.currentTarget.style.background = '#10b981'}
+                        className="message-btn reply"
                       >
                         Reply via Email
                       </button>
                       <button
                         onClick={() => handleDeleteMessage(msg._id)}
-                        style={{
-                          padding: '10px 20px',
-                          background: '#ef4444',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.background = '#dc2626'}
-                        onMouseOut={(e) => e.currentTarget.style.background = '#ef4444'}
+                        className="message-btn delete"
                       >
                         Delete
                       </button>
@@ -2573,31 +2491,141 @@ function SellerDashboard() {
         {/* REVENUE TAB */}
         {activeTab === 'revenue' && (
           <div className="products-section">
-            <div style={{
-              background: '#ffffff',
-              padding: '32px',
-              borderRadius: '20px',
-              marginBottom: '20px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-            }}>
-              <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '10px'}}>Revenue Analytics</h3>
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '30px'}}>
-                <div style={{padding: '20px', background: '#f0f9ff', borderRadius: '12px'}}>
-                  <p style={{fontSize: '14px', color: '#64748b', marginBottom: '8px'}}>Total Revenue</p>
-                  <h2 style={{fontSize: '32px', fontWeight: '700', color: '#0284c7'}}>Rs. {stats.totalRevenue?.toLocaleString() || 0}</h2>
-                </div>
-                <div style={{padding: '20px', background: '#f0fdf4', borderRadius: '12px'}}>
-                  <p style={{fontSize: '14px', color: '#64748b', marginBottom: '8px'}}>Total Sales</p>
-                  <h2 style={{fontSize: '32px', fontWeight: '700', color: '#059669'}}>{stats.totalSold || 0}</h2>
-                </div>
-                <div style={{padding: '20px', background: '#fef3c7', borderRadius: '12px'}}>
-                  <p style={{fontSize: '14px', color: '#64748b', marginBottom: '8px'}}>Avg. Order Value</p>
-                  <h2 style={{fontSize: '32px', fontWeight: '700', color: '#f59e0b'}}>
-                    Rs. {stats.totalSold > 0 ? Math.round(stats.totalRevenue / stats.totalSold).toLocaleString() : 0}
-                  </h2>
+            <div className="revenue-container">
+              <div className="revenue-header">
+                <h3 className="revenue-title">Revenue Analytics</h3>
+                <div className="revenue-controls">
+                  <div className="date-range-selector">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="calendar-icon">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth="2"/>
+                      <line x1="16" y1="2" x2="16" y2="6" strokeWidth="2"/>
+                      <line x1="8" y1="2" x2="8" y2="6" strokeWidth="2"/>
+                      <line x1="3" y1="10" x2="21" y2="10" strokeWidth="2"/>
+                    </svg>
+                    <select
+                      value={revenueDateRange}
+                      onChange={(e) => setRevenueDateRange(e.target.value)}
+                      className="date-range-select"
+                    >
+                      <option value="7">Last 7 Days</option>
+                      <option value="30">Last 30 Days</option>
+                      <option value="90">Last 90 Days</option>
+                      <option value="365">Last Year</option>
+                      <option value="all">All Time</option>
+                    </select>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="chevron-icon">
+                      <polyline points="6 9 12 15 18 9" strokeWidth="2"/>
+                    </svg>
+                  </div>
+                  <button 
+                    onClick={handleExportRevenue}
+                    className="export-btn"
+                    disabled={orders.length === 0}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export Report
+                  </button>
                 </div>
               </div>
-              <RevenueTrendChart data={chartData.revenue} />
+
+              <div className="revenue-stats-grid">
+                <div 
+                  className={`revenue-stat-card clickable ${selectedRevenueMetric === 'revenue' ? 'selected' : ''}`}
+                  onClick={() => setSelectedRevenueMetric('revenue')}
+                >
+                  <div className="revenue-stat-header">
+                    <p className="revenue-stat-label">TOTAL REVENUE</p>
+                    <div className={`revenue-growth-badge ${revenueStats.growthRate >= 0 ? 'positive' : 'negative'}`}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        {revenueStats.growthRate >= 0 ? (
+                          <polyline points="18 15 12 9 6 15" strokeWidth="2.5"/>
+                        ) : (
+                          <polyline points="6 9 12 15 18 9" strokeWidth="2.5"/>
+                        )}
+                      </svg>
+                      {Math.abs(revenueStats.growthRate).toFixed(1)}%
+                    </div>
+                  </div>
+                  <h2 className="revenue-stat-value">Rs. {revenueStats.totalRevenue.toLocaleString()}</h2>
+                  <p className="revenue-stat-subtitle">
+                    {revenueStats.growthRate >= 0 ? '+' : ''}{revenueStats.growthRate.toFixed(1)}% from last period
+                  </p>
+                </div>
+
+                <div 
+                  className={`revenue-stat-card orders-card clickable ${selectedRevenueMetric === 'orders' ? 'selected' : ''}`}
+                  onClick={() => setSelectedRevenueMetric('orders')}
+                >
+                  <div className="revenue-stat-header">
+                    <p className="revenue-stat-label">TOTAL ORDERS</p>
+                    <div className="revenue-stat-icon orders">
+                      <FaShoppingCart />
+                    </div>
+                  </div>
+                  <h2 className="revenue-stat-value">{revenueStats.totalOrders}</h2>
+                  <p className="revenue-stat-subtitle">Completed orders</p>
+                </div>
+
+                <div 
+                  className={`revenue-stat-card avg-card clickable ${selectedRevenueMetric === 'avg' ? 'selected' : ''}`}
+                  onClick={() => setSelectedRevenueMetric('avg')}
+                >
+                  <div className="revenue-stat-header">
+                    <p className="revenue-stat-label">AVG. ORDER VALUE</p>
+                    <div className="revenue-stat-icon avg">
+                      <FaDollarSign />
+                    </div>
+                  </div>
+                  <h2 className="revenue-stat-value">Rs. {Math.round(revenueStats.avgOrderValue).toLocaleString()}</h2>
+                  <p className="revenue-stat-subtitle">Per transaction</p>
+                </div>
+
+                <div 
+                  className={`revenue-stat-card fees-card clickable ${selectedRevenueMetric === 'fees' ? 'selected' : ''}`}
+                  onClick={() => setSelectedRevenueMetric('fees')}
+                >
+                  <div className="revenue-stat-header">
+                    <p className="revenue-stat-label">PLATFORM FEES</p>
+                    <div className="revenue-stat-icon fees">
+                      <FaChartPie />
+                    </div>
+                  </div>
+                  <h2 className="revenue-stat-value">Rs. {Math.round(revenueStats.platformFees).toLocaleString()}</h2>
+                  <p className="revenue-stat-subtitle">5% from revenue</p>
+                </div>
+
+                <div 
+                  className={`revenue-stat-card net-card clickable ${selectedRevenueMetric === 'net' ? 'selected' : ''}`}
+                  onClick={() => setSelectedRevenueMetric('net')}
+                >
+                  <div className="revenue-stat-header">
+                    <p className="revenue-stat-label">NET REVENUE</p>
+                    <div className="revenue-stat-icon net">
+                      <FaCheckCircle />
+                    </div>
+                  </div>
+                  <h2 className="revenue-stat-value">Rs. {Math.round(revenueStats.netRevenue).toLocaleString()}</h2>
+                  <p className="revenue-stat-subtitle">After platform fees</p>
+                </div>
+              </div>
+
+              <div className="revenue-chart-section">
+                <div className="revenue-chart-header">
+                  <h4 className="revenue-chart-title">
+                    {selectedRevenueMetric === 'revenue' && 'Revenue Trend'}
+                    {selectedRevenueMetric === 'orders' && 'Orders Trend'}
+                    {selectedRevenueMetric === 'avg' && 'Average Order Value Trend'}
+                    {selectedRevenueMetric === 'fees' && 'Platform Fees Trend'}
+                    {selectedRevenueMetric === 'net' && 'Net Revenue Trend'}
+                  </h4>
+                  <p className="revenue-chart-subtitle">
+                    Click on any card above to view its trend
+                  </p>
+                </div>
+                <RevenueTrendChart data={chartData.revenue} />
+              </div>
             </div>
           </div>
         )}
@@ -2605,13 +2633,8 @@ function SellerDashboard() {
         {/* PERFORMANCE TAB */}
         {activeTab === 'performance' && (
           <div className="products-section">
-            <div style={{
-              background: '#ffffff',
-              padding: '32px',
-              borderRadius: '20px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-            }}>
-              <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '20px'}}>Performance Analytics</h3>
+            <div className="performance-container">
+              <h3 className="performance-title">Performance Analytics</h3>
               <TopProductsChart data={chartData.topProducts} />
               <CategoryPerformanceChart data={chartData.categories} />
             </div>
@@ -2621,60 +2644,27 @@ function SellerDashboard() {
         {/* PROFILE TAB */}
         {activeTab === 'profile' && (
           <div className="products-section">
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px'}}>
-              <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b'}}>Seller Profile</h3>
+            <div className="profile-header-row">
+              <h3 className="profile-main-title">Seller Profile</h3>
               <button
                 onClick={() => setIsEditingProfile(!isEditingProfile)}
-                style={{
-                  background: '#00bcd4',
-                  color: 'white',
-                  border: 'none',
-                  padding: '12px 24px',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
+                className="profile-edit-btn"
               >
                 <FaEdit /> {isEditingProfile ? 'Cancel' : 'Edit Profile'}
               </button>
             </div>
 
             {/* Profile Card */}
-            <div style={{
-              background: '#ffffff',
-              padding: '32px',
-              borderRadius: '20px',
-              marginBottom: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-            }}>
+            <div className="profile-card">
               {/* Profile Header */}
-              <div style={{display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '32px'}}>
-                <div style={{position: 'relative'}}>
+              <div className="profile-header">
+                <div className="profile-avatar-wrapper">
                   <img
                     src={profileImage}
                     alt="Profile"
-                    style={{
-                      width: '100px',
-                      height: '100px',
-                      borderRadius: '50%',
-                      border: '4px solid #e5e7eb',
-                      objectFit: 'cover'
-                    }}
+                    className="profile-avatar"
                   />
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '5px',
-                    right: '5px',
-                    width: '20px',
-                    height: '20px',
-                    background: '#10b981',
-                    borderRadius: '50%',
-                    border: '3px solid white'
-                  }}></div>
+                  <div className="profile-status-indicator"></div>
                   
                   {/* Camera Icon Overlay */}
                   {isEditingProfile && (
@@ -2683,26 +2673,12 @@ function SellerDashboard() {
                         type="file"
                         accept="image/*"
                         onChange={handleProfileImageUpload}
-                        style={{display: 'none'}}
+                        className="profile-image-input"
                         id="profile-image-upload"
                       />
                       <label
                         htmlFor="profile-image-upload"
-                        style={{
-                          position: 'absolute',
-                          bottom: '0',
-                          right: '0',
-                          width: '32px',
-                          height: '32px',
-                          background: '#00bcd4',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          border: '3px solid white',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                        }}
+                        className="profile-camera-label"
                         title="Change profile picture"
                       >
                         <svg
@@ -2723,18 +2699,10 @@ function SellerDashboard() {
                   )}
                 </div>
                 <div>
-                  <h2 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '4px'}}>
+                  <h2 className="profile-store-name">
                     {profileData.storeName || 'Store Name'}
                   </h2>
-                  <span style={{
-                    display: 'inline-block',
-                    padding: '4px 12px',
-                    background: '#dbeafe',
-                    color: '#0284c7',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: '600'
-                  }}>
+                  <span className="profile-verified-badge">
                     Verified Seller
                   </span>
                 </div>
@@ -2742,21 +2710,13 @@ function SellerDashboard() {
 
               <form onSubmit={handleProfileUpdate}>
                 {/* Personal Information */}
-                <div style={{marginBottom: '32px'}}>
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    color: '#00bcd4',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
+                <div className="profile-section">
+                  <h3 className="profile-section-title">
                     <FaUser /> Personal Information
                   </h3>
-                  <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px'}}>
+                  <div className="profile-form-grid">
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#64748b'}}>
+                      <label className="profile-form-label">
                         FULL NAME
                       </label>
                       <input
@@ -2764,18 +2724,11 @@ function SellerDashboard() {
                         value={profileData.fullName}
                         onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
                         disabled={!isEditingProfile}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          background: isEditingProfile ? 'white' : '#f9fafb'
-                        }}
+                        className="profile-form-input"
                       />
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#64748b'}}>
+                      <label className="profile-form-label">
                         EMAIL ADDRESS
                       </label>
                       <input
@@ -2783,18 +2736,11 @@ function SellerDashboard() {
                         value={profileData.email}
                         onChange={(e) => setProfileData({...profileData, email: e.target.value})}
                         disabled={!isEditingProfile}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          background: isEditingProfile ? 'white' : '#f9fafb'
-                        }}
+                        className="profile-form-input"
                       />
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#64748b'}}>
+                      <label className="profile-form-label">
                         PHONE NUMBER
                       </label>
                       <input
@@ -2802,18 +2748,11 @@ function SellerDashboard() {
                         value={profileData.phone}
                         onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
                         disabled={!isEditingProfile}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          background: isEditingProfile ? 'white' : '#f9fafb'
-                        }}
+                        className="profile-form-input"
                       />
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#64748b'}}>
+                      <label className="profile-form-label">
                         CITY
                       </label>
                       <input
@@ -2821,18 +2760,11 @@ function SellerDashboard() {
                         value={profileData.city}
                         onChange={(e) => setProfileData({...profileData, city: e.target.value})}
                         disabled={!isEditingProfile}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          background: isEditingProfile ? 'white' : '#f9fafb'
-                        }}
+                        className="profile-form-input"
                       />
                     </div>
-                    <div style={{gridColumn: '1 / -1'}}>
-                      <label style={{display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#64748b'}}>
+                    <div className="profile-full-width">
+                      <label className="profile-form-label">
                         ADDRESS
                       </label>
                       <input
@@ -2840,18 +2772,11 @@ function SellerDashboard() {
                         value={profileData.address}
                         onChange={(e) => setProfileData({...profileData, address: e.target.value})}
                         disabled={!isEditingProfile}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          background: isEditingProfile ? 'white' : '#f9fafb'
-                        }}
+                        className="profile-form-input"
                       />
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#64748b'}}>
+                      <label className="profile-form-label">
                         COUNTRY
                       </label>
                       <input
@@ -2859,35 +2784,20 @@ function SellerDashboard() {
                         value={profileData.country}
                         onChange={(e) => setProfileData({...profileData, country: e.target.value})}
                         disabled={!isEditingProfile}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          background: isEditingProfile ? 'white' : '#f9fafb'
-                        }}
+                        className="profile-form-input"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Store Information */}
-                <div style={{marginBottom: '32px'}}>
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    color: '#00bcd4',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
+                <div className="profile-section">
+                  <h3 className="profile-section-title">
                     <FaBox /> Store Information
                   </h3>
-                  <div style={{display: 'grid', gap: '20px'}}>
+                  <div className="messages-grid">
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#64748b'}}>
+                      <label className="profile-form-label">
                         STORE NAME
                       </label>
                       <input
@@ -2895,18 +2805,11 @@ function SellerDashboard() {
                         value={profileData.storeName}
                         onChange={(e) => setProfileData({...profileData, storeName: e.target.value})}
                         disabled={!isEditingProfile}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          background: isEditingProfile ? 'white' : '#f9fafb'
-                        }}
+                        className="profile-form-input"
                       />
                     </div>
                     <div>
-                      <label style={{display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: '600', color: '#64748b'}}>
+                      <label className="profile-form-label">
                         STORE DESCRIPTION
                       </label>
                       <textarea
@@ -2914,15 +2817,7 @@ function SellerDashboard() {
                         onChange={(e) => setProfileData({...profileData, storeDescription: e.target.value})}
                         disabled={!isEditingProfile}
                         rows="4"
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '10px',
-                          fontSize: '14px',
-                          background: isEditingProfile ? 'white' : '#f9fafb',
-                          resize: 'vertical'
-                        }}
+                        className="profile-form-textarea"
                       />
                     </div>
                   </div>
@@ -2930,92 +2825,46 @@ function SellerDashboard() {
 
                 {/* Account Statistics */}
                 <div>
-                  <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    color: '#00bcd4',
-                    marginBottom: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
+                  <h3 className="profile-section-title">
                     <FaChartBar /> Account Statistics
                   </h3>
-                  <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px'}}>
-                    <div style={{
-                      padding: '20px',
-                      background: '#f0f9ff',
-                      borderRadius: '12px',
-                      textAlign: 'center'
-                    }}>
-                      <FaBox size={24} style={{color: '#0284c7', marginBottom: '8px'}} />
-                      <p style={{fontSize: '12px', color: '#64748b', marginBottom: '4px'}}>TOTAL PRODUCTS</p>
-                      <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b'}}>{stats.totalProducts}</h3>
-                      <p style={{fontSize: '11px', color: '#10b981', marginTop: '4px'}}>+5%</p>
+                  <div className="profile-stats-grid">
+                    <div className="profile-stat-card blue">
+                      <FaBox size={24} className="profile-stat-icon blue" />
+                      <p className="profile-stat-label">TOTAL PRODUCTS</p>
+                      <h3 className="profile-stat-value">{stats.totalProducts}</h3>
+                      <p className="profile-stat-growth">+5%</p>
                     </div>
-                    <div style={{
-                      padding: '20px',
-                      background: '#f0fdf4',
-                      borderRadius: '12px',
-                      textAlign: 'center'
-                    }}>
-                      <FaShoppingCart size={24} style={{color: '#059669', marginBottom: '8px'}} />
-                      <p style={{fontSize: '12px', color: '#64748b', marginBottom: '4px'}}>TOTAL ORDERS</p>
-                      <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b'}}>{stats.totalSold || 0}</h3>
+                    <div className="profile-stat-card green">
+                      <FaShoppingCart size={24} className="profile-stat-icon green" />
+                      <p className="profile-stat-label">TOTAL ORDERS</p>
+                      <h3 className="profile-stat-value">{stats.totalSold || 0}</h3>
                     </div>
-                    <div style={{
-                      padding: '20px',
-                      background: '#fef3c7',
-                      borderRadius: '12px',
-                      textAlign: 'center'
-                    }}>
-                      <FaChartLine size={24} style={{color: '#f59e0b', marginBottom: '8px'}} />
-                      <p style={{fontSize: '12px', color: '#64748b', marginBottom: '4px'}}>TOTAL REVENUE</p>
-                      <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b'}}>Rs. {stats.totalRevenue || 0}</h3>
+                    <div className="profile-stat-card yellow">
+                      <FaChartLine size={24} className="profile-stat-icon yellow" />
+                      <p className="profile-stat-label">TOTAL REVENUE</p>
+                      <h3 className="profile-stat-value">Rs. {stats.totalRevenue || 0}</h3>
                     </div>
-                    <div style={{
-                      padding: '20px',
-                      background: '#f0f9ff',
-                      borderRadius: '12px',
-                      textAlign: 'center'
-                    }}>
-                      <FaChartBar size={24} style={{color: '#8b5cf6', marginBottom: '8px'}} />
-                      <p style={{fontSize: '12px', color: '#64748b', marginBottom: '4px'}}>GROWTH RATE</p>
-                      <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b'}}>0%</h3>
+                    <div className="profile-stat-card purple">
+                      <FaChartBar size={24} className="profile-stat-icon purple" />
+                      <p className="profile-stat-label">GROWTH RATE</p>
+                      <h3 className="profile-stat-value">0%</h3>
                     </div>
                   </div>
                 </div>
 
                 {isEditingProfile && (
-                  <div style={{marginTop: '24px', display: 'flex', gap: '12px'}}>
+                  <div className="profile-actions">
                     <button
                       type="submit"
-                      style={{
-                        background: 'linear-gradient(135deg, #00bcd4 0%, #0097a7 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '14px 32px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        fontSize: '15px',
-                        fontWeight: '700'
-                      }}
+                      className="profile-save-btn"
                     >
                       Save Changes
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsEditingProfile(false)}
-                      style={{
-                        background: '#f1f5f9',
-                        color: '#475569',
-                        border: 'none',
-                        padding: '14px 32px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        fontSize: '15px',
-                        fontWeight: '700'
-                      }}
+                      className="profile-cancel-btn"
                     >
                       Cancel
                     </button>
@@ -3026,99 +2875,55 @@ function SellerDashboard() {
           </div>
         )}
 
+        {/* HELP CENTER TAB */}
+        {activeTab === 'help' && (
+          <HelpCenter sellerId={sellerData?._id} />
+        )}
+
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
           <div className="products-section">
-            <h3 style={{fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '30px'}}>Account Settings</h3>
+            <h3 className="inbox-title">Account Settings</h3>
 
             {/* Security Settings */}
-            <div style={{
-              background: '#ffffff',
-              padding: '32px',
-              borderRadius: '20px',
-              marginBottom: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-            }}>
-              <h4 style={{
-                fontSize: '18px',
-                fontWeight: '700',
-                color: '#00bcd4',
-                marginBottom: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
+            <div className="settings-card">
+              <h4 className="settings-section-title">
                 <FaCog /> Security Settings
               </h4>
 
               {/* Change Password */}
-              <div style={{
-                padding: '20px',
-                background: '#ffffff',
-                borderRadius: '12px',
-                marginBottom: '16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-              }}>
+              <div className="settings-item">
                 <div>
-                  <h5 style={{fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '4px'}}>
+                  <h5 className="settings-item-title">
                     Change Password
                   </h5>
-                  <p style={{fontSize: '13px', color: '#64748b'}}>
+                  <p className="settings-item-description">
                     Update your password to keep your account secure
                   </p>
                 </div>
                 <button
                   onClick={() => setShowChangePasswordModal(true)}
-                  style={{
-                    background: '#00bcd4',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}
+                  className="settings-change-btn"
                 >
                   Change
                 </button>
               </div>
 
               {/* Two-Factor Authentication */}
-              <div style={{
-                padding: '20px',
-                background: '#ffffff',
-                borderRadius: '12px',
-                marginBottom: '16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-              }}>
-                <div style={{flex: 1}}>
-                  <h5 style={{fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '4px'}}>
+              <div className="settings-item">
+                <div className="settings-item-content">
+                  <h5 className="settings-item-title">
                     Two-Factor Authentication
                   </h5>
-                  <p style={{fontSize: '13px', color: '#64748b', marginBottom: twoFAEnabled ? '8px' : '0'}}>
+                  <p className="settings-item-description">
                     Add an extra layer of security to your account
                   </p>
                   {twoFAEnabled && (
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '6px 12px',
-                      background: '#d1fae5',
-                      borderRadius: '20px',
-                      marginTop: '8px'
-                    }}>
+                    <div className="settings-2fa-badge">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"></polyline>
                       </svg>
-                      <span style={{fontSize: '12px', fontWeight: '600', color: '#059669'}}>
+                      <span className="settings-2fa-badge-text">
                         On since {twoFAEnabledDate ? twoFAEnabledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'recently'}
                       </span>
                     </div>
@@ -3127,32 +2932,14 @@ function SellerDashboard() {
                 {twoFAEnabled ? (
                   <button
                     onClick={handleDisable2FA}
-                    style={{
-                      background: '#fee2e2',
-                      color: '#991b1b',
-                      border: '2px solid #fecaca',
-                      padding: '10px 20px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }}
+                    className="settings-disable-btn"
                   >
                     Disable
                   </button>
                 ) : (
                   <button
                     onClick={handleEnable2FA}
-                    style={{
-                      background: '#00bcd4',
-                      color: 'white',
-                      border: 'none',
-                      padding: '10px 20px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }}
+                    className="settings-enable-btn"
                   >
                     Enable
                   </button>
@@ -3160,35 +2947,18 @@ function SellerDashboard() {
               </div>
 
               {/* Login History */}
-              <div style={{
-                padding: '20px',
-                background: '#ffffff',
-                borderRadius: '12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-              }}>
+              <div className="settings-item">
                 <div>
-                  <h5 style={{fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '4px'}}>
+                  <h5 className="settings-item-title">
                     Login History
                   </h5>
-                  <p style={{fontSize: '13px', color: '#64748b'}}>
+                  <p className="settings-item-description">
                     View your recent login activity
                   </p>
                 </div>
                 <button
                   onClick={handleViewLoginHistory}
-                  style={{
-                    background: '#f1f5f9',
-                    color: '#64748b',
-                    border: 'none',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}
+                  className="settings-view-btn"
                 >
                   View
                 </button>
@@ -3196,90 +2966,42 @@ function SellerDashboard() {
             </div>
 
             {/* Account Management */}
-            <div style={{
-              background: '#ffffff',
-              padding: '32px',
-              borderRadius: '20px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-            }}>
-              <h4 style={{
-                fontSize: '18px',
-                fontWeight: '700',
-                color: '#00bcd4',
-                marginBottom: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
+            <div className="settings-card">
+              <h4 className="settings-section-title">
                 <FaUser /> Account Management
               </h4>
 
               {/* Deactivate Account */}
-              <div style={{
-                padding: '20px',
-                background: '#fef3c7',
-                borderRadius: '12px',
-                marginBottom: '16px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                border: '2px solid #fbbf24'
-              }}>
+              <div className="settings-deactivate-item">
                 <div>
-                  <h5 style={{fontSize: '16px', fontWeight: '600', color: '#92400e', marginBottom: '4px'}}>
+                  <h5 className="settings-deactivate-title">
                     Deactivate Account
                   </h5>
-                  <p style={{fontSize: '13px', color: '#78350f'}}>
+                  <p className="settings-deactivate-description">
                     Temporarily disable your account. You can reactivate it anytime.
                   </p>
                 </div>
                 <button
                   onClick={handleDeactivateAccount}
-                  style={{
-                    background: '#fbbf24',
-                    color: '#78350f',
-                    border: 'none',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}
+                  className="settings-deactivate-btn"
                 >
                   Deactivate
                 </button>
               </div>
 
               {/* Delete Account */}
-              <div style={{
-                padding: '20px',
-                background: '#fee2e2',
-                borderRadius: '12px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                border: '2px solid #ef4444'
-              }}>
+              <div className="settings-delete-item">
                 <div>
-                  <h5 style={{fontSize: '16px', fontWeight: '600', color: '#991b1b', marginBottom: '4px'}}>
+                  <h5 className="settings-delete-title">
                     Delete Account
                   </h5>
-                  <p style={{fontSize: '13px', color: '#7f1d1d'}}>
+                  <p className="settings-delete-description">
                     Permanently delete your account and all data. This action cannot be undone.
                   </p>
                 </div>
                 <button
                   onClick={handleDeleteAccount}
-                  style={{
-                    background: '#ef4444',
-                    color: 'white',
-                    border: 'none',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}
+                  className="settings-delete-btn"
                 >
                   Delete
                 </button>
@@ -3291,45 +3013,25 @@ function SellerDashboard() {
 
       {/* EDIT PRODUCT MODAL */}
       {showEditModal && editingProduct && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '32px',
-            borderRadius: '20px',
-            maxWidth: '600px',
-            width: '90%',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-          }}>
-            <h3 style={{marginBottom: '24px', fontSize: '20px'}}>Edit Product</h3>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3 className="modal-title">Edit Product</h3>
             <form onSubmit={handleUpdateProduct}>
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px'}}>
-                <div>
-                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Product Name *</label>
+              <div className="modal-form-grid">
+                <div className="modal-form-group">
+                  <label className="modal-form-label">Product Name *</label>
                   <input
                     type="text"
                     value={editingProduct.name}
                     onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
                     required
-                    style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                    className="modal-form-input"
                   />
                 </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>
+                <div className="modal-form-group">
+                  <label className="modal-form-label">
                     SKU
-                    <span style={{fontSize: '12px', fontWeight: '400', color: '#64748b', marginLeft: '8px'}}>
+                    <span className="modal-form-hint">
                       (Read-only)
                     </span>
                   </label>
@@ -3337,42 +3039,42 @@ function SellerDashboard() {
                     type="text"
                     value={editingProduct.sku || 'Auto-generated'}
                     disabled
-                    style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace', background: '#f9fafb', color: '#64748b'}}
+                    className="modal-form-input"
                   />
                 </div>
               </div>
 
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px'}}>
-                <div>
-                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Price (Rs.) *</label>
+              <div className="modal-form-grid">
+                <div className="modal-form-group">
+                  <label className="modal-form-label">Price (Rs.) *</label>
                   <input
                     type="number"
                     value={editingProduct.price}
                     onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})}
                     required
-                    style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                    className="modal-form-input"
                   />
                 </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Stock *</label>
+                <div className="modal-form-group">
+                  <label className="modal-form-label">Stock *</label>
                   <input
                     type="number"
                     value={editingProduct.stock}
                     onChange={(e) => setEditingProduct({...editingProduct, stock: e.target.value})}
                     required
-                    style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                    className="modal-form-input"
                   />
                 </div>
               </div>
 
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px'}}>
-                <div>
-                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Condition *</label>
+              <div className="modal-form-grid">
+                <div className="modal-form-group">
+                  <label className="modal-form-label">Condition *</label>
                   <select
                     value={editingProduct.condition}
                     onChange={(e) => setEditingProduct({...editingProduct, condition: e.target.value})}
                     required
-                    style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                    className="modal-form-select"
                   >
                     <option value="New">New</option>
                     <option value="Like New">Like New</option>
@@ -3380,13 +3082,13 @@ function SellerDashboard() {
                     <option value="Vintage">Vintage</option>
                   </select>
                 </div>
-                <div>
-                  <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Category *</label>
+                <div className="modal-form-group">
+                  <label className="modal-form-label">Category *</label>
                   <select
                     value={editingProduct.category}
                     onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
                     required
-                    style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px'}}
+                    className="modal-form-select"
                   >
                     <option value="">Select Category</option>
                     <option value="Men's Collection">Men's Collection</option>
@@ -3399,46 +3101,109 @@ function SellerDashboard() {
                 </div>
               </div>
 
-              <div style={{marginBottom: '20px'}}>
-                <label style={{display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px'}}>Description *</label>
+              <div className="modal-form-full-width">
+                <label className="modal-form-label">Description *</label>
                 <textarea
                   value={editingProduct.description}
                   onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
                   required
                   rows="4"
-                  style={{width: '100%', padding: '12px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', resize: 'vertical'}}
+                  className="modal-form-textarea"
                 />
               </div>
 
-              <div style={{display: 'flex', gap: '12px'}}>
+              <div className="modal-actions">
                 <button
                   type="submit"
-                  style={{
-                    background: 'linear-gradient(135deg, #00bcd4 0%, #0097a7 100%)',
-                    color: 'white',
-                    border: 'none',
-                    padding: '14px 32px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '15px',
-                    fontWeight: '700'
-                  }}
+                  className="modal-submit-btn"
                 >
                   Update Product
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowEditModal(false); setEditingProduct(null); }}
-                  style={{
-                    background: '#f1f5f9',
-                    color: '#475569',
-                    border: 'none',
-                    padding: '14px 32px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    fontSize: '15px',
-                    fontWeight: '700'
+                  className="modal-cancel-btn"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* RESTOCK MODAL */}
+      {showRestockModal && restockProduct && (
+        <div className="modal-overlay">
+          <div className="restock-modal-content">
+            <div className="restock-modal-header">
+              <div className="restock-icon">
+                <FaPlus />
+              </div>
+              <h3 className="restock-modal-title">Restock Product</h3>
+            </div>
+            
+            <div className="restock-product-info">
+              <img 
+                src={restockProduct.images?.[0] || 'https://via.placeholder.com/80'} 
+                alt={restockProduct.name}
+                className="restock-product-image"
+              />
+              <div className="restock-product-details">
+                <h4 className="restock-product-name">{restockProduct.name}</h4>
+                <p className="restock-product-sku">SKU: {restockProduct.sku || 'N/A'}</p>
+                <div className="restock-current-stock">
+                  <span className="stock-badge out-of-stock">
+                    <FaTimesCircle /> Out of Stock
+                  </span>
+                  <span className="current-stock-text">Current: {restockProduct.stock} units</span>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleRestockSubmit}>
+              <div className="restock-form-group">
+                <label className="restock-form-label">
+                  Add Quantity *
+                  <span className="restock-form-hint">
+                    How many units do you want to add?
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  value={restockQuantity}
+                  onChange={(e) => setRestockQuantity(e.target.value)}
+                  min="1"
+                  required
+                  placeholder="Enter quantity to add"
+                  autoFocus
+                  className="restock-form-input"
+                />
+                {restockQuantity && parseInt(restockQuantity) > 0 && (
+                  <div className="restock-preview">
+                    <span className="restock-preview-label">New stock will be:</span>
+                    <span className="restock-preview-value">
+                      {restockProduct.stock + parseInt(restockQuantity)} units
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="restock-actions">
+                <button
+                  type="submit"
+                  className="restock-submit-btn"
+                >
+                  <FaCheckCircle /> Confirm Restock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRestockModal(false);
+                    setRestockProduct(null);
+                    setRestockQuantity('');
                   }}
+                  className="restock-cancel-btn"
                 >
                   Cancel
                 </button>
@@ -3450,53 +3215,17 @@ function SellerDashboard() {
 
       {/* 2FA PASSWORD VERIFICATION MODAL */}
       {show2FAModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '40px',
-            borderRadius: '20px',
-            maxWidth: '500px',
-            width: '90%',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-          }}>
-            <h3 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#1e293b',
-              marginBottom: '12px',
-              textAlign: 'center'
-            }}>
+        <div className="twofa-modal-overlay">
+          <div className="twofa-modal-content">
+            <h3 className="twofa-modal-title">
               {twoFAAction === 'enable' ? 'Enable' : 'Disable'} Two-Factor Authentication
             </h3>
-            <p style={{
-              fontSize: '14px',
-              color: '#64748b',
-              marginBottom: '32px',
-              textAlign: 'center',
-              lineHeight: '1.6'
-            }}>
+            <p className="twofa-modal-description">
               Please enter your password to confirm and {twoFAAction} two-factor authentication for your account.
             </p>
 
-            <div style={{marginBottom: '24px'}}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#475569'
-              }}>
+            <div className="twofa-form-group">
+              <label className="twofa-form-label">
                 Password
               </label>
               <input
@@ -3506,39 +3235,14 @@ function SellerDashboard() {
                 onKeyPress={(e) => e.key === 'Enter' && handleConfirm2FA()}
                 placeholder="Enter your password"
                 autoFocus
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '2px solid #e2e8f0',
-                  borderRadius: '12px',
-                  fontSize: '15px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#00bcd4'}
-                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                className="twofa-form-input"
               />
             </div>
 
-            <div style={{display: 'flex', gap: '12px'}}>
+            <div className="twofa-actions">
               <button
                 onClick={handleConfirm2FA}
-                style={{
-                  flex: 1,
-                  background: twoFAAction === 'enable' 
-                    ? 'linear-gradient(135deg, #00bcd4 0%, #0097a7 100%)' 
-                    : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '14px 24px',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  transition: 'transform 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                className={`twofa-confirm-btn ${twoFAAction === 'enable' ? 'enable' : 'disable'}`}
               >
                 {twoFAAction === 'enable' ? 'Enable' : 'Disable'} 2FA
               </button>
@@ -3547,38 +3251,14 @@ function SellerDashboard() {
                   setShow2FAModal(false);
                   setTwoFAPassword('');
                 }}
-                style={{
-                  flex: 1,
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: 'none',
-                  padding: '14px 24px',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                className="twofa-cancel-btn"
               >
                 Cancel
               </button>
             </div>
 
-            <div style={{
-              marginTop: '24px',
-              padding: '16px',
-              background: '#f0f9ff',
-              borderRadius: '12px',
-              border: '1px solid #bae6fd'
-            }}>
-              <p style={{
-                fontSize: '13px',
-                color: '#0369a1',
-                margin: 0,
-                lineHeight: '1.5'
-              }}>
+            <div className="twofa-note">
+              <p className="twofa-note-text">
                 <strong>Note:</strong> Two-factor authentication adds an extra layer of security to your account by requiring additional verification when logging in.
               </p>
             </div>
@@ -3588,61 +3268,20 @@ function SellerDashboard() {
 
       {/* 2FA SUCCESS MODAL */}
       {show2FASuccess && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '40px',
-            borderRadius: '20px',
-            maxWidth: '450px',
-            width: '90%',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-            textAlign: 'center'
-          }}>
+        <div className="twofa-modal-overlay">
+          <div className="success-modal-content">
             {/* Success Icon */}
-            <div style={{
-              width: '80px',
-              height: '80px',
-              background: twoFAAction === 'enable' 
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 24px',
-              animation: 'scaleIn 0.3s ease-out'
-            }}>
+            <div className={`success-icon ${twoFAAction === 'enable' ? 'enable' : 'disable'}`}>
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             </div>
 
-            <h3 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#1e293b',
-              marginBottom: '12px'
-            }}>
+            <h3 className="success-modal-title">
               Two-Factor Authentication {twoFAAction === 'enable' ? 'Enabled' : 'Disabled'}!
             </h3>
             
-            <p style={{
-              fontSize: '15px',
-              color: '#64748b',
-              marginBottom: '32px',
-              lineHeight: '1.6'
-            }}>
+            <p className="success-modal-description">
               {twoFAAction === 'enable' 
                 ? 'Your account is now protected with an additional layer of security.'
                 : 'Two-factor authentication has been removed from your account.'}
@@ -3650,20 +3289,7 @@ function SellerDashboard() {
 
             <button
               onClick={() => setShow2FASuccess(false)}
-              style={{
-                width: '100%',
-                background: 'linear-gradient(135deg, #00bcd4 0%, #0097a7 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '14px 24px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '15px',
-                fontWeight: '700',
-                transition: 'transform 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              className="success-ok-btn"
             >
               OK
             </button>
@@ -3673,99 +3299,49 @@ function SellerDashboard() {
 
       {/* LOGIN HISTORY MODAL */}
       {showLoginHistoryModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '32px',
-            borderRadius: '20px',
-            maxWidth: '700px',
-            width: '90%',
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-          }}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px'}}>
-              <h3 style={{
-                fontSize: '24px',
-                fontWeight: '700',
-                color: '#1e293b',
-                margin: 0
-              }}>
+        <div className="twofa-modal-overlay">
+          <div className="login-history-modal-content">
+            <div className="login-history-header">
+              <h3 className="login-history-title">
                 Login History
               </h3>
               <button
                 onClick={() => setShowLoginHistoryModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '24px',
-                  color: '#64748b',
-                  cursor: 'pointer',
-                  padding: '0',
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '8px'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'none'}
+                className="login-history-close-btn"
               >
                 ×
               </button>
             </div>
 
             {loginHistory.length === 0 ? (
-              <div style={{
-                textAlign: 'center',
-                padding: '60px 20px',
-                color: '#64748b'
-              }}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{margin: '0 auto 16px'}}>
+              <div className="login-history-empty">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="login-history-empty-icon">
                   <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <p style={{fontSize: '16px', fontWeight: '600', marginBottom: '8px'}}>No Login History</p>
-                <p style={{fontSize: '14px'}}>Your login activity will appear here</p>
+                <p className="login-history-empty-title">No Login History</p>
+                <p className="login-history-empty-text">Your login activity will appear here</p>
               </div>
             ) : (
               <div>
                 {loginHistory.map((login, index) => (
-                  <div key={index} style={{
-                    padding: '20px',
-                    background: '#f8fafc',
-                    borderRadius: '12px',
-                    marginBottom: '12px',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px'}}>
-                      <div style={{flex: 1}}>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px'}}>
+                  <div key={index} className="login-history-item">
+                    <div className="login-history-item-header">
+                      <div className="login-history-item-content">
+                        <div className="login-history-device">
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00bcd4" strokeWidth="2">
                             <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
                             <line x1="12" y1="18" x2="12.01" y2="18"></line>
                           </svg>
-                          <span style={{fontSize: '15px', fontWeight: '600', color: '#1e293b'}}>
+                          <span className="login-history-device-name">
                             {login.userAgent || 'Unknown Device'}
                           </span>
                         </div>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}}>
+                        <div className="login-history-time">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12 6 12 12 16 14"></polyline>
                           </svg>
-                          <span style={{fontSize: '13px', color: '#64748b'}}>
+                          <span className="login-history-time-text">
                             {new Date(login.timestamp).toLocaleString('en-US', {
                               month: 'short',
                               day: 'numeric',
@@ -3776,27 +3352,20 @@ function SellerDashboard() {
                           </span>
                         </div>
                         {login.ipAddress && (
-                          <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                          <div className="login-history-ip">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
                               <circle cx="12" cy="12" r="10"></circle>
                               <line x1="2" y1="12" x2="22" y2="12"></line>
                               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                             </svg>
-                            <span style={{fontSize: '13px', color: '#64748b'}}>
+                            <span className="login-history-ip-text">
                               IP: {login.ipAddress}
                             </span>
                           </div>
                         )}
                       </div>
                       {index === 0 && (
-                        <span style={{
-                          padding: '4px 12px',
-                          background: '#dbeafe',
-                          color: '#0284c7',
-                          borderRadius: '12px',
-                          fontSize: '11px',
-                          fontWeight: '600'
-                        }}>
+                        <span className="login-history-current-badge">
                           CURRENT
                         </span>
                       )}
@@ -3808,21 +3377,7 @@ function SellerDashboard() {
 
             <button
               onClick={() => setShowLoginHistoryModal(false)}
-              style={{
-                width: '100%',
-                marginTop: '16px',
-                background: '#f1f5f9',
-                color: '#475569',
-                border: 'none',
-                padding: '14px 24px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '15px',
-                fontWeight: '700',
-                transition: 'background 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
-              onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
+              className="login-history-close-bottom-btn"
             >
               Close
             </button>
@@ -3832,53 +3387,17 @@ function SellerDashboard() {
 
       {/* CHANGE PASSWORD MODAL */}
       {showChangePasswordModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '40px',
-            borderRadius: '20px',
-            maxWidth: '500px',
-            width: '90%',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-          }}>
-            <h3 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#1e293b',
-              marginBottom: '12px',
-              textAlign: 'center'
-            }}>
+        <div className="twofa-modal-overlay">
+          <div className="change-password-modal-content">
+            <h3 className="twofa-modal-title">
               Change Password
             </h3>
-            <p style={{
-              fontSize: '14px',
-              color: '#64748b',
-              marginBottom: '32px',
-              textAlign: 'center',
-              lineHeight: '1.6'
-            }}>
+            <p className="twofa-modal-description">
               Enter your current password and choose a new one
             </p>
 
-            <div style={{marginBottom: '20px'}}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#475569'
-              }}>
+            <div className="change-password-form-group">
+              <label className="change-password-label">
                 Current Password
               </label>
               <input
@@ -3886,28 +3405,12 @@ function SellerDashboard() {
                 value={changePasswordData.currentPassword}
                 onChange={(e) => setChangePasswordData({...changePasswordData, currentPassword: e.target.value})}
                 placeholder="Enter current password"
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '2px solid #e2e8f0',
-                  borderRadius: '12px',
-                  fontSize: '15px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#00bcd4'}
-                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                className="change-password-input"
               />
             </div>
 
-            <div style={{marginBottom: '20px'}}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#475569'
-              }}>
+            <div className="change-password-form-group">
+              <label className="change-password-label">
                 New Password
               </label>
               <input
@@ -3915,28 +3418,12 @@ function SellerDashboard() {
                 value={changePasswordData.newPassword}
                 onChange={(e) => setChangePasswordData({...changePasswordData, newPassword: e.target.value})}
                 placeholder="Enter new password"
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '2px solid #e2e8f0',
-                  borderRadius: '12px',
-                  fontSize: '15px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#00bcd4'}
-                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                className="change-password-input"
               />
             </div>
 
-            <div style={{marginBottom: '24px'}}>
-              <label style={{
-                display: 'block',
-                marginBottom: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#475569'
-              }}>
+            <div className="change-password-form-group">
+              <label className="change-password-label">
                 Confirm New Password
               </label>
               <input
@@ -3945,37 +3432,14 @@ function SellerDashboard() {
                 onChange={(e) => setChangePasswordData({...changePasswordData, confirmPassword: e.target.value})}
                 onKeyPress={(e) => e.key === 'Enter' && handleChangePassword()}
                 placeholder="Confirm new password"
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  border: '2px solid #e2e8f0',
-                  borderRadius: '12px',
-                  fontSize: '15px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#00bcd4'}
-                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                className="change-password-input"
               />
             </div>
 
-            <div style={{display: 'flex', gap: '12px'}}>
+            <div className="change-password-actions">
               <button
                 onClick={handleChangePassword}
-                style={{
-                  flex: 1,
-                  background: 'linear-gradient(135deg, #00bcd4 0%, #0097a7 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '14px 24px',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  transition: 'transform 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                className="change-password-submit-btn"
               >
                 Change Password
               </button>
@@ -3984,20 +3448,7 @@ function SellerDashboard() {
                   setShowChangePasswordModal(false);
                   setChangePasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
                 }}
-                style={{
-                  flex: 1,
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: 'none',
-                  padding: '14px 24px',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  fontSize: '15px',
-                  fontWeight: '700',
-                  transition: 'background 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                onMouseOut={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                className="change-password-cancel-btn"
               >
                 Cancel
               </button>
@@ -4008,82 +3459,32 @@ function SellerDashboard() {
 
       {/* PASSWORD CHANGE SUCCESS MODAL */}
       {showPasswordSuccessModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }}>
-          <div style={{
-            background: '#ffffff',
-            padding: '40px',
-            borderRadius: '20px',
-            maxWidth: '450px',
-            width: '90%',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '80px',
-              height: '80px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 24px'
-            }}>
+        <div className="twofa-modal-overlay">
+          <div className="success-modal-content">
+            <div className="success-icon enable">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             </div>
 
-            <h3 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#1e293b',
-              marginBottom: '12px'
-            }}>
+            <h3 className="success-modal-title">
               Password Changed Successfully!
             </h3>
             
-            <p style={{
-              fontSize: '15px',
-              color: '#64748b',
-              marginBottom: '32px',
-              lineHeight: '1.6'
-            }}>
+            <p className="success-modal-description">
               Your password has been updated. Please use your new password for future logins.
             </p>
 
             <button
               onClick={() => setShowPasswordSuccessModal(false)}
-              style={{
-                width: '100%',
-                background: 'linear-gradient(135deg, #00bcd4 0%, #0097a7 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '14px 24px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontSize: '15px',
-                fontWeight: '700',
-                transition: 'transform 0.2s'
-              }}
-              onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              className="success-ok-btn"
             >
               OK
             </button>
           </div>
         </div>
       )}
+      <Chatbot />
     </div>
   );
 }

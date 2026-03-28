@@ -1,6 +1,6 @@
 .order-status-page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   padding: 20px;
   font-family: 'Arial', sans-serif;
 }
@@ -12,33 +12,37 @@
   background: white;
   border: 1px solid #ddd;
   padding: 10px 20px;
-  border-radius: 5px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   color: #333;
   margin-bottom: 20px;
   transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .back-btn:hover {
   background: #00bcd4;
   color: white;
   border-color: #00bcd4;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,188,212,0.2);
 }
 
 .order-status-hero {
-  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   padding: 60px 20px;
   text-align: center;
-  border-radius: 10px;
+  border-radius: 16px;
   margin-bottom: 40px;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
 }
 
 .order-status-hero h1 {
   font-size: 42px;
   margin: 0 0 10px 0;
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .order-status-hero p {
@@ -52,59 +56,299 @@
   margin: 0 auto;
 }
 
-.track-order-section {
-  background: white;
-  padding: 40px;
-  border-radius: 10px;
-  text-align: center;
+/* Status Summary Cards */
+.status-cards-section {
   margin-bottom: 40px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.track-order-section h2 {
+.status-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.status-summary-card {
+  background: white;
+  border-radius: 16px;
+  padding: 30px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 2px solid transparent;
+}
+
+.status-summary-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  border-color: #00bcd4;
+}
+
+.status-card-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-card-content {
+  flex: 1;
+}
+
+.status-card-content h3 {
+  font-size: 12px;
+  color: #999;
+  margin: 0 0 5px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.status-card-count {
+  font-size: 36px;
+  font-weight: 700;
   color: #333;
-  font-size: 28px;
-  margin-bottom: 20px;
+  margin: 5px 0;
 }
 
-.track-box {
-  max-width: 500px;
-  margin: 0 auto;
-}
-
-.track-box p {
+.status-card-content p {
+  font-size: 13px;
   color: #666;
-  font-size: 16px;
-  margin-bottom: 20px;
+  margin: 0;
 }
 
-.track-btn {
-  background: #00bcd4;
-  color: white;
+/* Tabs */
+.tabs-section {
+  margin-bottom: 30px;
+}
+
+.tabs-container {
+  background: white;
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 14px 20px;
   border: none;
-  padding: 15px 40px;
-  border-radius: 5px;
-  font-size: 16px;
-  font-weight: 500;
+  background: transparent;
+  color: #666;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.tab-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Overview Section */
+.overview-section {
+  margin-bottom: 40px;
+}
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.quick-action-card {
+  background: white;
+  border-radius: 16px;
+  padding: 35px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transition: all 0.3s;
+}
+
+.quick-action-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.quick-action-card h3 {
+  font-size: 22px;
+  color: #333;
+  margin: 0 0 10px 0;
+}
+
+.quick-action-card p {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 25px 0;
+  line-height: 1.6;
+}
+
+.action-btn {
+  padding: 14px 32px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
 }
 
-.track-btn:hover {
-  background: #0097a7;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,188,212,0.3);
+.action-btn.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
+.action-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.action-btn.secondary {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.action-btn.secondary:hover {
+  background: #667eea;
+  color: white;
+}
+
+/* Tracking Timeline */
+.tracking-timeline-section {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  margin-bottom: 40px;
+}
+
+.tracking-timeline-section h2 {
+  font-size: 28px;
+  color: #333;
+  text-align: center;
+  margin: 0 0 40px 0;
+}
+
+.timeline-container {
+  max-width: 600px;
+  margin: 0 auto 30px;
+  position: relative;
+}
+
+.timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  position: relative;
+  padding-bottom: 40px;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+  z-index: 2;
+  position: relative;
+}
+
+.timeline-item.completed .timeline-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.timeline-item.pending .timeline-icon {
+  background: #f5f5f5;
+  color: #999;
+  border: 2px solid #e0e0e0;
+}
+
+.timeline-content {
+  flex: 1;
+  padding-top: 8px;
+}
+
+.timeline-content h4 {
+  font-size: 16px;
+  color: #333;
+  margin: 0 0 5px 0;
+  font-weight: 600;
+}
+
+.timeline-content p {
+  font-size: 13px;
+  color: #666;
+  margin: 0;
+}
+
+.timeline-item.pending .timeline-content h4,
+.timeline-item.pending .timeline-content p {
+  color: #999;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 24px;
+  top: 50px;
+  width: 2px;
+  height: calc(100% - 10px);
+  background: linear-gradient(180deg, #667eea 0%, #e0e0e0 100%);
+}
+
+.timeline-item.pending .timeline-line {
+  background: #e0e0e0;
+}
+
+.tracking-note {
+  text-align: center;
+  padding: 30px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  margin-top: 30px;
+}
+
+.tracking-note p {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 20px 0;
+}
+
+/* Status Detail Cards */
 .statuses-section {
   margin-bottom: 40px;
 }
 
 .statuses-section h2 {
-  color: #333;
   font-size: 32px;
+  color: #333;
   text-align: center;
-  margin-bottom: 30px;
+  margin: 0 0 30px 0;
 }
 
 .statuses-grid {
@@ -113,46 +357,58 @@
   gap: 20px;
 }
 
-.status-card {
+.status-detail-card {
   background: white;
-  padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   transition: all 0.3s;
 }
 
-.status-card:hover {
+.status-detail-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
 }
 
-.status-icon {
+.status-detail-header {
+  padding: 25px;
+  text-align: center;
+}
+
+.status-detail-icon {
   margin-bottom: 15px;
 }
 
-.status-card h3 {
-  font-size: 24px;
-  margin: 0 0 15px 0;
+.status-detail-header h3 {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 700;
+}
+
+.status-detail-body {
+  padding: 25px;
 }
 
 .status-description {
   color: #666;
   font-size: 14px;
   line-height: 1.6;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .status-timeline {
-  background: #f5f5f5;
-  padding: 10px 15px;
-  border-radius: 5px;
+  background: #f8f9fa;
+  padding: 12px 16px;
+  border-radius: 8px;
   font-size: 13px;
   color: #333;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  border-left: 3px solid #667eea;
 }
 
 .status-timeline strong {
-  color: #00bcd4;
+  color: #667eea;
+  font-weight: 600;
 }
 
 .status-actions {
@@ -163,7 +419,8 @@
 .status-actions strong {
   display: block;
   color: #333;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  font-weight: 600;
 }
 
 .status-actions ul {
@@ -172,115 +429,62 @@
 }
 
 .status-actions li {
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   line-height: 1.5;
 }
 
-.tracking-section {
+/* How It Works */
+.how-it-works-section {
   background: white;
+  border-radius: 16px;
   padding: 40px;
-  border-radius: 10px;
-  margin-bottom: 40px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
-.tracking-section h2 {
-  color: #333;
+.how-it-works-section h2 {
   font-size: 28px;
+  color: #333;
   text-align: center;
-  margin-bottom: 40px;
+  margin: 0 0 40px 0;
 }
 
-.tracking-steps {
+.steps-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 30px;
 }
 
-.tracking-step {
+.step-card {
   text-align: center;
 }
 
 .step-number {
   width: 60px;
   height: 60px;
-  background: #00bcd4;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
-  font-weight: bold;
-  margin: 0 auto 15px;
+  font-weight: 700;
+  margin: 0 auto 20px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.tracking-step h3 {
+.step-card h3 {
   color: #333;
   font-size: 18px;
   margin: 0 0 10px 0;
+  font-weight: 600;
 }
 
-.tracking-step p {
+.step-card p {
   color: #666;
   font-size: 14px;
   margin: 0;
-}
-
-.help-section {
-  background: white;
-  padding: 40px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.help-section h2 {
-  color: #333;
-  font-size: 28px;
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.help-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-}
-
-.help-card {
-  background: #f5f5f5;
-  padding: 30px;
-  border-radius: 10px;
-  text-align: center;
-}
-
-.help-card h3 {
-  color: #333;
-  font-size: 20px;
-  margin: 0 0 10px 0;
-}
-
-.help-card p {
-  color: #666;
-  font-size: 14px;
-  margin: 0 0 20px 0;
-}
-
-.help-card button {
-  background: #00bcd4;
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: 5px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.help-card button:hover {
-  background: #0097a7;
-  transform: translateY(-2px);
+  line-height: 1.6;
 }
 
 @media (max-width: 768px) {
@@ -292,21 +496,28 @@
     font-size: 16px;
   }
 
+  .status-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs-container {
+    flex-direction: column;
+  }
+
+  .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
   .statuses-grid {
     grid-template-columns: 1fr;
   }
 
-  .tracking-steps {
+  .steps-grid {
     grid-template-columns: 1fr;
   }
 
-  .help-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .track-order-section,
-  .tracking-section,
-  .help-section {
-    padding: 20px;
+  .tracking-timeline-section,
+  .how-it-works-section {
+    padding: 25px;
   }
 }

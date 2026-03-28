@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { FiSearch, FiUser, FiShoppingCart, FiHeart, FiArrowLeft, FiStar } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { FiSearch, FiUser, FiShoppingCart, FiHeart, FiArrowLeft, FiStar, FiArrowRight, FiTag, FiFilter } from 'react-icons/fi';
 import './Shop.css';
-import { productAPI, cartAPI } from './services/api';
+import { productAPI, cartAPI } from '../services/api';;
 
 function Shop() {
   const navigate = useNavigate();
@@ -10,6 +10,8 @@ function Shop() {
   const categoryParam = searchParams.get('category');
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [favorites, setFavorites] = useState([]);
   const [cart, setCart] = useState([]);
   const [user, setUser] = useState(null);
@@ -83,7 +85,7 @@ function Shop() {
         setSelectedCategory('KIDS');
       }
     }
-  }, [categoryParam]);
+  }, [categoryParam, selectedCategory]);
 
   // Infinite scroll
   useEffect(() => {
@@ -144,7 +146,27 @@ function Shop() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const products = await productAPI.getAll({ limit: 20, page: 1 });
+      
+      // Build search params
+      const params = {
+        limit: 20,
+        page: 1
+      };
+      
+      if (searchQuery.trim()) {
+        params.q = searchQuery;
+      }
+      
+      if (selectedCategory !== 'ALL') {
+        params.category = selectedCategory;
+      }
+      
+      // Use advanced search if there are filters, otherwise use regular getAll
+      const response = searchQuery.trim() || selectedCategory !== 'ALL' 
+        ? await productAPI.search(params)
+        : await productAPI.getAll(params);
+      
+      const products = response.products || response;
       
       if (products && products.length > 0) {
         const mappedProducts = products.map(p => ({
@@ -166,25 +188,86 @@ function Shop() {
         setAllProducts(mappedProducts);
         setPage(1);
         setHasMore(products.length >= 20);
+      } else {
+        setAllProducts([]);
+        setHasMore(false);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
+      setAllProducts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredProducts = allProducts.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'ALL' || 
-      (selectedCategory === 'MEN' && product.name.toLowerCase().includes('men')) ||
-      (selectedCategory === 'WOMEN' && product.name.toLowerCase().includes('women')) ||
-      (selectedCategory === 'KIDS' && (product.name.toLowerCase().includes('kid') || product.name.toLowerCase().includes('boy') || product.name.toLowerCase().includes('girl'))) ||
-      (selectedCategory === 'SPORTS' && (product.name.toLowerCase().includes('sport') || product.name.toLowerCase().includes('track') || product.name.toLowerCase().includes('athletic'))) ||
-      (selectedCategory === 'VINTAGE' && product.name.toLowerCase().includes('vintage'));
+  // Fetch search suggestions
+  const fetchSuggestions = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
     
-    return matchesSearch && matchesCategory;
-  });
+    try {
+      const response = await productAPI.getSuggestions(query);
+      if (response.success) {
+        // Format suggestions with product images
+        const formattedSuggestions = {
+          products: response.suggestions.products.map(p => ({
+            ...p,
+            type: 'product'
+          })),
+          collections: [
+            ...response.suggestions.categories.map(c => ({
+              name: c.name,
+              type: 'category'
+            })),
+            ...response.suggestions.brands.map(b => ({
+              name: b.name,
+              type: 'brand'
+            }))
+          ],
+          sellers: response.suggestions.sellers.map(s => ({
+            ...s,
+            type: 'seller'
+          }))
+        };
+        
+        setSearchSuggestions(formattedSuggestions);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+    }
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    fetchSuggestions(value);
+  };
+
+  // Handle search submit
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    setShowSuggestions(false);
+    fetchProducts();
+  };
+
+  // Handle suggestion click
+  const handleSuggestionClick = (suggestion) => {
+    setSearchQuery(suggestion.name);
+    setShowSuggestions(false);
+    
+    // If it's a category, set the category filter
+    if (suggestion.type === 'category') {
+      setSelectedCategory(suggestion.name.toUpperCase());
+    }
+    
+    // Trigger search
+    setTimeout(() => fetchProducts(), 100);
+  };
 
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
@@ -199,43 +282,6 @@ function Shop() {
   const handleSubcategoryClick = (categoryParam) => {
     navigate(`/shop?category=${categoryParam}`);
     setShowCategoryCards(false);
-  };
-
-  const toggleSection = (section) => {
-    setCollapsedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  const handleGenderChange = (gender) => {
-    setSelectedGenders(prev => 
-      prev.includes(gender) ? prev.filter(g => g !== gender) : [...prev, gender]
-    );
-  };
-
-  const handleSizeChange = (size) => {
-    setSelectedSizes(prev => 
-      prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
-    );
-  };
-
-  const handleBrandChange = (brand) => {
-    setSelectedBrands(prev => 
-      prev.includes(brand) ? prev.filter(b => b !== brand) : [...prev, brand]
-    );
-  };
-
-  const handleColorChange = (color) => {
-    setSelectedColors(prev => 
-      prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]
-    );
-  };
-
-  const handlePriceRangeChange = (range) => {
-    setSelectedPriceRange(prev => 
-      prev.includes(range) ? prev.filter(r => r !== range) : [...prev, range]
-    );
   };
 
   const isDiscountActive = (discount) => {
@@ -313,6 +359,133 @@ function Shop() {
     <div className="shop-page">
       <header className="shop-header">
         <h1>Shop All Products</h1>
+        <div className="search-container">
+          <form onSubmit={handleSearchSubmit} className="search-form">
+            <FiSearch className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search products, brands, categories..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onFocus={() => searchSuggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            />
+            {searchQuery && (
+              <button 
+                type="button" 
+                className="clear-search"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchSuggestions([]);
+                  setShowSuggestions(false);
+                  fetchProducts();
+                }}
+              >
+                ×
+              </button>
+            )}
+          </form>
+          {showSuggestions && (searchSuggestions.products?.length > 0 || searchSuggestions.collections?.length > 0 || searchSuggestions.sellers?.length > 0) && (
+            <div className="search-suggestions">
+              {/* Products Section */}
+              {searchSuggestions.products && searchSuggestions.products.length > 0 && (
+                <div className="suggestions-section">
+                  <div className="suggestions-header">
+                    <span className="suggestions-title">PRODUCTS</span>
+                    <FiArrowRight className="suggestions-arrow" />
+                  </div>
+                  {searchSuggestions.products.map((product, index) => (
+                    <div
+                      key={`product-${index}`}
+                      className="suggestion-item product-suggestion"
+                      onClick={() => {
+                        navigate(`/product/${product._id}`);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      {product.image ? (
+                        <img 
+                          src={product.image} 
+                          alt={product.name}
+                          className="suggestion-product-image"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="suggestion-product-placeholder">
+                          <FiShoppingCart />
+                        </div>
+                      )}
+                      <div className="suggestion-details">
+                        <span className="suggestion-text">{product.name}</span>
+                        <div className="suggestion-meta">
+                          {product.category && (
+                            <span className="suggestion-category">{product.category}</span>
+                          )}
+                          {product.price && (
+                            <span className="suggestion-price">Rs. {product.price.toLocaleString()}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Collections Section (Categories + Brands) */}
+              {searchSuggestions.collections && searchSuggestions.collections.length > 0 && (
+                <div className="suggestions-section">
+                  <div className="suggestions-header">
+                    <span className="suggestions-title">COLLECTIONS</span>
+                    <FiArrowRight className="suggestions-arrow" />
+                  </div>
+                  {searchSuggestions.collections.map((collection, index) => (
+                    <div
+                      key={`collection-${index}`}
+                      className="suggestion-item collection-suggestion"
+                      onClick={() => handleSuggestionClick(collection)}
+                    >
+                      <div className="suggestion-icon-wrapper">
+                        {collection.type === 'brand' ? <FiTag /> : <FiFilter />}
+                      </div>
+                      <div className="suggestion-details">
+                        <span className="suggestion-text">{collection.name}</span>
+                        <span className="suggestion-type">{collection.type}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Sellers Section */}
+              {searchSuggestions.sellers && searchSuggestions.sellers.length > 0 && (
+                <div className="suggestions-section">
+                  <div className="suggestions-header">
+                    <span className="suggestions-title">SELLERS</span>
+                    <FiArrowRight className="suggestions-arrow" />
+                  </div>
+                  {searchSuggestions.sellers.map((seller, index) => (
+                    <div
+                      key={`seller-${index}`}
+                      className="suggestion-item seller-suggestion"
+                      onClick={() => {
+                        setSearchQuery(seller.name);
+                        setShowSuggestions(false);
+                        setTimeout(() => fetchProducts(), 100);
+                      }}
+                    >
+                      <div className="suggestion-icon-wrapper">
+                        <FiUser />
+                      </div>
+                      <span className="suggestion-text">{seller.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="filter-tabs">
@@ -366,9 +539,9 @@ function Shop() {
             </div>
           ) : (
             <div className="product-grid">
-              {filteredProducts.map(product => (
-                <div key={product.id} className="product-card">
-                  <div className="product-image" onClick={() => navigate(`/product/${product.id}`)}>
+              {allProducts.map(product => (
+                <div key={product.id} className="product-card" onClick={() => navigate(`/product/${product.id}`)}>
+                  <div className="product-image-container">
                     <img 
                       src={product.image} 
                       alt={product.name} 
@@ -380,39 +553,31 @@ function Shop() {
                     {product.discount && isDiscountActive(product.discount) && (
                       <div className="discount-badge">{product.discount.percentage}% OFF</div>
                     )}
+                    <button 
+                      className="wishlist-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(product.id);
+                      }}
+                    >
+                      <FiHeart className={favorites.includes(product.id) ? 'favorited' : ''} />
+                    </button>
                   </div>
-                  <div className="product-info">
-                    <h3>{product.name}</h3>
-                    {product.discount && isDiscountActive(product.discount) ? (
-                      <div className="price-container">
-                        <p className="product-price discounted">Rs. {product.discountedPrice.toLocaleString()}</p>
-                        <p className="product-price original">Rs. {product.price.toLocaleString()}</p>
-                      </div>
-                    ) : (
-                      <p className="product-price">Rs. {product.price.toLocaleString()}</p>
-                    )}
-                    {product.discount && isDiscountActive(product.discount) && (
-                      <p className="discount-validity">
-                        Valid until {new Date(product.discount.endDate).toLocaleDateString()}
-                      </p>
-                    )}
-                    {product.paymentOptions && product.paymentOptions.length > 0 && (
-                      <div className="payment-icons">
-                        {product.paymentOptions.map((option) => {
-                          const icons = {
-                            cod: '💵',
-                            online: '💳',
-                            esewa: '🟢',
-                            khalti: '🟣',
-                            card: '💳'
-                          };
-                          return (
-                            <span key={option} className="payment-icon-small" title={option.toUpperCase()}>
-                              {icons[option] || '💳'}
-                            </span>
-                          );
-                        })}
-                      </div>
+                  <div className="product-details">
+                    <h3 className="product-name">{product.name}</h3>
+                    <p className="product-category">{product.category}</p>
+                    <div className="product-pricing">
+                      {product.discount && isDiscountActive(product.discount) ? (
+                        <>
+                          <span className="current-price">Rs. {product.discountedPrice.toLocaleString()}</span>
+                          <span className="original-price">Rs. {product.price.toLocaleString()}</span>
+                        </>
+                      ) : (
+                        <span className="current-price">Rs. {product.price.toLocaleString()}</span>
+                      )}
+                    </div>
+                    {product.condition && (
+                      <span className="product-condition">{product.condition}</span>
                     )}
                   </div>
                 </div>

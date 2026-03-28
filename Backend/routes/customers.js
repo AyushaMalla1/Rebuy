@@ -2,9 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Customer = require('../models/Customer');
 const User = require('../models/User');
-const { upload } = require('../config/cloudinary');
-const fs = require('fs');
-const path = require('path');
+const { upload, cloudinary } = require('../config/cloudinary');
 
 // Upload profile image
 router.post('/:userId/profile-image', upload.single('profileImage'), async (req, res) => {
@@ -13,7 +11,7 @@ router.post('/:userId/profile-image', upload.single('profileImage'), async (req,
       return res.status(400).json({ message: 'No image file provided' });
     }
 
-    const imageUrl = `/uploads/profile-images/${req.file.filename}`;
+    const imageUrl = req.file.path;
 
     // Update customer profile image
     let customer = await Customer.findOne({ user: req.params.userId });
@@ -32,13 +30,11 @@ router.post('/:userId/profile-image', upload.single('profileImage'), async (req,
         profileImage: imageUrl
       });
     } else {
-      // Delete old image file if exists
+      // Delete old image from cloudinary if exists
       if (customer.profileImage) {
         try {
-          const oldImagePath = path.join(__dirname, '..', customer.profileImage);
-          if (fs.existsSync(oldImagePath)) {
-            fs.unlinkSync(oldImagePath);
-          }
+          const publicId = customer.profileImage.split('/').pop().split('.')[0];
+          await cloudinary.uploader.destroy(`rebuy-products/${publicId}`);
         } catch (err) {
           console.error('Error deleting old image:', err);
         }
@@ -69,12 +65,10 @@ router.delete('/:userId/profile-image', async (req, res) => {
 
     if (customer.profileImage) {
       try {
-        const imagePath = path.join(__dirname, '..', customer.profileImage);
-        if (fs.existsSync(imagePath)) {
-          fs.unlinkSync(imagePath);
-        }
+        const publicId = customer.profileImage.split('/').pop().split('.')[0];
+        await cloudinary.uploader.destroy(`rebuy-products/${publicId}`);
       } catch (err) {
-        console.error('Error deleting image file:', err);
+        console.error('Error deleting image from cloudinary:', err);
       }
     }
 

@@ -5,6 +5,179 @@ const Seller = require('../models/Seller');
 const { validatePaymentOptions } = require('../utils/paymentOptions');
 const { validateDiscount, calculateDiscountedPrice } = require('../utils/discount');
 
+// Advanced search endpoint
+router.get('/search', async (req, res) => {
+  try {
+    const { 
+      q, // search query
+      category, 
+      condition, 
+      minPrice, 
+      maxPrice, 
+      size,
+      brand,
+      sort = 'relevance',
+      page = 1,
+      limit = 24 
+    } = req.query;
+    
+    let query = { status: 'Approved' };
+    
+    // Text search across multiple fields
+    if (q && q.trim()) {
+      query.$or = [
+        { name: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { brand: { $regex: q, $options: 'i' } },
+        { category: { $regex: q, $options: 'i' } },
+        { storeName: { $regex: q, $options: 'i' } }
+      ];
+    }
+    
+    // Filter by category
+    if (category && category !== 'ALL') {
+      query.category = category;
+    }
+    
+    // Filter by condition
+    if (condition) {
+      query.condition = condition;
+    }
+    
+    // Filter by price range
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = parseFloat(minPrice);
+      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+    }
+    
+    // Filter by size
+    if (size) {
+      query.size = size;
+    }
+    
+    // Filter by brand
+    if (brand) {
+      query.brand = { $regex: brand, $options: 'i' };
+    }
+    
+    // Sort options
+    let sortOption = { createdAt: -1 }; // Default: newest first
+    if (sort === 'price-low') sortOption = { price: 1 };
+    if (sort === 'price-high') sortOption = { price: -1 };
+    if (sort === 'popular') sortOption = { sold: -1 };
+    if (sort === 'rating') sortOption = { rating: -1 };
+    if (sort === 'name') sortOption = { name: 1 };
+    
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Execute query
+    const products = await Product.find(query)
+      .sort(sortOption)
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    // Get total count for pagination
+    const total = await Product.countDocuments(query);
+    
+    // Get available filters based on current search
+    const categories = await Product.distinct('category', { status: 'Approved' });
+    const conditions = await Product.distinct('condition', { status: 'Approved' });
+    const sizes = await Product.distinct('size', { status: 'Approved' });
+    const brands = await Product.distinct('brand', { status: 'Approved' });
+    
+    res.json({
+      success: true,
+      products,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      },
+      filters: {
+        categories,
+        conditions,
+        sizes,
+        brands: brands.filter(b => b && b !== 'Unbranded')
+      }
+    });
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Search failed', 
+      error: error.message 
+    });
+  }
+});
+
+// Search suggestions (autocomplete)
+router.get('/suggestions', async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || q.trim().length < 2) {
+      return res.json({ success: true, suggestions: [] });
+    }
+    
+    // Get product suggestions with images
+    const productSuggestions = await Product.find({
+      status: 'Approved',
+      name: { $regex: q, $options: 'i' }
+    })
+    .select('name category images price')
+    .limit(5);
+    
+    // Get brand suggestions
+    const brandSuggestions = await Product.distinct('brand', {
+      status: 'Approved',
+      brand: { $regex: q, $options: 'i' }
+    });
+    
+    // Get category suggestions
+    const categorySuggestions = await Product.distinct('category', {
+      status: 'Approved',
+      category: { $regex: q, $options: 'i' }
+    });
+    
+    // Get seller/store suggestions
+    const sellerSuggestions = await Seller.find({
+      $or: [
+        { storeName: { $regex: q, $options: 'i' } },
+        { fullName: { $regex: q, $options: 'i' } }
+      ]
+    })
+    .select('storeName fullName')
+    .limit(3);
+    
+    res.json({
+      success: true,
+      suggestions: {
+        products: productSuggestions.map(p => ({ 
+          _id: p._id,
+          name: p.name, 
+          category: p.category, 
+          image: p.images[0] || null,
+          price: p.price,
+          type: 'product' 
+        })),
+        brands: brandSuggestions.slice(0, 3).map(b => ({ name: b, type: 'brand' })),
+        categories: categorySuggestions.slice(0, 3).map(c => ({ name: c, type: 'category' })),
+        sellers: sellerSuggestions.map(s => ({ name: s.storeName || s.fullName, type: 'seller' }))
+      }
+    });
+  } catch (error) {
+    console.error('Suggestions error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to get suggestions', 
+      error: error.message 
+    });
+  }
+});
+
 // Get all approved products (for landing page)
 router.get('/', async (req, res) => {
   try {
@@ -46,7 +219,7 @@ router.get('/', async (req, res) => {
 // Get single product
 router.get('/:id', async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id).populate('seller', 'fullName email storeName');
+    const product = await Product.findById(req.params.id).populate('seller', 'fullName email storeName profileImage rating totalSales totalProducts totalReviews responseTime shippingTime badges joinedDate');
     
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
@@ -56,6 +229,24 @@ router.get('/:id', async (req, res) => {
     const productObj = product.toObject();
     if (productObj.discount) {
       productObj.discountedPrice = calculateDiscountedPrice(productObj.price, productObj.discount);
+    }
+    
+    // Add seller information
+    if (productObj.seller) {
+      productObj.sellerInfo = {
+        id: productObj.seller._id,
+        name: productObj.seller.fullName,
+        storeName: productObj.seller.storeName,
+        avatar: productObj.seller.profileImage || 'https://i.pravatar.cc/100',
+        rating: productObj.seller.rating || 5.0,
+        totalReviews: productObj.seller.totalReviews || 0,
+        totalTransactions: productObj.seller.totalSales || 0,
+        itemsForSale: productObj.seller.totalProducts || 0,
+        badges: productObj.seller.badges || ['New Seller'],
+        joinedDate: productObj.seller.joinedDate || productObj.seller.createdAt,
+        responseTime: productObj.seller.responseTime || '1 hour',
+        shippingTime: productObj.seller.shippingTime || '1-2 days'
+      };
     }
     
     res.json(productObj);

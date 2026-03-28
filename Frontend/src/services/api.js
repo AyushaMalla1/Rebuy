@@ -36,6 +36,11 @@ export const authAPI = {
     method: 'POST',
     body: JSON.stringify(credentials),
   }),
+  
+  changePassword: (userId, passwordData) => apiCall(`/auth/change-password/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(passwordData),
+  }),
 };
 
 // Product APIs
@@ -167,6 +172,78 @@ export const sellerAPI = {
   }),
 };
 
+// Customer APIs
+export const customerAPI = {
+  get: (userId) => apiCall(`/customers/${userId}`),
+  
+  update: (userId, customerData) => apiCall(`/customers/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify(customerData),
+  }),
+  
+  getAddresses: (userId) => apiCall(`/customers/${userId}/addresses`),
+  
+  addAddress: (userId, addressData) => apiCall(`/customers/${userId}/addresses`, {
+    method: 'POST',
+    body: JSON.stringify(addressData),
+  }),
+  
+  updateAddress: (userId, addressId, addressData) => apiCall(`/customers/${userId}/addresses/${addressId}`, {
+    method: 'PUT',
+    body: JSON.stringify(addressData),
+  }),
+  
+  deleteAddress: (userId, addressId) => apiCall(`/customers/${userId}/addresses/${addressId}`, {
+    method: 'DELETE',
+  }),
+  
+  setDefaultAddress: (userId, addressId) => apiCall(`/customers/${userId}/addresses/${addressId}/default`, {
+    method: 'PATCH',
+  }),
+  
+  updatePreferences: (userId, preferences) => apiCall(`/customers/${userId}/preferences`, {
+    method: 'PATCH',
+    body: JSON.stringify(preferences),
+  }),
+  
+  updateStatus: (userId, status) => apiCall(`/customers/${userId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  }),
+  
+  update2FA: (userId, enabled) => apiCall(`/customers/${userId}/2fa`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  }),
+  
+  addLoginHistory: (userId, loginData) => apiCall(`/customers/${userId}/login-history`, {
+    method: 'POST',
+    body: JSON.stringify(loginData),
+  }),
+  
+  uploadProfileImage: async (userId, imageFile) => {
+    const formData = new FormData();
+    formData.append('profileImage', imageFile);
+    
+    const response = await fetch(`${API_URL}/customers/${userId}/profile-image`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to upload image');
+    }
+    
+    return data;
+  },
+  
+  deleteProfileImage: (userId) => apiCall(`/customers/${userId}/profile-image`, {
+    method: 'DELETE',
+  }),
+};
+
 export default {
   auth: authAPI,
   products: productAPI,
@@ -176,4 +253,5 @@ export default {
   reviews: reviewAPI,
   wishlist: wishlistAPI,
   seller: sellerAPI,
+  customer: customerAPI,
 };

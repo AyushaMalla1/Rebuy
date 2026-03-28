@@ -183,8 +183,11 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password, userType } = req.body;
 
+    console.log('Login attempt:', { email, userType, passwordLength: password?.length });
+
     // Validation
     if (!email || !password) {
+      console.log('Missing credentials');
       return res.status(400).json({ 
         success: false, 
         message: 'Please provide email and password' 
@@ -195,6 +198,7 @@ router.post('/login', async (req, res) => {
     if (userType === 'seller') {
       const seller = await Seller.findOne({ email });
       if (!seller) {
+        console.log('Seller not found:', email);
         return res.status(401).json({ 
           success: false, 
           message: 'Invalid email or password' 
@@ -203,6 +207,7 @@ router.post('/login', async (req, res) => {
 
       // Check password
       const isPasswordValid = await seller.comparePassword(password);
+      console.log('Seller password valid:', isPasswordValid);
       if (!isPasswordValid) {
         return res.status(401).json({ 
           success: false, 
@@ -213,6 +218,7 @@ router.post('/login', async (req, res) => {
       // Generate token
       const token = generateToken(seller._id);
 
+      console.log('Seller login successful:', email);
       return res.status(200).json({
         success: true,
         message: 'Login successful',
@@ -236,14 +242,16 @@ router.post('/login', async (req, res) => {
     // Otherwise, check User collection for customers
     const user = await User.findOne({ email });
     if (!user) {
+      console.log('User not found:', email);
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid email or password' 
-      });
+        });
     }
 
     // Check password
     const isPasswordValid = await user.comparePassword(password);
+    console.log('User password valid:', isPasswordValid);
     if (!isPasswordValid) {
       return res.status(401).json({ 
         success: false, 
@@ -253,6 +261,8 @@ router.post('/login', async (req, res) => {
 
     // Generate token
     const token = generateToken(user._id);
+
+    console.log('Customer login successful:', email);
 
     const userResponse = {
       _id: user._id,
@@ -280,7 +290,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Forgot Password Route
+// Forgot Password Route - Send OTP
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -291,62 +301,151 @@ router.post('/forgot-password', async (req, res) => {
 
     // Check in User model
     let user = await User.findOne({ email });
-    let userType = 'buyer';
+    let Model = User;
 
     // If not found in User, check in Seller model
     if (!user) {
       user = await Seller.findOne({ email });
-      userType = 'seller';
+      Model = Seller;
     }
 
     if (!user) {
       // Don't reveal if email exists or not for security
       return res.json({ 
-        message: 'If an account exists with this email, you will receive password reset instructions.' 
+        success: true,
+        message: 'If an account exists with this email, you will receive an OTP to reset your password.' 
       });
     }
 
-    // Generate a simple reset token (in production, use crypto and store in DB with expiry)
-    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // In a real application, you would:
-    // 1. Store the reset token in the database with an expiry time
-    // 2. Send an email with a link containing the token
-    // 3. Create a reset password page that validates the token
+    // Set OTP expiry to 10 minutes from now
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     
-    // For now, we'll just return a success message
-    console.log(`Password reset requested for: ${email}`);
-    console.log(`Reset token (for development): ${resetToken}`);
-    console.log(`User type: ${userType}`);
+    // Save OTP to database
+    user.resetPasswordOTP = otp;
+    user.resetPasswordOTPExpiry = otpExpiry;
+    await user.save();
+
+    // Send OTP via email
+    try {
+      await sendEmail(user.email, 'passwordResetOTP', { userName: user.fullName, otp });
+      console.log(`Password reset OTP sent to: ${email}`);
+      console.log(`OTP (for development): ${otp}`);
+    } catch (emailError) {
+      console.error('Failed to send OTP email:', emailError);
+      return res.status(500).json({ 
+        success: false,
+        message: 'Failed to send OTP email. Please try again.' 
+      });
+    }
 
     res.json({ 
-      message: 'If an account exists with this email, you will receive password reset instructions.',
-      // In development, include the token (remove in production)
-      devToken: resetToken,
-      devEmail: email
+      success: true,
+      message: 'OTP has been sent to your email. Please check your inbox.',
+      email: email // Send email back so frontend can use it
     });
 
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error. Please try again later.' 
+    });
   }
 });
 
-// Reset Password Route (for when user clicks the email link)
+// Verify OTP Route
+router.post('/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Email and OTP are required' 
+      });
+    }
+
+    // Find user in User or Seller model
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await Seller.findOne({ email });
+    }
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    // Check if OTP exists
+    if (!user.resetPasswordOTP) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'No OTP found. Please request a new one.' 
+      });
+    }
+
+    // Check if OTP has expired
+    if (new Date() > user.resetPasswordOTPExpiry) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'OTP has expired. Please request a new one.' 
+      });
+    }
+
+    // Verify OTP
+    if (user.resetPasswordOTP !== otp) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid OTP. Please try again.' 
+      });
+    }
+
+    // OTP is valid
+    res.json({ 
+      success: true,
+      message: 'OTP verified successfully. You can now reset your password.',
+      email: email
+    });
+
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error. Please try again later.' 
+    });
+  }
+});
+
+// Reset Password Route (after OTP verification)
 router.post('/reset-password', async (req, res) => {
   try {
-    const { email, newPassword, confirmPassword } = req.body;
+    const { email, otp, newPassword, confirmPassword } = req.body;
 
-    if (!email || !newPassword || !confirmPassword) {
-      return res.status(400).json({ message: 'All fields are required' });
+    if (!email || !otp || !newPassword || !confirmPassword) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'All fields are required' 
+      });
     }
 
     if (newPassword !== confirmPassword) {
-      return res.status(400).json({ message: 'Passwords do not match' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Passwords do not match' 
+      });
     }
 
     if (newPassword.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+      return res.status(400).json({ 
+        success: false,
+        message: 'Password must be at least 8 characters' 
+      });
     }
 
     // Find user in User or Seller model
@@ -359,18 +458,110 @@ router.post('/reset-password', async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    // Verify OTP one more time
+    if (!user.resetPasswordOTP || user.resetPasswordOTP !== otp) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid or expired OTP' 
+      });
+    }
+
+    if (new Date() > user.resetPasswordOTPExpiry) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'OTP has expired. Please request a new one.' 
+      });
     }
 
     // Update password (it will be hashed by the pre-save hook in the model)
     user.password = newPassword;
+    
+    // Clear OTP fields
+    user.resetPasswordOTP = null;
+    user.resetPasswordOTPExpiry = null;
+    
     await user.save();
 
-    res.json({ message: 'Password reset successfully. You can now login with your new password.' });
+    // Send password changed confirmation email
+    try {
+      await sendEmail(user.email, 'passwordChanged', user.fullName);
+    } catch (emailError) {
+      console.error('Failed to send password changed email:', emailError);
+      // Don't fail the password reset if email fails
+    }
+
+    res.json({ 
+      success: true,
+      message: 'Password reset successfully. You can now login with your new password.' 
+    });
 
   } catch (error) {
     console.error('Reset password error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error. Please try again later.' 
+    });
+  }
+});
+
+// Change Password Route (for logged-in users)
+router.put('/change-password/:userId', async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required'
+      });
+    }
+    
+    const user = await User.findById(req.params.userId);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    // Verify current password
+    const isPasswordValid = await user.comparePassword(currentPassword);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+    
+    // Update password (will be hashed by pre-save hook)
+    user.password = newPassword;
+    await user.save();
+    
+    // Send confirmation email
+    try {
+      await sendEmail(user.email, 'passwordChanged', user.fullName);
+    } catch (emailError) {
+      console.error('Failed to send password changed email:', emailError);
+      // Don't fail the password change if email fails
+    }
+    
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error. Please try again later.' 
+    });
   }
 });
 

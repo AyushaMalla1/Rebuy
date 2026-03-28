@@ -1,25 +1,70 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FiMessageCircle, FiX, FiSend, FiUser, FiCpu } from 'react-icons/fi';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import './Chatbot.css';
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
+// Removed direct Gemini API initialization as it's now handled by the Python backend.
 
 function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: "Hi! I'm Rebuy AI Assistant powered by Gemini. How can I help you today?",
-      sender: 'bot',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [userRole, setUserRole] = useState('Guest');
+  const [userId, setUserId] = useState('guest');
   const messagesEndRef = useRef(null);
-  const chatHistoryRef = useRef([]);
+
+  useEffect(() => {
+    let userInfo = null;
+    try {
+      const storedUserInfo = localStorage.getItem('userInfo');
+      const storedUser = localStorage.getItem('user');
+      const rawData = (storedUserInfo && storedUserInfo !== "undefined") ? storedUserInfo : 
+                      ((storedUser && storedUser !== "undefined") ? storedUser : null);
+      if (rawData) {
+        userInfo = JSON.parse(rawData);
+      }
+    } catch (e) {
+      console.error('Failed to parse user info', e);
+    }
+    
+    let determinedRole = 'Guest';
+    if (userInfo) {
+      if (userInfo.role) {
+        determinedRole = userInfo.role.charAt(0).toUpperCase() + userInfo.role.slice(1).toLowerCase();
+      } else if (userInfo.userType === 'admin' || userInfo.isAdmin) {
+        determinedRole = 'Admin';
+      } else if (userInfo.userType === 'seller' || userInfo.isSeller) {
+        determinedRole = 'Seller';
+      } else {
+        determinedRole = 'Customer';
+      }
+      if (userInfo._id || userInfo.id) {
+        setUserId(userInfo._id || userInfo.id);
+      }
+    } else {
+      setUserId('guest');
+    }
+    
+    setUserRole(determinedRole);
+
+    let welcomeText = "Hi! I'm Rebuy AI Assistant powered by Google AI. How can I help you today?";
+    if (determinedRole === 'Seller') {
+      welcomeText = "Hi! I'm Rebuy AI Assistant. For Sellers, I offer insights on trending products, low-stock alerts, promotional ideas, and performance suggestions to help you manage your store effectively. How can I help today?";
+    } else if (determinedRole === 'Customer') {
+      welcomeText = "Hi! I'm Rebuy AI Assistant. For Customers, I assist with order tracking, payments, product recommendations, and delivery-related queries. How can I help today?";
+    } else if (determinedRole === 'Admin') {
+      welcomeText = "Hi! I'm Rebuy AI Assistant. For Admins, I provide instant analytics, summarized reports, and system performance updates. How can I help today?";
+    }
+
+    setMessages([
+      {
+        id: 1,
+        text: welcomeText,
+        sender: 'bot',
+        timestamp: new Date()
+      }
+    ]);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -31,45 +76,26 @@ function Chatbot() {
 
   const getBotResponse = async (userMessage) => {
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      
-      // System context about Rebuy
-      const context = `You are a helpful AI assistant for Rebuy, a sustainable thrift fashion marketplace in Pakistan. 
-
-Key Information about Rebuy:
-- We sell second-hand thrift fashion items including vintage jackets, hoodies, t-shirts, jeans, and more
-- Price range: Rs. 3,000 to Rs. 8,000
-- Categories: Men's, Women's, Kid's, Sportswear, and Vintage
-- Shipping: Available across Pakistan, 3-5 business days
-- Payment methods: Cash on Delivery (COD), Credit/Debit Cards, Mobile Banking
-- Return policy: 7-day return for unused items in original condition
-- Contact: support@rebuy.com, +92 300 1234567 (Mon-Sat, 9 AM - 6 PM)
-- Sellers can register through "Become a Seller" page, approval takes 1-2 business days
-
-Be friendly, helpful, and concise. If asked about products not related to fashion, politely redirect to fashion items.`;
-
-      // Build chat history
-      const chat = model.startChat({
-        history: chatHistoryRef.current,
-        generationConfig: {
-          maxOutputTokens: 200,
+      const response = await fetch('http://localhost:5000/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          message: userMessage,
+          user_id: userId,
+          role: userRole
+        }),
       });
 
-      const result = await chat.sendMessage(context + "\n\nUser: " + userMessage);
-      const response = await result.response;
-      const text = response.text();
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
 
-      // Update chat history
-      chatHistoryRef.current.push(
-        { role: "user", parts: [{ text: userMessage }] },
-        { role: "model", parts: [{ text: text }] }
-      );
-
-      return text;
+      const data = await response.json();
+      return data.reply || "I am Rebuy's AI assistant, and I can only provide information related to thrift fashion, your store, and Rebuy services.";
     } catch (error) {
-      console.error('Gemini API Error:', error);
-      return "I'm having trouble connecting right now. Please try again in a moment, or contact our support team at support@rebuy.com";
+      return "I'm currently receiving too many requests or experiencing a network error. Please try again in a few seconds!";
     }
   };
 
@@ -102,7 +128,7 @@ Be friendly, helpful, and concise. If asked about products not related to fashio
       console.error('Error getting bot response:', error);
       const errorResponse = {
         id: messages.length + 2,
-        text: "I'm having trouble responding right now. Please try again.",
+        text: "I'm currently experiencing high traffic or a temporary error. Please try again in a moment.",
         sender: 'bot',
         timestamp: new Date()
       };
@@ -119,15 +145,85 @@ Be friendly, helpful, and concise. If asked about products not related to fashio
     }
   };
 
-  const quickQuestions = [
-    "What products do you have?",
-    "How much does shipping cost?",
-    "How do I become a seller?",
-    "What's your return policy?"
-  ];
+  const quickQuestions = userRole === 'Seller' 
+    ? [
+        "What are my trending products?",
+        "Do I have any low stock alerts?",
+        "Any promotional ideas for slow items?",
+        "How is my store performing?"
+      ]
+    : userRole === 'Admin'
+    ? [
+        "Show me platform stats",
+        "Total users registered?",
+        "Any products needing approval?"
+      ]
+    : userRole === 'Customer'
+    ? [
+        "Can you track my order?",
+        "What are your payment options?",
+        "Can you recommend some products?",
+        "How long does delivery take?"
+      ]
+    : [
+        "What products do you have?",
+        "How much does shipping cost?",
+        "How do I become a seller?",
+        "What's your return policy?"
+      ];
 
   const handleQuickQuestion = (question) => {
     setInputMessage(question);
+  };
+
+  const renderMessageWithFormatting = (text) => {
+    // Basic markdown parsing for images and bold text
+    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    const segments = [];
+    let lastIndex = 0;
+    
+    let match;
+    while ((match = imageRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push({ type: 'text', content: text.substring(lastIndex, match.index) });
+      }
+      segments.push({ type: 'image', alt: match[1], src: match[2] });
+      lastIndex = imageRegex.lastIndex;
+    }
+    if (lastIndex < text.length) {
+      segments.push({ type: 'text', content: text.substring(lastIndex) });
+    }
+    
+    return segments.map((seg, idx) => {
+      if (seg.type === 'image') {
+        const defaultStyle = { maxWidth: '100%', borderRadius: '8px', margin: '8px 0', display: 'block' };
+        return (
+          <img 
+            key={idx} 
+            src={seg.src} 
+            alt={seg.alt} 
+            style={defaultStyle}
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+        );
+      } else {
+        // Parse bold **text** and newlines
+        const lines = seg.content.split('\n');
+        return (
+          <span key={idx}>
+            {lines.map((line, lineIdx) => {
+              const boldParts = line.split(/\*\*(.*?)\*\*/g);
+              return (
+                <React.Fragment key={lineIdx}>
+                  {boldParts.map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : part)}
+                  {lineIdx < lines.length - 1 && <br />}
+                </React.Fragment>
+              );
+            })}
+          </span>
+        );
+      }
+    });
   };
 
   return (
@@ -173,7 +269,9 @@ Be friendly, helpful, and concise. If asked about products not related to fashio
                   {message.sender === 'user' ? <FiUser /> : <FiCpu />}
                 </div>
                 <div className="message-content">
-                  <p>{message.text}</p>
+                  <div className="message-text">
+                    {renderMessageWithFormatting(message.text)}
+                  </div>
                   <span className="message-time">
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>

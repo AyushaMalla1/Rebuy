@@ -21,7 +21,7 @@ import Affiliates from './Affiliates';
 import FAQ from './FAQ';
 import OrderStatus from './OrderStatus';
 import PaymentOptions from './PaymentOptions';
-import Shop from './Shop';
+import Shop from './components/Shop';
 
 function App() {
   return (

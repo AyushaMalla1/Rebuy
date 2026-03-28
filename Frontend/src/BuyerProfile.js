@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, FiHeart, FiSettings, FiLogOut, FiEdit2, FiSave, FiX, FiHome, FiPackage, FiRefreshCw, FiTruck, FiStar, FiAward, FiGift, FiMessageSquare, FiSend } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, FiHeart, FiSettings, FiLogOut, FiEdit2, FiSave, FiX, FiHome, FiPackage, FiRefreshCw, FiTruck, FiStar, FiAward, FiGift, FiMessageSquare, FiSend, FiChevronRight } from 'react-icons/fi';
 import './BuyerProfile.css';
-import { orderAPI, loyaltyAPI } from './services/api';
+import { orderAPI, loyaltyAPI, customerAPI, authAPI } from './services/api';
+import { getProvinces, getDistrictsByProvince, getMunicipalitiesByDistrict, getAreasByMunicipality } from './data/nepalLocations';
 
 function BuyerProfile() {
   const navigate = useNavigate();
@@ -15,9 +16,13 @@ function BuyerProfile() {
     email: '',
     phone: '',
     address: '',
-    city: ''
+    city: '',
+    profileImage: ''
   });
   const [editData, setEditData] = useState({ ...userData });
+  const [profileImage, setProfileImage] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loyaltyData, setLoyaltyData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -74,18 +79,19 @@ function BuyerProfile() {
   const [wishlist, setWishlist] = useState([]);
 
   // Address Book
-  const [addresses, setAddresses] = useState([
-    { id: 1, name: 'Home', fullName: 'John Doe', phone: '+977 9812345678', address: 'Kathmandu, Thamel', city: 'Kathmandu', isDefault: true },
-    { id: 2, name: 'Office', fullName: 'John Doe', phone: '+977 9812345678', address: 'Lalitpur, Patan', city: 'Lalitpur', isDefault: false },
-  ]);
+  const [addresses, setAddresses] = useState([]);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
   const [newAddress, setNewAddress] = useState({
-    name: '',
+    label: '',
     fullName: '',
     phone: '',
-    address: '',
+    state: '',
+    district: '',
+    municipality: '',
     city: '',
+    landmark: '',
+    deliveryType: 'home',
     isDefault: false
   });
 
@@ -184,7 +190,7 @@ function BuyerProfile() {
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
   };
 
-  const handlePasswordSubmit = () => {
+  const handlePasswordSubmit = async () => {
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       showToast('Please fill in all fields', 'error');
       return;
@@ -195,15 +201,25 @@ function BuyerProfile() {
       return;
     }
     
-    if (passwordData.newPassword.length < 6) {
-      showToast('Password must be at least 6 characters long', 'error');
+    if (passwordData.newPassword.length < 8) {
+      showToast('Password must be at least 8 characters long', 'error');
       return;
     }
     
-    // In a real app, this would call the backend API
-    showToast('Password changed successfully!', 'success');
-    setShowPasswordModal(false);
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      await authAPI.changePassword(user._id, {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+      
+      showToast('Password changed successfully! A confirmation email has been sent.', 'success');
+      setShowPasswordModal(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      console.error('Password change error:', error);
+      showToast(error.message || 'Failed to change password', 'error');
+    }
   };
 
   const handleRedeemPoints = () => {
@@ -306,8 +322,9 @@ function BuyerProfile() {
       setUserData(data);
       setEditData(data);
       
-      // Fetch orders and loyalty data
+      // Fetch customer profile, orders and loyalty data
       if (user._id) {
+        fetchCustomerProfile(user._id);
         fetchOrders(user._id);
         fetchLoyaltyData(user._id);
       }
@@ -326,6 +343,56 @@ function BuyerProfile() {
       setActiveTab(tab);
     }
   }, [location, navigate]);
+
+  const fetchCustomerProfile = async (userId) => {
+    try {
+      const profile = await customerAPI.get(userId);
+      if (profile) {
+        // Update user data with profile info
+        setUserData({
+          fullName: profile.fullName,
+          email: profile.email,
+          phone: profile.phone || '',
+          address: '', // Will be from addresses array
+          city: '',
+          profileImage: profile.profileImage || ''
+        });
+        setEditData({
+          fullName: profile.fullName,
+          email: profile.email,
+          phone: profile.phone || '',
+          address: '',
+          city: '',
+          profileImage: profile.profileImage || ''
+        });
+        setProfileImagePreview(profile.profileImage || '');
+        
+        // Load addresses
+        if (profile.addresses && profile.addresses.length > 0) {
+          const formattedAddresses = profile.addresses.map(addr => ({
+            _id: addr._id,
+            id: addr._id,
+            name: addr.label || addr.deliveryType,
+            fullName: addr.fullName,
+            phone: addr.phone,
+            address: `${addr.landmark}, ${addr.city}, ${addr.municipality}`,
+            city: addr.city,
+            state: addr.state,
+            district: addr.district,
+            municipality: addr.municipality,
+            landmark: addr.landmark,
+            deliveryType: addr.deliveryType,
+            isDefault: addr.isDefault,
+            label: addr.label
+          }));
+          setAddresses(formattedAddresses);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching customer profile:', error);
+      // If profile doesn't exist, that's okay - it will be created on first save
+    }
+  };
 
   const loadWishlist = () => {
     try {
@@ -385,9 +452,89 @@ function BuyerProfile() {
   const handleCancel = () => {
     setEditData({ ...userData });
     setIsEditing(false);
+    setProfileImagePreview(userData.profileImage || '');
+    setProfileImage(null);
   };
 
-  const handleSave = () => {
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select an image file', 'error');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('Image size must be less than 5MB', 'error');
+        return;
+      }
+      
+      setProfileImage(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageUpload = async () => {
+    if (!profileImage) return;
+    
+    try {
+      setUploadingImage(true);
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      if (!user || !user._id) {
+        showToast('Please login to upload profile image', 'error');
+        return;
+      }
+      
+      const result = await customerAPI.uploadProfileImage(user._id, profileImage);
+      
+      setUserData(prev => ({ ...prev, profileImage: result.profileImage }));
+      setEditData(prev => ({ ...prev, profileImage: result.profileImage }));
+      setProfileImagePreview(result.profileImage);
+      setProfileImage(null);
+      
+      showToast('Profile image updated successfully!', 'success');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      showToast(error.message || 'Failed to upload image', 'error');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleImageDelete = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      if (!user || !user._id) {
+        showToast('Please login to delete profile image', 'error');
+        return;
+      }
+      
+      await customerAPI.deleteProfileImage(user._id);
+      
+      setUserData(prev => ({ ...prev, profileImage: '' }));
+      setEditData(prev => ({ ...prev, profileImage: '' }));
+      setProfileImagePreview('');
+      setProfileImage(null);
+      
+      showToast('Profile image deleted successfully!', 'success');
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      showToast(error.message || 'Failed to delete image', 'error');
+    }
+  };
+
+
+  const handleSave = async () => {
     // Validate required fields
     if (!editData.fullName.trim()) {
       showToast('Full name is required', 'error');
@@ -419,12 +566,25 @@ function BuyerProfile() {
       return;
     }
     
-    setUserData({ ...editData });
-    const user = JSON.parse(localStorage.getItem('user'));
-    const updatedUser = { ...user, ...editData };
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    setIsEditing(false);
-    showToast('Profile updated successfully!', 'success');
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      // Update customer profile in backend
+      await customerAPI.update(user._id, {
+        fullName: editData.fullName,
+        email: editData.email,
+        phone: editData.phone
+      });
+      
+      setUserData({ ...editData });
+      const updatedUser = { ...user, ...editData };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setIsEditing(false);
+      showToast('Profile updated successfully!', 'success');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      showToast('Failed to update profile', 'error');
+    }
   };
 
   const handleChange = (e) => {
@@ -437,38 +597,76 @@ function BuyerProfile() {
 
   const handleAddressChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setNewAddress(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    
+    // Handle cascading selections
+    if (name === 'state') {
+      // Reset dependent fields when state changes
+      setNewAddress(prev => ({
+        ...prev,
+        state: value,
+        district: '',
+        municipality: '',
+        city: ''
+      }));
+    } else if (name === 'district') {
+      // Reset dependent fields when district changes
+      setNewAddress(prev => ({
+        ...prev,
+        district: value,
+        municipality: '',
+        city: ''
+      }));
+    } else if (name === 'municipality') {
+      // Reset city when municipality changes
+      setNewAddress(prev => ({
+        ...prev,
+        municipality: value,
+        city: ''
+      }));
+    } else {
+      setNewAddress(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
+    }
   };
 
   const handleAddAddress = () => {
     setShowAddressForm(true);
     setEditingAddress(null);
     setNewAddress({
-      name: '',
+      label: '',
       fullName: '',
       phone: '',
-      address: '',
+      state: '',
+      district: '',
+      municipality: '',
       city: '',
+      landmark: '',
+      deliveryType: 'home',
       isDefault: false
     });
   };
 
   const handleEditAddress = (address) => {
     setShowAddressForm(true);
-    setEditingAddress(address.id);
-    setNewAddress(address);
+    setEditingAddress(address._id);
+    setNewAddress({
+      label: address.label || '',
+      fullName: address.fullName,
+      phone: address.phone,
+      state: address.state || '',
+      district: address.district || '',
+      municipality: address.municipality || '',
+      city: address.city,
+      landmark: address.landmark || '',
+      deliveryType: address.deliveryType || 'home',
+      isDefault: address.isDefault
+    });
   };
 
-  const handleSaveAddress = () => {
+  const handleSaveAddress = async () => {
     // Validate required fields
-    if (!newAddress.name.trim()) {
-      showToast('Address label is required (e.g., Home, Office)', 'error');
-      return;
-    }
-    
     if (!newAddress.fullName.trim()) {
       showToast('Full name is required', 'error');
       return;
@@ -487,40 +685,86 @@ function BuyerProfile() {
       return;
     }
     
-    if (!newAddress.address.trim()) {
-      showToast('Address is required', 'error');
+    if (!newAddress.state.trim()) {
+      showToast('State/Province is required', 'error');
+      return;
+    }
+    
+    if (!newAddress.district.trim()) {
+      showToast('District is required', 'error');
+      return;
+    }
+    
+    if (!newAddress.municipality.trim()) {
+      showToast('Municipality is required', 'error');
       return;
     }
     
     if (!newAddress.city.trim()) {
-      showToast('City is required', 'error');
+      showToast('City/Area is required', 'error');
       return;
     }
     
-    if (editingAddress) {
-      setAddresses(addresses.map(addr => 
-        addr.id === editingAddress ? { ...newAddress, id: editingAddress } : addr
-      ));
-    } else {
-      const newId = Math.max(...addresses.map(a => a.id), 0) + 1;
-      setAddresses([...addresses, { ...newAddress, id: newId }]);
+    if (!newAddress.landmark.trim()) {
+      showToast('Nearest landmark is required', 'error');
+      return;
     }
-    setShowAddressForm(false);
-    setEditingAddress(null);
-    showToast('Address saved successfully!', 'success');
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      if (editingAddress) {
+        // Update existing address
+        await customerAPI.updateAddress(user._id, editingAddress, newAddress);
+        showToast('Address updated successfully!', 'success');
+      } else {
+        // Add new address
+        await customerAPI.addAddress(user._id, newAddress);
+        showToast('Address added successfully!', 'success');
+      }
+      
+      // Refresh addresses
+      await fetchCustomerProfile(user._id);
+      setShowAddressForm(false);
+      setEditingAddress(null);
+    } catch (error) {
+      console.error('Error saving address:', error);
+      showToast('Failed to save address', 'error');
+    }
   };
 
-  const handleDeleteAddress = (id) => {
+  const handleDeleteAddress = async (id) => {
     if (window.confirm('Are you sure you want to delete this address?')) {
-      setAddresses(addresses.filter(addr => addr.id !== id));
+      try {
+        console.log('Deleting address with ID:', id);
+        const user = JSON.parse(localStorage.getItem('user'));
+        console.log('User ID:', user._id);
+        const response = await customerAPI.deleteAddress(user._id, id);
+        console.log('Delete response:', response);
+        
+        // Refresh addresses
+        await fetchCustomerProfile(user._id);
+        showToast('Address deleted successfully', 'success');
+      } catch (error) {
+        console.error('Error deleting address:', error);
+        console.error('Error details:', error.response?.data);
+        showToast('Failed to delete address', 'error');
+      }
     }
   };
 
-  const handleSetDefaultAddress = (id) => {
-    setAddresses(addresses.map(addr => ({
-      ...addr,
-      isDefault: addr.id === id
-    })));
+  const handleSetDefaultAddress = async (id) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      await customerAPI.setDefaultAddress(user._id, id);
+      
+      // Refresh addresses
+      await fetchCustomerProfile(user._id);
+      showToast('Default address updated', 'success');
+    } catch (error) {
+      console.error('Error setting default address:', error);
+      showToast('Failed to set default address', 'error');
+    }
   };
 
   const handleAddToCartFromWishlist = async (item) => {
@@ -735,7 +979,7 @@ function BuyerProfile() {
       {/* Sidebar */}
       <aside className="profile-sidebar">
         <div className="sidebar-header">
-          <h2>My Account</h2>
+          <img src="/logo.png" alt="ReStyle" className="sidebar-logo" />
         </div>
 
         <nav className="sidebar-menu">
@@ -808,18 +1052,9 @@ function BuyerProfile() {
         {activeTab === 'profile' && (
           <div className="profile-section">
             <div className="section-header">
-              <h1>My Profile</h1>
-            </div>
-
-            {/* User Info Card */}
-            <div className="profile-card user-info-card">
-              <div className="user-avatar">
-                <FiUser size={60} />
-              </div>
-              <div className="user-details">
-                <h2>{userData.fullName}</h2>
-                <p>{userData.email}</p>
-                <p>{userData.phone}</p>
+              <div>
+                <h1>My Account</h1>
+                <p>Manage your profile and track your orders</p>
               </div>
             </div>
 
@@ -970,24 +1205,30 @@ function BuyerProfile() {
                       <h4>Welcome Bonus</h4>
                       <p>500 points earned</p>
                     </div>
+                    <FiChevronRight />
                   </div>
                   <div className="reward-item">
                     <div className="reward-icon-wrapper purchase">
-                      <FiStar className="reward-icon-svg" />
+                      <FiShoppingBag className="reward-icon-svg" />
                     </div>
                     <div>
                       <h4>Purchase Rewards</h4>
                       <p>750 points earned</p>
                     </div>
+                    <FiChevronRight />
                   </div>
                   <button 
                     className="redeem-btn"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('Redeem button clicked');
                       setShowRedeemModal(true);
                     }}
+                    type="button"
                     style={{cursor: 'pointer'}}
                   >
-                    <FiAward /> Redeem Points
+                    <FiGift /> Redeem Points
                   </button>
                 </div>
               </div>
@@ -999,7 +1240,10 @@ function BuyerProfile() {
         {activeTab === 'orders' && (
           <div className="orders-section">
             <div className="section-header">
-              <h1>My Orders</h1>
+              <div>
+                <h1>My Orders</h1>
+                <p>Track and manage your purchases</p>
+              </div>
             </div>
 
             {/* Order Filter Tabs */}
@@ -1260,7 +1504,10 @@ function BuyerProfile() {
         {activeTab === 'wishlist' && (
           <div className="wishlist-section">
             <div className="section-header">
-              <h1>My Wishlist</h1>
+              <div>
+                <h1>My Wishlist</h1>
+                <p>Your saved items and favorites</p>
+              </div>
             </div>
 
             <div className="wishlist-grid">
@@ -1328,7 +1575,10 @@ function BuyerProfile() {
         {activeTab === 'messages' && (
           <div className="messages-section">
             <div className="section-header">
-              <h1>Messages</h1>
+              <div>
+                <h1>Messages</h1>
+                <p>Chat with sellers and support</p>
+              </div>
             </div>
 
             <div className="messages-container">
@@ -1420,7 +1670,10 @@ function BuyerProfile() {
         {activeTab === 'settings' && (
           <div className="settings-section">
             <div className="section-header">
-              <h1>Account Settings</h1>
+              <div>
+                <h1>Account Settings</h1>
+                <p>Manage your preferences and security</p>
+              </div>
             </div>
 
             {/* Personal Information */}
@@ -1442,6 +1695,47 @@ function BuyerProfile() {
                   </div>
                 )}
               </div>
+              
+              {/* Profile Image Upload */}
+              <div className="profile-image-section">
+                <div className="profile-image-container">
+                  {profileImagePreview ? (
+                    <img src={profileImagePreview} alt="Profile" className="profile-image-preview" />
+                  ) : (
+                    <div className="profile-image-placeholder">
+                      <FiUser size={48} />
+                    </div>
+                  )}
+                </div>
+                <div className="profile-image-actions">
+                  <input
+                    type="file"
+                    id="profileImageInput"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    style={{ display: 'none' }}
+                  />
+                  <label htmlFor="profileImageInput" className="upload-image-btn">
+                    <FiEdit2 /> Choose Image
+                  </label>
+                  {profileImage && (
+                    <button 
+                      className="save-image-btn" 
+                      onClick={handleImageUpload}
+                      disabled={uploadingImage}
+                    >
+                      {uploadingImage ? 'Uploading...' : 'Save Image'}
+                    </button>
+                  )}
+                  {profileImagePreview && !profileImage && (
+                    <button className="delete-image-btn" onClick={handleImageDelete}>
+                      <FiX /> Remove
+                    </button>
+                  )}
+                  <p className="image-hint">Max size: 5MB. Formats: JPG, PNG, WEBP</p>
+                </div>
+              </div>
+
               <div className="info-grid">
                 <div className="info-field">
                   <label><FiUser /> Full Name</label>
@@ -1529,16 +1823,6 @@ function BuyerProfile() {
                   <h4>{editingAddress ? 'Edit Address' : 'Add New Address'}</h4>
                   <div className="form-grid">
                     <div className="form-field">
-                      <label>Label (e.g., Home, Office)</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={newAddress.name}
-                        onChange={handleAddressChange}
-                        placeholder="Home"
-                      />
-                    </div>
-                    <div className="form-field">
                       <label>Full Name</label>
                       <input
                         type="text"
@@ -1559,23 +1843,93 @@ function BuyerProfile() {
                       />
                     </div>
                     <div className="form-field">
-                      <label>City</label>
-                      <input
-                        type="text"
+                      <label>State/Province</label>
+                      <select
+                        name="state"
+                        value={newAddress.state}
+                        onChange={handleAddressChange}
+                      >
+                        <option value="">Select State</option>
+                        {getProvinces().map(province => (
+                          <option key={province} value={province}>{province}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>District</label>
+                      <select
+                        name="district"
+                        value={newAddress.district}
+                        onChange={handleAddressChange}
+                        disabled={!newAddress.state}
+                      >
+                        <option value="">Select District</option>
+                        {newAddress.state && getDistrictsByProvince(newAddress.state).map(district => (
+                          <option key={district} value={district}>{district}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>Municipality</label>
+                      <select
+                        name="municipality"
+                        value={newAddress.municipality}
+                        onChange={handleAddressChange}
+                        disabled={!newAddress.district}
+                      >
+                        <option value="">Select Municipality</option>
+                        {newAddress.state && newAddress.district && 
+                          getMunicipalitiesByDistrict(newAddress.state, newAddress.district).map(municipality => (
+                            <option key={municipality} value={municipality}>{municipality}</option>
+                          ))
+                        }
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>City/Area</label>
+                      <select
                         name="city"
                         value={newAddress.city}
                         onChange={handleAddressChange}
-                        placeholder="Kathmandu"
-                      />
+                        disabled={!newAddress.municipality}
+                      >
+                        <option value="">Select Area</option>
+                        {newAddress.state && newAddress.district && newAddress.municipality &&
+                          getAreasByMunicipality(newAddress.state, newAddress.district, newAddress.municipality).map(area => (
+                            <option key={area} value={area}>{area}</option>
+                          ))
+                        }
+                      </select>
                     </div>
                     <div className="form-field full-width">
-                      <label>Full Address</label>
+                      <label>Nearest Landmark</label>
                       <input
                         type="text"
-                        name="address"
-                        value={newAddress.address}
+                        name="landmark"
+                        value={newAddress.landmark}
                         onChange={handleAddressChange}
-                        placeholder="Street, Area, Landmark"
+                        placeholder="e.g., Near Ratna Park, Opposite City Mall"
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label>Label for Effective Delivery</label>
+                      <select
+                        name="deliveryType"
+                        value={newAddress.deliveryType}
+                        onChange={handleAddressChange}
+                      >
+                        <option value="home">Home</option>
+                        <option value="office">Office</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>Custom Label (Optional)</label>
+                      <input
+                        type="text"
+                        name="label"
+                        value={newAddress.label}
+                        onChange={handleAddressChange}
+                        placeholder="e.g., Mom's House, Work"
                       />
                     </div>
                     <div className="form-field full-width">
@@ -1602,37 +1956,55 @@ function BuyerProfile() {
               )}
 
               <div className="address-list">
-                {addresses.map(address => (
-                  <div key={address.id} className="address-card">
-                    <div className="address-header">
-                      <div className="address-label">
-                        <span className="label-name">{address.name}</span>
-                        {address.isDefault && <span className="default-badge">Default</span>}
-                      </div>
-                      <div className="address-actions">
-                        <button className="icon-btn" onClick={() => handleEditAddress(address)}>
-                          <FiEdit2 />
-                        </button>
-                        <button className="icon-btn delete" onClick={() => handleDeleteAddress(address.id)}>
-                          <FiX />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="address-details">
-                      <p className="address-name">{address.fullName}</p>
-                      <p className="address-phone">{address.phone}</p>
-                      <p className="address-text">{address.address}, {address.city}</p>
-                    </div>
-                    {!address.isDefault && (
-                      <button 
-                        className="set-default-btn" 
-                        onClick={() => handleSetDefaultAddress(address.id)}
-                      >
-                        Set as Default
-                      </button>
-                    )}
+                {addresses.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '60px 20px',
+                    color: '#9ca3af',
+                    fontSize: '15px'
+                  }}>
+                    <FiMapPin style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }} />
+                    <p style={{ margin: '0 0 8px 0', fontWeight: 500, color: '#6b7280' }}>No addresses added yet</p>
+                    <p style={{ margin: 0, fontSize: '14px' }}>Click "Add New Address" to add your first address</p>
                   </div>
-                ))}
+                ) : (
+                  addresses.map(address => (
+                    <div key={address._id} className="address-card">
+                      <div className="address-header">
+                        <div className="address-label">
+                          <span className="label-name">{address.name}</span>
+                          {address.isDefault && <span className="default-badge">Default</span>}
+                        </div>
+                        <div className="address-actions">
+                          <button className="icon-btn" onClick={() => handleEditAddress(address)}>
+                            <FiEdit2 />
+                          </button>
+                          <button className="icon-btn delete" onClick={() => handleDeleteAddress(address._id)}>
+                            <FiX />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="address-details">
+                        <p className="address-name">{address.fullName}</p>
+                        <p className="address-phone">{address.phone}</p>
+                        <p className="address-text">
+                          {address.landmark && `${address.landmark}, `}
+                          {address.city}, {address.municipality}
+                          {address.district && `, ${address.district}`}
+                          {address.state && `, ${address.state}`}
+                        </p>
+                      </div>
+                      {!address.isDefault && (
+                        <button 
+                          className="set-default-btn" 
+                          onClick={() => handleSetDefaultAddress(address._id)}
+                        >
+                          Set as Default
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -1822,50 +2194,6 @@ function BuyerProfile() {
             {toast.show && (
               <div className={`toast toast-${toast.type}`}>
                 <span>{toast.message}</span>
-              </div>
-            )}
-
-            {/* Redeem Points Modal */}
-            {showRedeemModal && (
-              <div className="modal-overlay" onClick={() => setShowRedeemModal(false)}>
-                <div className="modal-content password-modal" onClick={(e) => e.stopPropagation()}>
-                  <div className="modal-header">
-                    <h2>Redeem Loyalty Points</h2>
-                    <button className="close-modal" onClick={() => setShowRedeemModal(false)}>
-                      <FiX />
-                    </button>
-                  </div>
-                  <div className="modal-body">
-                    <div className="redeem-info">
-                      <p>Available Points: <strong>{loyaltyData ? loyaltyData.totalPoints : 1250}</strong></p>
-                      <p>Conversion Rate: <strong>100 points = Rs. 10</strong></p>
-                    </div>
-                    <div className="form-field">
-                      <label>Points to Redeem</label>
-                      <input
-                        type="number"
-                        value={redeemAmount}
-                        onChange={(e) => setRedeemAmount(e.target.value)}
-                        placeholder="Enter points amount"
-                        min="1"
-                        max={loyaltyData ? loyaltyData.totalPoints : 1250}
-                      />
-                      {redeemAmount && !isNaN(redeemAmount) && (
-                        <p className="conversion-preview">
-                          You will receive: <strong>Rs. {(parseInt(redeemAmount) / 10).toFixed(2)}</strong>
-                        </p>
-                      )}
-                    </div>
-                    <div className="modal-actions">
-                      <button className="save-btn" onClick={handleRedeemPoints}>
-                        <FiGift /> Redeem Now
-                      </button>
-                      <button className="cancel-btn" onClick={() => setShowRedeemModal(false)}>
-                        <FiX /> Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -2134,6 +2462,50 @@ function BuyerProfile() {
       {toast.show && (
         <div className={`toast toast-${toast.type}`}>
           <span>{toast.message}</span>
+        </div>
+      )}
+
+      {/* Redeem Points Modal */}
+      {showRedeemModal && (
+        <div className="modal-overlay" onClick={() => setShowRedeemModal(false)}>
+          <div className="modal-content password-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Redeem Loyalty Points</h2>
+              <button className="close-modal" onClick={() => setShowRedeemModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="redeem-info">
+                <p>Available Points: <strong>{loyaltyData ? loyaltyData.totalPoints : 1250}</strong></p>
+                <p>Conversion Rate: <strong>100 points = Rs. 10</strong></p>
+              </div>
+              <div className="form-field">
+                <label>Points to Redeem</label>
+                <input
+                  type="number"
+                  value={redeemAmount}
+                  onChange={(e) => setRedeemAmount(e.target.value)}
+                  placeholder="Enter points amount"
+                  min="1"
+                  max={loyaltyData ? loyaltyData.totalPoints : 1250}
+                />
+                {redeemAmount && !isNaN(redeemAmount) && (
+                  <p className="conversion-preview">
+                    You will receive: <strong>Rs. {(parseInt(redeemAmount) / 10).toFixed(2)}</strong>
+                  </p>
+                )}
+              </div>
+              <div className="modal-actions">
+                <button className="save-btn" onClick={handleRedeemPoints}>
+                  <FiGift /> Redeem Now
+                </button>
+                <button className="cancel-btn" onClick={() => setShowRedeemModal(false)}>
+                  <FiX /> Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

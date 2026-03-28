@@ -81,22 +81,21 @@ function ProductDetail() {
     return null;
   }
 
-  // Seller Information (use product seller data or default)
-  const sellerInfo = {
-    name: product.sellerName || 'vitalesteven',
+  // Seller Information (use product seller data from API)
+  const sellerInfo = product.sellerInfo || {
+    id: product.seller,
+    name: product.sellerName || 'Seller',
     storeName: product.storeName || 'Thrift Store',
-    avatar: 'https://i.pinimg.com/736x/bc/83/08/bc8308ad115003adae43e7743ef2254f.jpg',
+    avatar: 'https://i.pravatar.cc/100',
     rating: 5.0,
-    totalReviews: 112,
-    totalTransactions: 207,
-    itemsForSale: 90,
-    badges: ['Trusted Seller', 'Quick Responder', 'Speedy Shipper'],
-    joinedDate: 'January 2024',
+    totalReviews: 0,
+    totalTransactions: 0,
+    itemsForSale: 0,
+    badges: ['New Seller'],
+    joinedDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
     responseTime: '1 hour',
     shippingTime: '1-2 days'
   };
-
-  if (!product) return null;
 
   // Multiple images for gallery
   const productImages = product.images && product.images.length > 0 
@@ -207,7 +206,7 @@ function ProductDetail() {
 
     try {
       const userData = JSON.parse(user);
-      const response = await fetch('http://localhost:5000/api/messages', {
+      const response = await fetch('http://localhost:5000/api/messages/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -216,7 +215,8 @@ function ProductDetail() {
         body: JSON.stringify({
           senderId: userData._id,
           senderModel: 'User',
-          receiverId: product.sellerId,
+          receiverId: product.seller,
+          receiverModel: 'Seller',
           productId: product._id,
           subject: contactForm.subject,
           message: contactForm.message
@@ -263,16 +263,9 @@ function ProductDetail() {
     <div className="product-detail-page">
       {/* Header */}
       <header className="detail-header">
-        <div className="header-content">
-          <Link to="/" className="back-link">
-            <FiChevronLeft /> Back to Shop
-          </Link>
-          <div className="header-actions">
-            <button className={`favorite-btn ${isFavorite ? 'active' : ''}`} onClick={toggleFavorite}>
-              <FiHeart />
-            </button>
-          </div>
-        </div>
+        <Link to="/" className="back-link">
+          <FiChevronLeft /> Back to Shop
+        </Link>
       </header>
 
       <div className="detail-container">
@@ -302,307 +295,258 @@ function ProductDetail() {
 
         {/* Product Info */}
         <div className="product-info">
-          <div className="product-header">
-            <h1>{product.name}</h1>
-            <div className="product-meta">
-              <div className="rating">
-                <FiStar className="star-icon" />
-                <span>{product.rating}</span>
-                <span className="reviews">({product.reviews} reviews)</span>
-              </div>
-              <span className={`condition-badge ${product.condition.toLowerCase().replace(' ', '-')}`}>
-                {product.condition}
-              </span>
-              <span className="category-badge">{product.category}</span>
-            </div>
+          {/* Product Title */}
+          <h1 className="product-title">{product.name}</h1>
+
+          {/* Condition Badge */}
+          <div className="product-badges">
+            <span className={`condition-badge ${product.condition.toLowerCase().replace(' ', '-')}`}>
+              {product.condition.toUpperCase()}
+            </span>
           </div>
 
-          <div className="price-section">
+          {/* Rating */}
+          <div className="product-rating">
+            <div className="stars">
+              {[...Array(5)].map((_, i) => (
+                <FiStar key={i} className={i < Math.floor(product.rating || 4.5) ? 'star-filled' : 'star-empty'} />
+              ))}
+            </div>
+            <span className="rating-text">{product.rating || '4.5'} ({product.reviews || 128} reviews)</span>
+          </div>
+
+          {/* Price */}
+          <div className="product-price-section">
             {product.discount && isDiscountActive(product.discount) ? (
               <>
-                <div className="discount-info">
-                  <div className="discount-percentage-badge">{product.discount.percentage}% OFF</div>
-                  <div className="discount-validity-period">
-                    Valid until {new Date(product.discount.endDate).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </div>
-                </div>
-                <div className="price-display">
-                  <div className="current-price discounted">Rs. {product.discountedPrice.toLocaleString()}</div>
-                  <div className="original-price strikethrough">Rs. {product.price.toLocaleString()}</div>
-                  <div className="savings-amount">You save Rs. {(product.price - product.discountedPrice).toLocaleString()}</div>
+                <span className="discount-badge">{product.discount.percentage}% OFF</span>
+                <div className="price-row">
+                  <span className="current-price">Rs. {product.discountedPrice?.toLocaleString()}</span>
+                  <span className="original-price">Rs. {product.price.toLocaleString()}</span>
                 </div>
               </>
             ) : (
-              <div className="current-price">Rs. {product.price.toLocaleString()}</div>
+              <span className="current-price">Rs. {product.price.toLocaleString()}</span>
             )}
           </div>
 
+          {/* Size Guide Link */}
+          <a href="#" className="size-guide-link" onClick={(e) => e.preventDefault()}>Size Guide</a>
+
           {/* Size Selection */}
-          <div className="size-section">
-            <h3>Select Size</h3>
-            <div className="size-options">
-              {['S', 'M', 'L', 'XL', 'XXL'].map(size => (
-                <button
-                  key={size}
-                  className={`size-btn ${selectedSize === size ? 'selected' : ''}`}
-                  onClick={() => setSelectedSize(size)}
-                >
-                  {size}
-                </button>
-              ))}
-            </div>
+          <div className="size-selection">
+            {['M', 'L', 'XL', 'XXL'].map(size => (
+              <button
+                key={size}
+                className={`size-option ${selectedSize === size ? 'selected' : ''}`}
+                onClick={() => setSelectedSize(size)}
+              >
+                {size}
+              </button>
+            ))}
           </div>
 
-          {/* Payment Method Selection */}
-          <div className="payment-section">
-            <h3>Available Payment Methods</h3>
-            <div className="payment-options">
-              {product.paymentOptions && product.paymentOptions.length > 0 ? (
-                product.paymentOptions.map((option) => {
-                  const paymentInfo = {
-                    cod: { icon: '💵', label: 'Cash on Delivery', desc: 'Pay when you receive the item' },
-                    online: { icon: '💳', label: 'Online Payment', desc: 'Pay securely with card or digital wallet' },
-                    esewa: { icon: '🟢', label: 'eSewa', desc: 'Pay with eSewa digital wallet' },
-                    khalti: { icon: '🟣', label: 'Khalti', desc: 'Pay with Khalti digital wallet' },
-                    card: { icon: '💳', label: 'Card Payment', desc: 'Pay with credit or debit card' }
-                  };
-                  const info = paymentInfo[option] || { icon: '💳', label: option, desc: 'Payment method' };
-                  
-                  return (
-                    <label key={option} className={`payment-option ${selectedPayment === option ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="payment"
-                        value={option}
-                        checked={selectedPayment === option}
-                        onChange={(e) => setSelectedPayment(e.target.value)}
-                      />
-                      <div className="payment-content">
-                        <span className="payment-icon">{info.icon}</span>
-                        <div>
-                          <strong>{info.label}</strong>
-                          <p>{info.desc}</p>
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })
-              ) : (
-                <p>No payment options available</p>
-              )}
-            </div>
+          {/* Payment Methods */}
+          <div className="payment-methods">
+            <label className={`payment-method ${selectedPayment === 'online' ? 'selected' : ''}`}>
+              <input
+                type="radio"
+                name="payment"
+                value="online"
+                checked={selectedPayment === 'online'}
+                onChange={(e) => setSelectedPayment(e.target.value)}
+              />
+              <span className="payment-icon">💳</span>
+              <div className="payment-info">
+                <strong>Online Payment</strong>
+                <p>Pay securely with card or digital wallet</p>
+              </div>
+            </label>
+            <label className={`payment-method ${selectedPayment === 'cod' ? 'selected' : ''}`}>
+              <input
+                type="radio"
+                name="payment"
+                value="cod"
+                checked={selectedPayment === 'cod'}
+                onChange={(e) => setSelectedPayment(e.target.value)}
+              />
+              <span className="payment-icon">🚚</span>
+              <div className="payment-info">
+                <strong>Cash on Delivery</strong>
+                <p>Pay when your order arrives</p>
+              </div>
+            </label>
           </div>
 
           {/* Action Buttons */}
-          <div className="action-buttons">
+          <div className="product-actions">
             {product.stock > 0 ? (
               <>
-                <button className="purchase-btn" onClick={handlePurchase}>
-                  PURCHASE
+                <button className="btn-add-cart" onClick={handleAddToCart}>
+                  <FiShoppingCart /> Add to Cart
                 </button>
-                <button className="add-cart-btn" onClick={handleAddToCart}>
-                  <FiShoppingCart /> ADD TO CART
+                <button className="btn-buy-now" onClick={handlePurchase}>
+                  Buy It Now
                 </button>
               </>
             ) : (
               <>
-                <button 
-                  className="purchase-btn" 
-                  style={{
-                    background: '#e5e7eb',
-                    color: '#9ca3af',
-                    cursor: 'not-allowed'
-                  }}
-                  disabled
-                >
+                <button className="btn-out-stock" disabled>
                   OUT OF STOCK
                 </button>
-                <button className="add-cart-btn" onClick={handleAddToWishlist}>
+                <button className="btn-wishlist" onClick={handleAddToWishlist}>
                   <FiHeart /> ADD TO WISHLIST
                 </button>
               </>
             )}
           </div>
 
-          {/* Contact Seller Button */}
-          <button 
-            onClick={() => setShowContactModal(true)}
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: '#f8fafc',
-              border: '2px solid #e2e8f0',
-              borderRadius: '12px',
-              fontSize: '15px',
-              fontWeight: '600',
-              color: '#475569',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              marginTop: '12px',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = '#00bcd4';
-              e.currentTarget.style.color = 'white';
-              e.currentTarget.style.borderColor = '#00bcd4';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = '#f8fafc';
-              e.currentTarget.style.color = '#475569';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-            }}
-          >
-            <FiMessageSquare /> Contact Seller
-          </button>
-
-          {/* Product Features */}
-          <div className="product-features">
-            <div className="feature-item">
-              <FiShield className="feature-icon" />
-              <div>
-                <h4>Buyer Protection</h4>
-                <p>Full refund if item not as described</p>
-              </div>
-            </div>
-            <div className="feature-item">
-              <FiTruck className="feature-icon" />
-              <div>
-                <h4>Fast Shipping</h4>
-                <p>Express delivery available</p>
-              </div>
-            </div>
-            <div className="feature-item">
-              <FiRefreshCw className="feature-icon" />
-              <div>
-                <h4>Easy Returns</h4>
-                <p>7-day return policy</p>
-              </div>
-            </div>
-          </div>
+          {/* Secure Transaction Note */}
+          <p className="secure-note">Secure transaction. Hassle-free 14-day returns.</p>
 
           {/* Description */}
-          <div className="description-section">
+          <div className="product-description">
             <h3>Description</h3>
-            <p>
-              {product.condition} condition. Carefully inspected and cleaned. 
-              Perfect for sustainable fashion lovers.
-            </p>
-            <ul>
-              <li>Condition: {product.condition}</li>
-              <li>Material: Premium quality fabric</li>
-              <li>Care: Machine washable</li>
-              <li>Authenticity: Verified by Rebuy</li>
-            </ul>
+            <p>{product.description || `${product.condition} condition. Carefully inspected and cleaned. Perfect for sustainable fashion lovers.`}</p>
           </div>
 
-          {/* Product Story */}
-          {product.story && (
-            <div className="story-section">
-              <h3>📖 Item Story</h3>
-              <div className="story-content">
+          {/* Features */}
+          <div className="product-features-compact">
+            <div className="feature-compact">
+              <FiTruck className="feature-icon-compact" />
+              <div>
+                <strong>Free Shipping</strong>
+                <p>On all orders over $100</p>
+              </div>
+            </div>
+            <div className="feature-compact">
+              <FiAward className="feature-icon-compact" />
+              <div>
+                <strong>Genuine Quality</strong>
+                <p>Certified Rebuy Vendor</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Condition Details & Verification - Inside Product Card */}
+          <div className="condition-details-card">
+            <h3>Condition Details & Verification</h3>
+            
+            {/* Condition Explanation */}
+            <div className="condition-explanation-box">
+              <div className="condition-header">
+                <span className={`condition-label ${product.condition.toLowerCase().replace(' ', '-')}`}>
+                  {product.condition.toUpperCase()}
+                </span>
+                {product.condition === 'Excellent' && <span className="condition-stars-inline">★★★★★</span>}
+                {product.condition === 'Very Good' && <span className="condition-stars-inline">★★★★</span>}
+                {product.condition === 'Good' && <span className="condition-stars-inline">★★★</span>}
+                {product.condition === 'Fair' && <span className="condition-stars-inline">★★</span>}
+              </div>
+              
+              <p className="condition-description">
+                {product.condition === 'Excellent' && 'This item is practically new! It shows no obvious signs of being worn or washed and is in excellent condition.'}
+                {product.condition === 'Very Good' && 'This item shows no major flaws. Due to being worn or washed, there may be light fading or pilling.'}
+                {product.condition === 'Good' && 'Item has clearly been worn but is still in good condition. There may be minor signs of wear such as fading.'}
+                {product.condition === 'Fair' && 'Item shows visible signs of wear. May have minor defects but is still functional and wearable.'}
+              </p>
+            </div>
+
+            {/* Item Story */}
+            {product.story && (
+              <div className="item-story-box">
+                <h4>Item Story</h4>
                 <p>{product.story}</p>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Measurements */}
-          <div className="measurements-section">
-            <h3>Measurements</h3>
-            <table>
-              <tbody>
-                <tr>
-                  <td>Length</td>
-                  <td>26 inches</td>
-                </tr>
-                <tr>
-                  <td>Shoulder</td>
-                  <td>18 inches</td>
-                </tr>
-                <tr>
-                  <td>Chest</td>
-                  <td>40 inches</td>
-                </tr>
-                <tr>
-                  <td>Waist</td>
-                  <td>38 inches</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Seller Profile */}
-          <div className="seller-profile-section">
-            <h3>Seller Information</h3>
-            <div className="seller-profile-card">
-              <div className="seller-header">
-                <div className="seller-avatar">
-                  <img src={sellerInfo.avatar} alt={sellerInfo.storeName} />
-                </div>
-                <div className="seller-info">
-                  <h4>{sellerInfo.storeName}</h4>
-                  <div className="seller-rating">
-                    <div className="stars">
-                      {[...Array(5)].map((_, i) => (
-                        <FiStar key={i} className="star-filled" />
-                      ))}
-                    </div>
-                    <span>{sellerInfo.rating} ({sellerInfo.totalReviews} Reviews)</span>
-                  </div>
-                  <div className="seller-stats">
-                    <span>{sellerInfo.totalTransactions} Transactions</span>
-                    <span>•</span>
-                    <span>{sellerInfo.itemsForSale} items for sale</span>
-                  </div>
-                </div>
+            {/* Verification Promise */}
+            <div className="verification-box">
+              <div className="verification-icon">
+                <FiShield />
               </div>
-
-              <div className="seller-badges">
-                <div className="badge trusted">
-                  <FiShield />
-                  <span>Trusted Seller</span>
-                </div>
-                <div className="badge quick">
-                  <FiZap />
-                  <span>Quick Responder</span>
-                </div>
-                <div className="badge speedy">
-                  <FiPackage />
-                  <span>Speedy Shipper</span>
-                </div>
-              </div>
-
-              <div className="seller-details">
-                <div className="detail-item">
-                  <span className="detail-label">Joined:</span>
-                  <span className="detail-value">{sellerInfo.joinedDate}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Response Time:</span>
-                  <span className="detail-value">{sellerInfo.responseTime}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="detail-label">Shipping Time:</span>
-                  <span className="detail-value">{sellerInfo.shippingTime}</span>
-                </div>
-              </div>
-
-              <div className="seller-actions">
-                <button className="follow-btn">
-                  <FiAward /> Follow Seller
-                </button>
-                <button className="message-btn">
-                  <FiMessageSquare /> Message Seller
-                </button>
+              <div className="verification-text">
+                <h4>Condition Verification Promise</h4>
+                <p>After receiving your order, you can verify if the product matches the listed description. We encourage honest feedback to build trust in our community. If the item doesn't match the description, contact us within 48 hours for a resolution.</p>
               </div>
             </div>
+
+            {/* Transparency Note */}
+            <div className="transparency-note">
+              <p>This feature enhances both transparency and emotional connection in the buying process. Sellers label each product with clear condition badges, helping customers understand exactly what they are purchasing. By combining accurate condition labeling with personal storytelling, the platform promotes authenticity, transparency, and stronger buyer-seller relationships.</p>
+            </div>
           </div>
+
+          {/* Seller Profile Section */}
+          <div className="seller-profile-card">
+            <h3>About the Seller</h3>
+            
+            <div className="seller-info-header">
+              <img src={sellerInfo.avatar} alt={sellerInfo.name} className="seller-avatar" />
+              <div className="seller-basic-info">
+                <h4>{sellerInfo.name}</h4>
+                <p className="seller-store-name">{sellerInfo.storeName}</p>
+                <div className="seller-rating">
+                  <FiStar className="star-filled" />
+                  <span>{sellerInfo.rating} ({sellerInfo.totalReviews} reviews)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="seller-stats">
+              <div className="seller-stat">
+                <FiPackage className="stat-icon" />
+                <div>
+                  <strong>{sellerInfo.itemsForSale}</strong>
+                  <p>Items for Sale</p>
+                </div>
+              </div>
+              <div className="seller-stat">
+                <FiRefreshCw className="stat-icon" />
+                <div>
+                  <strong>{sellerInfo.totalTransactions}</strong>
+                  <p>Total Sales</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="seller-badges">
+              {sellerInfo.badges.map((badge, index) => (
+                <span key={index} className="seller-badge">
+                  <FiAward /> {badge}
+                </span>
+              ))}
+            </div>
+
+            <div className="seller-details">
+              <div className="seller-detail-item">
+                <FiZap className="detail-icon" />
+                <div>
+                  <strong>Response Time</strong>
+                  <p>{sellerInfo.responseTime}</p>
+                </div>
+              </div>
+              <div className="seller-detail-item">
+                <FiTruck className="detail-icon" />
+                <div>
+                  <strong>Shipping Time</strong>
+                  <p>{sellerInfo.shippingTime}</p>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              className="btn-view-seller-profile"
+              onClick={() => navigate(`/seller/${sellerInfo.id || product.seller._id || product.seller}`)}
+            >
+              View Seller Profile & Products
+            </button>
+          </div>
+
+          {/* Contact Seller */}
+          <button className="btn-contact-seller" onClick={() => setShowContactModal(true)}>
+            <FiMessageSquare /> Contact Seller
+          </button>
         </div>
       </div>
 
@@ -613,6 +557,11 @@ function ProductDetail() {
       <section className="similar-products">
         <h2>Similar Listings</h2>
         <div className="similar-grid">
+          {similarProducts.length === 0 && (
+            <p style={{gridColumn: '1 / -1', textAlign: 'center', color: '#999', padding: '40px'}}>
+              No similar products available
+            </p>
+          )}
           {similarProducts.map(item => (
             <div key={item.id} className="similar-card" onClick={() => navigate(`/product/${item.id}`)}>
               <img src={item.image} alt={item.name} />

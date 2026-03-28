@@ -44,6 +44,10 @@ const reviewRoutes = require('./routes/reviews');
 const wishlistRoutes = require('./routes/wishlist');
 const sellerRoutes = require('./routes/sellers');
 const messageRoutes = require('./routes/messages');
+const notificationRoutes = require('./routes/notifications');
+const customerRoutes = require('./routes/customers');
+const chatbotRoutes = require('./routes/chatbotRoutes');
+const adminRoutes = require('./routes/admin');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -54,6 +58,10 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/customers', customerRoutes);
+app.use('/api/chat', chatbotRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
