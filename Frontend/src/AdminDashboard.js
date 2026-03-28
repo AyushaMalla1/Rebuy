@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  FiUsers, FiShoppingBag, FiPackage, FiDollarSign, FiTrendingUp, 
+  FiUsers, FiShoppingBag, FiPackage, FiTrendingUp, 
   FiSettings, FiLogOut, FiHome, FiShield, FiEdit2, FiTrash2, 
   FiEye, FiCheckCircle, FiXCircle, FiSearch, FiFilter, FiDownload,
   FiBarChart2, FiPieChart, FiActivity, FiClock, FiAlertCircle,
-  FiUserCheck, FiMonitor, FiAward, FiBell, FiMessageSquare, FiGrid
+  FiUserCheck, FiMonitor, FiAward, FiBell, FiMessageSquare, FiGrid, FiUser
 } from 'react-icons/fi';
+import { 
+  MdPeople, MdStorefront, MdInventory, MdAttachMoney, MdShowChart, MdAccessTime
+} from 'react-icons/md';
 import './AdminDashboard.css';
 import Chatbot from './components/Chatbot';
+import { RevenueTrendChart, TopProductsChart, CategoryPerformanceChart, StockLevelsChart } from './components/Charts';
 
 function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   // State
   const [users, setUsers] = useState([]);
@@ -29,75 +37,158 @@ function AdminDashboard() {
     totalRevenue: 0
   });
 
+  // Chart data
+  const [chartData, setChartData] = useState({
+    revenue: [
+      { day: 'Mon', revenue: 1200 },
+      { day: 'Tue', revenue: 1900 },
+      { day: 'Wed', revenue: 1500 },
+      { day: 'Thu', revenue: 2200 },
+      { day: 'Fri', revenue: 2800 },
+      { day: 'Sat', revenue: 3200 },
+      { day: 'Sun', revenue: 2600 }
+    ],
+    topProducts: [
+      { name: 'Vintage Jacket', sales: 45 },
+      { name: 'Retro Shoes', sales: 38 },
+      { name: 'Classic Watch', sales: 32 },
+      { name: 'Denim Jeans', sales: 28 },
+      { name: 'Leather Bag', sales: 25 }
+    ],
+    categories: [
+      { name: 'Vintage', value: 35 },
+      { name: 'Retro', value: 25 },
+      { name: 'Classic', value: 20 },
+      { name: 'Modern', value: 15 },
+      { name: 'Other', value: 5 }
+    ]
+  });
+
   React.useEffect(() => {
     fetchAdminData();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchAdminData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchAdminData = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const token = localStorage.getItem('token');
-      const headers = { 'Authorization': `Bearer ${token}` };
+      
+      if (!token) {
+        console.log('No token found, redirecting to login');
+        navigate('/login');
+        return;
+      }
+
+      const headers = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      console.log('Fetching admin data from backend...');
 
       const [statsRes, usersRes, sellersRes, productsRes, ordersRes] = await Promise.all([
-        fetch('http://localhost:5000/api/admin/stats', { headers }),
-        fetch('http://localhost:5000/api/admin/users', { headers }),
-        fetch('http://localhost:5000/api/admin/sellers/pending', { headers }),
-        fetch('http://localhost:5000/api/admin/products', { headers }),
-        fetch('http://localhost:5000/api/admin/orders', { headers })
+        fetch('http://localhost:5000/api/admin/stats', { headers }).catch(err => {
+          console.error('Stats fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/users', { headers }).catch(err => {
+          console.error('Users fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/sellers/pending', { headers }).catch(err => {
+          console.error('Sellers fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/products', { headers }).catch(err => {
+          console.error('Products fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/orders', { headers }).catch(err => {
+          console.error('Orders fetch error:', err);
+          return { ok: false, status: 500 };
+        })
       ]);
 
-      const stats = await statsRes.json();
-      const usersData = await usersRes.json();
-      const sellersData = await sellersRes.json();
-      const productsData = await productsRes.json();
-      const ordersData = await ordersRes.json();
+      console.log('API Response statuses:', {
+        stats: statsRes.status,
+        users: usersRes.status,
+        sellers: sellersRes.status,
+        products: productsRes.status,
+        orders: ordersRes.status
+      });
+
+      // Check for authentication errors
+      if (statsRes.status === 401 || usersRes.status === 401) {
+        console.log('Authentication failed, redirecting to login');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+
+      const stats = await statsRes.json().catch(() => ({ success: false }));
+      const usersData = await usersRes.json().catch(() => ({ success: false }));
+      const sellersData = await sellersRes.json().catch(() => ({ success: false }));
+      const productsData = await productsRes.json().catch(() => ({ success: false }));
+      const ordersData = await ordersRes.json().catch(() => ({ success: false }));
+
+      console.log('Parsed data:', { stats, usersData, sellersData, productsData, ordersData });
 
       if (stats.success) setAdminStats(stats.stats);
       if (usersData.success) {
         setUsers(usersData.users.map(u => ({
           id: u._id,
-          name: u.fullName,
+          name: u.fullName || u.name || 'Unknown',
           email: u.email,
-          type: u.userType === 'seller' ? 'Seller' : 'User',
-          status: u.isActive ? 'Active' : 'Inactive',
+          type: u.userType === 'seller' ? 'Seller' : 'Customer',
+          status: u.isActive !== false ? 'Active' : 'Inactive',
           joined: new Date(u.createdAt).toLocaleDateString()
         })));
       }
       if (sellersData.success) {
         setPendingSellers(sellersData.sellers.map(s => ({
           id: s._id,
-          name: s.fullName,
+          name: s.fullName || s.name || 'Unknown',
           email: s.email,
-          storeName: s.storeName,
-          phone: s.phone,
-          address: s.address,
+          storeName: s.storeName || 'N/A',
+          phone: s.phone || 'N/A',
+          address: s.address || 'N/A',
           appliedDate: new Date(s.createdAt).toLocaleDateString(),
-          documents: 'Pending',
-          experience: 'Checking...'
+          documents: s.documentsVerified ? 'Verified' : 'Pending',
+          experience: s.experience || 'Not specified'
         })));
       }
       if (productsData.success) {
         setProducts(productsData.products.map(p => ({
           id: p._id,
           name: p.name,
-          seller: p.seller?.name || p.sellerName || 'Unknown',
+          seller: p.seller?.fullName || p.seller?.name || p.sellerName || 'Unknown',
           price: p.price,
-          stock: p.stock,
-          status: p.status
+          stock: p.stock || 0,
+          status: p.status || 'Pending'
         })));
       }
       if (ordersData.success) {
         setOrders(ordersData.orders.map(o => ({
           id: o._id,
-          customer: o.customerName,
-          product: o.items?.[0]?.productName + (o.items?.length > 1 ? ' + more' : '') || 'Items',
-          amount: o.total,
-          status: o.status,
-          date: new Date(o.orderDate).toLocaleDateString()
+          customer: o.customerName || o.customer?.fullName || 'Unknown',
+          product: o.items?.[0]?.productName + (o.items?.length > 1 ? ` +${o.items.length - 1} more` : '') || 'Items',
+          amount: o.total || 0,
+          status: o.status || 'Processing',
+          date: new Date(o.orderDate || o.createdAt).toLocaleDateString()
         })));
       }
+
+      console.log('Admin data loaded successfully');
     } catch (error) {
       console.error('Error fetching admin data:', error);
+      setError('Failed to load dashboard data. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -110,70 +201,227 @@ function AdminDashboard() {
   const handleDeleteUser = async (id) => {
     if (window.confirm('Are you sure you want to deactivate this user?')) {
       try {
-        await fetch(`http://localhost:5000/api/customers/${id}/status`, {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/customers/${id}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ status: 'deactivated' })
         });
-        fetchAdminData();
-      } catch (err) { console.error(err); }
+        
+        if (response.ok) {
+          alert('User deactivated successfully');
+          fetchAdminData();
+        } else {
+          alert('Failed to deactivate user');
+        }
+      } catch (err) { 
+        console.error(err);
+        alert('Error deactivating user');
+      }
     }
   };
 
-  const handleDeleteProduct = (id) => {
+  const handleDeleteProduct = async (id) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
-      setProducts(products.filter(p => p.id !== id));
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/products/${id}`, {
+          method: 'DELETE',
+          headers: { 
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          alert('Product deleted successfully');
+          fetchAdminData();
+        } else {
+          alert('Failed to delete product');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error deleting product');
+      }
     }
   };
 
   const handleApproveSeller = async (id) => {
     if (window.confirm('Approve this seller application?')) {
       try {
+        const token = localStorage.getItem('token');
         const row = pendingSellers.find(s => s.id === id);
-        await fetch(`http://localhost:5000/api/sellers/${id}/status`, {
+        const response = await fetch(`http://localhost:5000/api/sellers/${id}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ status: 'approved' })
         });
-        alert(`${row.name} has been approved as a seller!`);
-        fetchAdminData();
-      } catch (err) { console.error(err); }
+        
+        if (response.ok) {
+          alert(`${row?.name || 'Seller'} has been approved successfully!`);
+          fetchAdminData();
+        } else {
+          alert('Failed to approve seller');
+        }
+      } catch (err) { 
+        console.error(err);
+        alert('Error approving seller');
+      }
     }
   };
 
   const handleRejectSeller = async (id) => {
-    if (window.confirm('Reject this seller application?')) {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (reason && window.confirm('Reject this seller application?')) {
       try {
-        await fetch(`http://localhost:5000/api/sellers/${id}/status`, {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/sellers/${id}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'rejected' })
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'rejected', reason })
         });
-        fetchAdminData();
-      } catch (err) { console.error(err); }
+        
+        if (response.ok) {
+          alert('Seller application rejected');
+          fetchAdminData();
+        } else {
+          alert('Failed to reject seller');
+        }
+      } catch (err) { 
+        console.error(err);
+        alert('Error rejecting seller');
+      }
     }
   };
 
   const handleBlockUser = async (userId) => {
     if (window.confirm('Block this user for suspicious activity?')) {
       try {
-        await fetch(`http://localhost:5000/api/customers/${userId}/status`, {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/customers/${userId}/status`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ status: 'suspended' })
         });
-        alert('User has been blocked!');
-        fetchAdminData();
-      } catch (err) { console.error(err); }
+        
+        if (response.ok) {
+          alert('User has been blocked successfully!');
+          fetchAdminData();
+        } else {
+          alert('Failed to block user');
+        }
+      } catch (err) { 
+        console.error(err);
+        alert('Error blocking user');
+      }
     }
   };
 
-  const handleApproveProduct = (id) => {
-    setProducts(products.map(p => p.id === id ? { ...p, status: 'Approved' } : p));
+  const handleApproveProduct = async (id) => {
+    if (window.confirm('Approve this product?')) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/products/${id}/status`, {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'approved' })
+        });
+        
+        if (response.ok) {
+          alert('Product approved successfully');
+          fetchAdminData();
+        } else {
+          alert('Failed to approve product');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error approving product');
+      }
+    }
   };
 
-  const handleRejectProduct = (id) => {
-    setProducts(products.map(p => p.id === id ? { ...p, status: 'Rejected' } : p));
+  const handleRejectProduct = async (id) => {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (reason && window.confirm('Reject this product?')) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/products/${id}/status`, {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'rejected', reason })
+        });
+        
+        if (response.ok) {
+          alert('Product rejected');
+          fetchAdminData();
+        } else {
+          alert('Failed to reject product');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error rejecting product');
+      }
+    }
+  };
+
+  // Filter functions
+  const getFilteredUsers = () => {
+    let filtered = users;
+    if (searchQuery) {
+      filtered = filtered.filter(u => 
+        u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(u => u.type.toLowerCase() === filterStatus);
+    }
+    return filtered;
+  };
+
+  const getFilteredProducts = () => {
+    let filtered = products;
+    if (searchQuery) {
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.seller.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(p => p.status.toLowerCase() === filterStatus);
+    }
+    return filtered;
+  };
+
+  const getFilteredOrders = () => {
+    let filtered = orders;
+    if (searchQuery) {
+      filtered = filtered.filter(o => 
+        o.customer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        o.id.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(o => o.status.toLowerCase() === filterStatus);
+    }
+    return filtered;
   };
 
   // Stats
@@ -205,117 +453,131 @@ function AdminDashboard() {
               e.target.style.display = 'none';
             }}
           />
-          <h2>Admin Panel</h2>
+          <h2></h2>
         </div>
 
         <nav className="sidebar-nav">
-          <div className="nav-section">
-            <p className="nav-label">MAIN MENU</p>
-            <button 
-              className={activeTab === 'overview' ? 'active' : ''} 
-              onClick={() => setActiveTab('overview')}
-            >
-              <FiGrid /> Dashboard
-            </button>
-            <button 
-              className={activeTab === 'seller-approval' ? 'active' : ''} 
-              onClick={() => setActiveTab('seller-approval')}
-            >
-              <FiUserCheck /> Seller Approval
-            </button>
-            <button 
-              className={activeTab === 'users' ? 'active' : ''} 
-              onClick={() => setActiveTab('users')}
-            >
-              <FiUsers /> User Management
-            </button>
-            <button 
-              className={activeTab === 'products' ? 'active' : ''} 
-              onClick={() => setActiveTab('products')}
-            >
-              <FiMonitor /> Product Monitoring
-            </button>
-            <button 
-              className={activeTab === 'orders' ? 'active' : ''} 
-              onClick={() => setActiveTab('orders')}
-            >
-              <FiShoppingBag /> Orders
-            </button>
-          </div>
+          <button 
+            className={activeTab === 'overview' ? 'active' : ''} 
+            onClick={() => setActiveTab('overview')}
+          >
+            <FiGrid /> Dashboard
+          </button>
+          <button 
+            className={activeTab === 'seller-approval' ? 'active' : ''} 
+            onClick={() => setActiveTab('seller-approval')}
+          >
+            <FiUserCheck /> Seller Approval
+          </button>
+          <button 
+            className={activeTab === 'users' ? 'active' : ''} 
+            onClick={() => setActiveTab('users')}
+          >
+            <FiUsers /> User Management
+          </button>
+          <button 
+            className={activeTab === 'products' ? 'active' : ''} 
+            onClick={() => setActiveTab('products')}
+          >
+            <FiMonitor /> Product Monitoring
+          </button>
+          <button 
+            className={activeTab === 'orders' ? 'active' : ''} 
+            onClick={() => setActiveTab('orders')}
+          >
+            <FiShoppingBag /> Orders
+          </button>
 
-          <div className="nav-section">
-            <p className="nav-label">ANALYTICS & REPORTS</p>
-            <button 
-              className={activeTab === 'sales' ? 'active' : ''} 
-              onClick={() => setActiveTab('sales')}
-            >
-              <FiBarChart2 /> Sales & Reports
-            </button>
-            <button 
-              className={activeTab === 'fraud' ? 'active' : ''} 
-              onClick={() => setActiveTab('fraud')}
-            >
-              <FiShield /> Fraud Detection
-            </button>
-          </div>
+          <button 
+            className={activeTab === 'sales' ? 'active' : ''} 
+            onClick={() => setActiveTab('sales')}
+          >
+            <FiBarChart2 /> Sales & Reports
+          </button>
+          <button 
+            className={activeTab === 'fraud' ? 'active' : ''} 
+            onClick={() => setActiveTab('fraud')}
+          >
+            <FiShield /> Fraud Detection
+          </button>
+          <button 
+            className={activeTab === 'audit' ? 'active' : ''} 
+            onClick={() => setActiveTab('audit')}
+          >
+            <FiClock /> Audit Log
+          </button>
 
-          <div className="nav-section">
-            <p className="nav-label">ENGAGEMENT</p>
-            <button 
-              className={activeTab === 'loyalty' ? 'active' : ''} 
-              onClick={() => setActiveTab('loyalty')}
-            >
-              <FiAward /> Loyalty Points
-            </button>
-            <button 
-              className={activeTab === 'announcements' ? 'active' : ''} 
-              onClick={() => setActiveTab('announcements')}
-            >
-              <FiBell /> Announcements
-            </button>
-            <button 
-              className={activeTab === 'chatbot' ? 'active' : ''} 
-              onClick={() => setActiveTab('chatbot')}
-            >
-              <FiMessageSquare /> AI Chatbot
-            </button>
-          </div>
+          <button 
+            className={activeTab === 'announcements' ? 'active' : ''} 
+            onClick={() => setActiveTab('announcements')}
+          >
+            <FiBell /> Announcements
+          </button>
+          <button 
+            className={activeTab === 'loyalty' ? 'active' : ''} 
+            onClick={() => setActiveTab('loyalty')}
+          >
+            <FiAward /> Loyalty Points
+          </button>
 
-          <div className="nav-section">
-            <p className="nav-label">SYSTEM</p>
-            <button 
-              className={activeTab === 'settings' ? 'active' : ''} 
-              onClick={() => setActiveTab('settings')}
-            >
-              <FiSettings /> Settings
-            </button>
-          </div>
-        </nav>
-
-        <div className="sidebar-footer">
-          <Link to="/" className="home-link">
-            <FiHome /> Back to Store
-          </Link>
-          <button onClick={handleLogout} className="logout-btn">
+          <button 
+            className={activeTab === 'settings' ? 'active' : ''} 
+            onClick={() => setActiveTab('settings')}
+          >
+            <FiSettings /> Settings
+          </button>
+          
+          <button 
+            className="logout-menu-btn"
+            onClick={handleLogout}
+          >
             <FiLogOut /> Logout
           </button>
-        </div>
+        </nav>
+
       </aside>
 
       {/* Main Content */}
       <main className="admin-main">
         <header className="admin-header">
           <div className="header-left">
-            <h1>Admin Dashboard</h1>
+            <h1>
+              {activeTab === 'overview' && 'Admin Dashboard'}
+              {activeTab === 'seller-approval' && 'Seller Approval'}
+              {activeTab === 'users' && 'User Management'}
+              {activeTab === 'products' && 'Product Monitoring'}
+              {activeTab === 'orders' && 'Orders Management'}
+              {activeTab === 'sales' && 'Sales & Reports'}
+              {activeTab === 'fraud' && 'Fraud Detection'}
+              {activeTab === 'audit' && 'Audit Log'}
+              {activeTab === 'announcements' && 'Announcements'}
+              {activeTab === 'loyalty' && 'Loyalty Points'}
+              {activeTab === 'settings' && 'Settings'}
+            </h1>
             <p className="header-subtitle">
               <FiActivity className="subtitle-icon" />
-              Manage your e-commerce platform efficiently
+              {activeTab === 'overview' && 'Manage your e-commerce platform efficiently'}
+              {activeTab === 'seller-approval' && 'Review and approve seller applications'}
+              {activeTab === 'users' && 'Manage users and their accounts'}
+              {activeTab === 'products' && 'Monitor and approve product listings'}
+              {activeTab === 'orders' && 'Track and manage customer orders'}
+              {activeTab === 'sales' && 'View sales analytics and reports'}
+              {activeTab === 'fraud' && 'Monitor suspicious activities'}
+              {activeTab === 'audit' && 'View system activity logs'}
+              {activeTab === 'announcements' && 'Manage platform announcements'}
+              {activeTab === 'loyalty' && 'Manage loyalty points program'}
+              {activeTab === 'settings' && 'Configure platform settings'}
             </p>
           </div>
           <div className="header-right">
             <div className="search-box">
               <FiSearch className="search-icon" />
-              <input type="text" placeholder="Search anything..." />
+              <input 
+                type="text" 
+                placeholder="Search anything..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
             <div className="admin-info">
               <div className="admin-avatar">
@@ -332,107 +594,99 @@ function AdminDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <>
+            {loading ? (
+              <div className="loading-state">
+                <FiActivity size={48} className="loading-icon" />
+                <p>Loading dashboard data...</p>
+              </div>
+            ) : error ? (
+              <div className="error-state">
+                <FiAlertCircle size={48} />
+                <h3>Error Loading Data</h3>
+                <p>{error}</p>
+                <button onClick={fetchAdminData} className="retry-btn">
+                  <FiActivity /> Retry
+                </button>
+              </div>
+            ) : (
+              <>
             {/* Stats Grid */}
             <div className="stats-grid">
               <div className="stat-card blue">
-                <div className="stat-header">
+                <div className="stat-card-content">
                   <div className="stat-icon-wrapper blue">
-                    <FiUsers className="stat-icon" />
+                    <MdPeople className="stat-icon" />
                   </div>
-                  <div className="stat-trend positive">
-                    <FiTrendingUp />
-                    <span>+12%</span>
+                  <div className="stat-content">
+                    <p className="stat-label">Total Users</p>
+                    <h3 className="stat-value">{totalUsers}</h3>
+                    <p className="stat-description">+5 new users this month</p>
                   </div>
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Total Users</p>
-                  <h3 className="stat-value">{totalUsers}</h3>
-                  <p className="stat-description">+5 new users this month</p>
                 </div>
               </div>
 
               <div className="stat-card green">
-                <div className="stat-header">
+                <div className="stat-card-content">
                   <div className="stat-icon-wrapper green">
-                    <FiShoppingBag className="stat-icon" />
+                    <MdStorefront className="stat-icon" />
                   </div>
-                  <div className="stat-trend positive">
-                    <FiTrendingUp />
-                    <span>+8%</span>
+                  <div className="stat-content">
+                    <p className="stat-label">Total Sellers</p>
+                    <h3 className="stat-value">{totalSellers}</h3>
+                    <p className="stat-description">+2 new sellers this month</p>
                   </div>
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Total Sellers</p>
-                  <h3 className="stat-value">{totalSellers}</h3>
-                  <p className="stat-description">+2 new sellers this month</p>
                 </div>
               </div>
 
               <div className="stat-card orange">
-                <div className="stat-header">
+                <div className="stat-card-content">
                   <div className="stat-icon-wrapper orange">
-                    <FiPackage className="stat-icon" />
+                    <MdInventory className="stat-icon" />
                   </div>
-                  <div className="stat-trend warning">
-                    <FiAlertCircle />
-                    <span>{pendingProducts}</span>
+                  <div className="stat-content">
+                    <p className="stat-label">Total Products</p>
+                    <h3 className="stat-value">{totalProducts}</h3>
+                    <p className="stat-description">{pendingProducts} pending approval</p>
                   </div>
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Total Products</p>
-                  <h3 className="stat-value">{totalProducts}</h3>
-                  <p className="stat-description">{pendingProducts} pending approval</p>
                 </div>
               </div>
 
               <div className="stat-card purple">
-                <div className="stat-header">
+                <div className="stat-card-content">
                   <div className="stat-icon-wrapper purple">
-                    <FiBarChart2 className="stat-icon" />
+                    <FiShoppingBag className="stat-icon" />
                   </div>
-                  <div className="stat-trend positive">
-                    <FiTrendingUp />
-                    <span>+15%</span>
+                  <div className="stat-content">
+                    <p className="stat-label">Total Orders</p>
+                    <h3 className="stat-value">{totalOrders}</h3>
+                    <p className="stat-description">+8% from last month</p>
                   </div>
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Total Orders</p>
-                  <h3 className="stat-value">{totalOrders}</h3>
-                  <p className="stat-description">+8% from last month</p>
-                </div>
-              </div>
-
-              <div className="stat-card cyan">
-                <div className="stat-header">
-                  <div className="stat-icon-wrapper cyan">
-                    <FiDollarSign className="stat-icon" />
-                  </div>
-                  <div className="stat-trend positive">
-                    <FiTrendingUp />
-                    <span>+18%</span>
-                  </div>
-                </div>
-                <div className="stat-content">
-                  <p className="stat-label">Total Revenue</p>
-                  <h3 className="stat-value">Rs. {totalRevenue.toLocaleString()}</h3>
-                  <p className="stat-description">+15% from last month</p>
                 </div>
               </div>
 
               <div className="stat-card red">
-                <div className="stat-header">
+                <div className="stat-card-content">
                   <div className="stat-icon-wrapper red">
-                    <FiPieChart className="stat-icon" />
+                    <MdShowChart className="stat-icon" />
                   </div>
-                  <div className="stat-trend positive">
-                    <FiTrendingUp />
-                    <span>+5%</span>
+                  <div className="stat-content">
+                    <p className="stat-label">Growth Rate</p>
+                    <h3 className="stat-value">12.5%</h3>
+                    <p className="stat-description">Excellent performance</p>
                   </div>
                 </div>
-                <div className="stat-content">
-                  <p className="stat-label">Growth Rate</p>
-                  <h3 className="stat-value">12.5%</h3>
-                  <p className="stat-description">Excellent performance</p>
+              </div>
+
+              <div className="stat-card cyan">
+                <div className="stat-card-content">
+                  <div className="stat-icon-wrapper cyan">
+                    <MdAttachMoney className="stat-icon" />
+                  </div>
+                  <div className="stat-content">
+                    <p className="stat-label">Total Revenue</p>
+                    <h3 className="stat-value">Rs. {totalRevenue.toLocaleString()}</h3>
+                    <p className="stat-description">+15% from last month</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -511,36 +765,46 @@ function AdminDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Charts Section */}
+            <div className="activity-section">
+              <div className="section-title-row">
+                <h2>
+                  <FiBarChart2 className="section-icon" />
+                  Analytics Overview
+                </h2>
+              </div>
+              <div className="chart-container">
+                <RevenueTrendChart data={chartData.revenue} />
+              </div>
+            </div>
+          </>
+            )}
           </>
         )}
 
         {/* Users Management Tab */}
         {activeTab === 'users' && (
           <div className="content-section">
-            <div className="section-header">
-              <div className="section-title-group">
-                <h2>
-                  <FiUsers className="section-icon" />
-                  Users Management
-                </h2>
-                <p className="section-subtitle">{totalUsers} total users registered</p>
-              </div>
-              <div className="header-actions">
-                <div className="filter-buttons">
-                  <button className="filter-btn active">
-                    <FiUsers /> All Users
-                  </button>
-                  <button className="filter-btn">
-                    <FiShoppingBag /> Sellers
-                  </button>
-                  <button className="filter-btn">
-                    <FiUsers /> Customers
-                  </button>
-                </div>
-                <button className="export-btn">
-                  <FiDownload /> Export
-                </button>
-              </div>
+            <div className="filter-buttons">
+              <button 
+                className={`filter-btn ${filterStatus === 'all' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('all')}
+              >
+                <FiUsers /> All Users
+              </button>
+              <button 
+                className={`filter-btn ${filterStatus === 'seller' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('seller')}
+              >
+                <FiShoppingBag /> Sellers
+              </button>
+              <button 
+                className={`filter-btn ${filterStatus === 'customer' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('customer')}
+              >
+                <FiUsers /> Customers
+              </button>
             </div>
 
             <div className="table-container">
@@ -557,37 +821,46 @@ function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(user => (
-                    <tr key={user.id}>
-                      <td>#{user.id}</td>
-                      <td className="user-name">{user.name}</td>
-                      <td>{user.email}</td>
-                      <td>
-                        <span className={`type-badge ${user.type.toLowerCase()}`}>
-                          {user.type}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`status-badge ${user.status.toLowerCase()}`}>
-                          {user.status}
-                        </span>
-                      </td>
-                      <td>{user.joined}</td>
-                      <td>
-                        <div className="action-buttons">
-                          <button className="view-btn" title="View Details">
-                            <FiEye />
-                          </button>
-                          <button className="edit-btn" title="Edit User">
-                            <FiEdit2 />
-                          </button>
-                          <button className="delete-btn" onClick={() => handleDeleteUser(user.id)} title="Delete User">
-                            <FiTrash2 />
-                          </button>
-                        </div>
+                  {getFilteredUsers().length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                        <FiUsers size={48} style={{ color: '#d0d2d6', marginBottom: '10px' }} />
+                        <p style={{ color: '#8e8e8e' }}>No users found</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    getFilteredUsers().map(user => (
+                      <tr key={user.id}>
+                        <td>#{user.id}</td>
+                        <td className="user-name">{user.name}</td>
+                        <td>{user.email}</td>
+                        <td>
+                          <span className={`type-badge ${user.type.toLowerCase()}`}>
+                            {user.type}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${user.status.toLowerCase()}`}>
+                            {user.status}
+                          </span>
+                        </td>
+                        <td>{user.joined}</td>
+                        <td>
+                          <div className="action-buttons">
+                            <button className="view-btn" title="View Details">
+                              <FiEye />
+                            </button>
+                            <button className="edit-btn" title="Edit User">
+                              <FiEdit2 />
+                            </button>
+                            <button className="delete-btn" onClick={() => handleDeleteUser(user.id)} title="Delete User">
+                              <FiTrash2 />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -597,33 +870,31 @@ function AdminDashboard() {
         {/* Products Tab */}
         {activeTab === 'products' && (
           <div className="content-section">
-            <div className="section-header">
-              <div className="section-title-group">
-                <h2>
-                  <FiPackage className="section-icon" />
-                  Products Management
-                </h2>
-                <p className="section-subtitle">{totalProducts} products • {pendingProducts} pending approval</p>
-              </div>
-              <div className="header-actions">
-                <div className="filter-buttons">
-                  <button className="filter-btn active">
-                    <FiPackage /> All Products
-                  </button>
-                  <button className="filter-btn">
-                    <FiCheckCircle /> Approved
-                  </button>
-                  <button className="filter-btn">
-                    <FiClock /> Pending
-                  </button>
-                  <button className="filter-btn">
-                    <FiXCircle /> Rejected
-                  </button>
-                </div>
-                <button className="export-btn">
-                  <FiDownload /> Export
-                </button>
-              </div>
+            <div className="filter-buttons">
+              <button 
+                className={`filter-btn ${filterStatus === 'all' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('all')}
+              >
+                <FiPackage /> All Products
+              </button>
+              <button 
+                className={`filter-btn ${filterStatus === 'approved' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('approved')}
+              >
+                <FiCheckCircle /> Approved
+              </button>
+              <button 
+                className={`filter-btn ${filterStatus === 'pending' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('pending')}
+              >
+                <FiClock /> Pending
+              </button>
+              <button 
+                className={`filter-btn ${filterStatus === 'rejected' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('rejected')}
+              >
+                <FiXCircle /> Rejected
+              </button>
             </div>
 
             <div className="table-container">
@@ -640,40 +911,49 @@ function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(product => (
-                    <tr key={product.id}>
-                      <td>#{product.id}</td>
-                      <td className="product-name">{product.name}</td>
-                      <td>{product.seller}</td>
-                      <td className="product-price">Rs. {product.price.toLocaleString()}</td>
-                      <td>{product.stock} units</td>
-                      <td>
-                        <span className={`status-badge ${product.status.toLowerCase()}`}>
-                          {product.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="action-buttons">
-                          {product.status === 'Pending' && (
-                            <>
-                              <button className="approve-btn" onClick={() => handleApproveProduct(product.id)} title="Approve">
-                                <FiCheckCircle />
-                              </button>
-                              <button className="reject-btn" onClick={() => handleRejectProduct(product.id)} title="Reject">
-                                <FiXCircle />
-                              </button>
-                            </>
-                          )}
-                          <button className="view-btn" title="View Details">
-                            <FiEye />
-                          </button>
-                          <button className="delete-btn" onClick={() => handleDeleteProduct(product.id)} title="Delete">
-                            <FiTrash2 />
-                          </button>
-                        </div>
+                  {getFilteredProducts().length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                        <FiPackage size={48} style={{ color: '#d0d2d6', marginBottom: '10px' }} />
+                        <p style={{ color: '#8e8e8e' }}>No products found</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    getFilteredProducts().map(product => (
+                      <tr key={product.id}>
+                        <td>#{product.id}</td>
+                        <td className="product-name">{product.name}</td>
+                        <td>{product.seller}</td>
+                        <td className="product-price">Rs. {product.price.toLocaleString()}</td>
+                        <td>{product.stock} units</td>
+                        <td>
+                          <span className={`status-badge ${product.status.toLowerCase()}`}>
+                            {product.status}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            {product.status === 'Pending' && (
+                              <>
+                                <button className="approve-btn" onClick={() => handleApproveProduct(product.id)} title="Approve">
+                                  <FiCheckCircle />
+                                </button>
+                                <button className="reject-btn" onClick={() => handleRejectProduct(product.id)} title="Reject">
+                                  <FiXCircle />
+                                </button>
+                              </>
+                            )}
+                            <button className="view-btn" title="View Details">
+                              <FiEye />
+                            </button>
+                            <button className="delete-btn" onClick={() => handleDeleteProduct(product.id)} title="Delete">
+                              <FiTrash2 />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -683,33 +963,31 @@ function AdminDashboard() {
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="content-section">
-            <div className="section-header">
-              <div className="section-title-group">
-                <h2>
-                  <FiShoppingBag className="section-icon" />
-                  Orders Management
-                </h2>
-                <p className="section-subtitle">{totalOrders} total orders • Rs. {totalRevenue.toLocaleString()} revenue</p>
-              </div>
-              <div className="header-actions">
-                <div className="filter-buttons">
-                  <button className="filter-btn active">
-                    <FiFilter /> All Orders
-                  </button>
-                  <button className="filter-btn">
-                    <FiClock /> Processing
-                  </button>
-                  <button className="filter-btn">
-                    <FiPackage /> Shipped
-                  </button>
-                  <button className="filter-btn">
-                    <FiCheckCircle /> Delivered
-                  </button>
-                </div>
-                <button className="export-btn">
-                  <FiDownload /> Export
-                </button>
-              </div>
+            <div className="filter-buttons">
+              <button 
+                className={`filter-btn ${filterStatus === 'all' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('all')}
+              >
+                <FiFilter /> All Orders
+              </button>
+              <button 
+                className={`filter-btn ${filterStatus === 'processing' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('processing')}
+              >
+                <FiClock /> Processing
+              </button>
+              <button 
+                className={`filter-btn ${filterStatus === 'shipped' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('shipped')}
+              >
+                <FiPackage /> Shipped
+              </button>
+              <button 
+                className={`filter-btn ${filterStatus === 'delivered' ? 'active' : ''}`}
+                onClick={() => setFilterStatus('delivered')}
+              >
+                <FiCheckCircle /> Delivered
+              </button>
             </div>
 
             <div className="table-container">
@@ -726,30 +1004,39 @@ function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map(order => (
-                    <tr key={order.id}>
-                      <td>#{order.id}</td>
-                      <td className="customer-name">{order.customer}</td>
-                      <td>{order.product}</td>
-                      <td className="order-amount">Rs. {order.amount.toLocaleString()}</td>
-                      <td>
-                        <span className={`status-badge ${order.status.toLowerCase()}`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td>{order.date}</td>
-                      <td>
-                        <div className="action-buttons">
-                          <button className="view-btn" title="View Details">
-                            <FiEye />
-                          </button>
-                          <button className="edit-btn" title="Update Status">
-                            <FiEdit2 />
-                          </button>
-                        </div>
+                  {getFilteredOrders().length === 0 ? (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px' }}>
+                        <FiShoppingBag size={48} style={{ color: '#d0d2d6', marginBottom: '10px' }} />
+                        <p style={{ color: '#8e8e8e' }}>No orders found</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    getFilteredOrders().map(order => (
+                      <tr key={order.id}>
+                        <td>#{order.id}</td>
+                        <td className="customer-name">{order.customer}</td>
+                        <td>{order.product}</td>
+                        <td className="order-amount">Rs. {order.amount.toLocaleString()}</td>
+                        <td>
+                          <span className={`status-badge ${order.status.toLowerCase()}`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td>{order.date}</td>
+                        <td>
+                          <div className="action-buttons">
+                            <button className="view-btn" title="View Details">
+                              <FiEye />
+                            </button>
+                            <button className="edit-btn" title="Update Status">
+                              <FiEdit2 />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -759,16 +1046,6 @@ function AdminDashboard() {
         {/* Seller Approval Tab */}
         {activeTab === 'seller-approval' && (
           <div className="content-section">
-            <div className="section-header">
-              <div className="section-title-group">
-                <h2>
-                  <FiUserCheck className="section-icon" />
-                  Seller Approval
-                </h2>
-                <p className="section-subtitle">{pendingSellers.length} pending applications</p>
-              </div>
-            </div>
-
             <div className="sellers-grid">
               {pendingSellers.map(seller => (
                 <div key={seller.id} className="seller-approval-card">
@@ -837,24 +1114,15 @@ function AdminDashboard() {
         {/* Sales & Reports Tab */}
         {activeTab === 'sales' && (
           <div className="content-section">
-            <div className="section-header">
-              <div className="section-title-group">
-                <h2>
-                  <FiBarChart2 className="section-icon" />
-                  Sales & Reports
-                </h2>
-                <p className="section-subtitle">Comprehensive analytics and insights</p>
-              </div>
-              <button className="export-btn">
-                <FiDownload /> Export Report
-              </button>
-            </div>
+            <button className="export-btn" style={{marginBottom: '20px'}}>
+              <FiDownload /> Export Report
+            </button>
 
             {/* Analytics Stats */}
             <div className="analytics-grid">
               <div className="analytics-card revenue">
                 <div className="analytics-icon">
-                  <FiDollarSign />
+                  <MdAttachMoney />
                 </div>
                 <div className="analytics-content">
                   <p className="analytics-label">Total Revenue</p>
@@ -878,7 +1146,7 @@ function AdminDashboard() {
 
               <div className="analytics-card sellers">
                 <div className="analytics-icon">
-                  <FiUsers />
+                  <MdStorefront />
                 </div>
                 <div className="analytics-content">
                   <p className="analytics-label">Active Sellers</p>
@@ -889,7 +1157,7 @@ function AdminDashboard() {
 
               <div className="analytics-card customers">
                 <div className="analytics-icon">
-                  <FiUserCheck />
+                  <MdPeople />
                 </div>
                 <div className="analytics-content">
                   <p className="analytics-label">Total Customers</p>
@@ -915,12 +1183,20 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* Chart Placeholder */}
+            {/* Charts */}
             <div className="chart-container">
-              <h4>Sales Trend</h4>
-              <div className="chart-placeholder">
-                <FiPieChart size={48} />
-                <p>Sales chart visualization would appear here</p>
+              <h4>Revenue Trend</h4>
+              <RevenueTrendChart data={chartData.revenue} />
+            </div>
+
+            <div className="metrics-row">
+              <div className="chart-container">
+                <h4>Top Products</h4>
+                <TopProductsChart data={chartData.topProducts} />
+              </div>
+              <div className="chart-container">
+                <h4>Category Performance</h4>
+                <CategoryPerformanceChart data={chartData.categories} />
               </div>
             </div>
           </div>
@@ -929,16 +1205,6 @@ function AdminDashboard() {
         {/* Fraud Detection Tab */}
         {activeTab === 'fraud' && (
           <div className="content-section">
-            <div className="section-header">
-              <div className="section-title-group">
-                <h2>
-                  <FiShield className="section-icon" />
-                  Fraud Detection
-                </h2>
-                <p className="section-subtitle">{suspiciousActivities.length} suspicious activities detected</p>
-              </div>
-            </div>
-
             <div className="fraud-alerts">
               {suspiciousActivities.map(activity => (
                 <div key={activity.id} className={`fraud-card risk-${activity.riskLevel.toLowerCase()}`}>
@@ -991,9 +1257,145 @@ function AdminDashboard() {
           </div>
         )}
 
+        {/* Audit Log Tab */}
+        {activeTab === 'audit' && (
+          <div className="content-section">
+            <div className="filter-buttons">
+              <button className="filter-btn active">
+                <FiActivity /> All Activities
+              </button>
+              <button className="filter-btn">
+                <FiUsers /> User Actions
+              </button>
+              <button className="filter-btn">
+                <FiPackage /> Product Changes
+              </button>
+              <button className="filter-btn">
+                <FiSettings /> System Events
+              </button>
+            </div>
+
+            <div className="audit-timeline">
+              <div className="audit-entry">
+                <div className="audit-icon user">
+                  <FiUserCheck />
+                </div>
+                <div className="audit-content">
+                  <div className="audit-header">
+                    <h4>Seller Approved</h4>
+                    <span className="audit-time">2 hours ago</span>
+                  </div>
+                  <p className="audit-description">
+                    Admin approved seller application for <strong>John's Vintage Store</strong>
+                  </p>
+                  <div className="audit-meta">
+                    <span className="audit-user">
+                      <FiUser /> Administrator
+                    </span>
+                    <span className="audit-ip">
+                      IP: 192.168.1.1
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="audit-entry">
+                <div className="audit-icon product">
+                  <FiPackage />
+                </div>
+                <div className="audit-content">
+                  <div className="audit-header">
+                    <h4>Product Deleted</h4>
+                    <span className="audit-time">5 hours ago</span>
+                  </div>
+                  <p className="audit-description">
+                    Admin deleted product <strong>"Vintage Jacket"</strong> due to policy violation
+                  </p>
+                  <div className="audit-meta">
+                    <span className="audit-user">
+                      <FiUser /> Administrator
+                    </span>
+                    <span className="audit-ip">
+                      IP: 192.168.1.1
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="audit-entry">
+                <div className="audit-icon system">
+                  <FiSettings />
+                </div>
+                <div className="audit-content">
+                  <div className="audit-header">
+                    <h4>System Settings Updated</h4>
+                    <span className="audit-time">1 day ago</span>
+                  </div>
+                  <p className="audit-description">
+                    Payment gateway configuration updated
+                  </p>
+                  <div className="audit-meta">
+                    <span className="audit-user">
+                      <FiUser /> Administrator
+                    </span>
+                    <span className="audit-ip">
+                      IP: 192.168.1.1
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="audit-entry">
+                <div className="audit-icon warning">
+                  <FiAlertCircle />
+                </div>
+                <div className="audit-content">
+                  <div className="audit-header">
+                    <h4>User Suspended</h4>
+                    <span className="audit-time">2 days ago</span>
+                  </div>
+                  <p className="audit-description">
+                    Admin suspended user <strong>suspicious_user@email.com</strong> for fraudulent activity
+                  </p>
+                  <div className="audit-meta">
+                    <span className="audit-user">
+                      <FiUser /> Administrator
+                    </span>
+                    <span className="audit-ip">
+                      IP: 192.168.1.1
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="audit-entry">
+                <div className="audit-icon success">
+                  <FiCheckCircle />
+                </div>
+                <div className="audit-content">
+                  <div className="audit-header">
+                    <h4>Bulk Product Approval</h4>
+                    <span className="audit-time">3 days ago</span>
+                  </div>
+                  <p className="audit-description">
+                    Admin approved 15 pending products in bulk operation
+                  </p>
+                  <div className="audit-meta">
+                    <span className="audit-user">
+                      <FiUser /> Administrator
+                    </span>
+                    <span className="audit-ip">
+                      IP: 192.168.1.1
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Other Tabs */}
-        {(activeTab === 'loyalty' || activeTab === 'announcements' || activeTab === 'chatbot' || 
-          activeTab === 'settings') && (
+        {(activeTab === 'loyalty' || activeTab === 'announcements' || activeTab === 'settings') && (
           <div className="content-section">
             <div className="empty-state-card">
               {activeTab === 'loyalty' && (
@@ -1008,14 +1410,6 @@ function AdminDashboard() {
                   <FiBell size={64} />
                   <h3>Announcements</h3>
                   <p>Create and manage platform announcements</p>
-                </>
-              )}
-
-              {activeTab === 'chatbot' && (
-                <>
-                  <FiMessageSquare size={64} />
-                  <h3>AI Chatbot</h3>
-                  <p>Configure and monitor AI chatbot interactions</p>
                 </>
               )}
               {activeTab === 'settings' && (
