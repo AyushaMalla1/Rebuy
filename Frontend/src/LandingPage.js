@@ -20,6 +20,7 @@ function LandingPage() {
   const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('ALL');
   const [activeFaqTab, setActiveFaqTab] = useState('all');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState({ products: [], sellers: [], pages: [] });
@@ -74,6 +75,22 @@ function LandingPage() {
 
     // Fetch products from backend
     fetchProducts();
+    
+    // Listen for cart updates
+    const handleCartUpdate = () => {
+      const updatedCart = localStorage.getItem('cart');
+      if (updatedCart) {
+        setCart(JSON.parse(updatedCart));
+      } else {
+        setCart([]);
+      }
+    };
+    
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    
+    return () => {
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+    };
   }, []);
 
   const syncCartWithBackend = async (customerId) => {
@@ -126,26 +143,37 @@ function LandingPage() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const products = await productAPI.getAll({ limit: 50 });
+      const response = await productAPI.getAll({ limit: 100, status: 'Approved' });
       
-      if (products && products.length > 0) {
+      // Handle both array response and object with products array
+      const productsArray = Array.isArray(response) ? response : (response.products || []);
+      
+      if (productsArray && productsArray.length > 0) {
         // Map backend products to frontend format
-        const mappedProducts = products.map(p => ({
+        const mappedProducts = productsArray.map(p => ({
           id: p._id,
+          _id: p._id,
           name: p.name,
           price: p.price,
+          discountedPrice: p.discount?.active ? p.price * (1 - p.discount.percentage / 100) : null,
           category: p.featured ? 'TOP' : 'NEW',
-          image: p.images[0] || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+          backendCategory: p.category, // Store original category
+          subcategory: p.subcategory,
+          image: (p.images && p.images[0]) || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+          images: p.images || [],
           rating: p.rating || 4.5,
           reviews: p.reviews || 0,
           condition: p.condition,
+          size: p.size,
+          brand: p.brand,
           story: p.story,
           seller: p.seller,
           sellerName: p.sellerName,
-          storeName: p.storeName
+          storeName: p.storeName,
+          stock: p.stock,
+          paymentOptions: p.paymentOptions
         }));
         setAllProducts(mappedProducts);
-        // Save to localStorage for wishlist access
         localStorage.setItem('allProducts', JSON.stringify(mappedProducts));
       } else {
         // Use demo products if backend is empty
@@ -162,22 +190,38 @@ function LandingPage() {
     }
   };
 
-  // Filter products based on active tab, category, and search
+  // Filter products based on active tab, category, subcategory, and search
   const filteredProducts = allProducts.filter(product => {
     const matchesTab = activeTab === 'ALL' || product.category === activeTab;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'ALL' || 
-      (selectedCategory === 'MEN' && product.name.toLowerCase().includes('men')) ||
-      (selectedCategory === 'WOMEN' && product.name.toLowerCase().includes('women')) ||
-      (selectedCategory === 'KIDS' && product.name.toLowerCase().includes('kid')) ||
-      (selectedCategory === 'SPORTSWEAR' && product.name.toLowerCase().includes('sport')) ||
-      (selectedCategory === 'VINTAGE' && product.name.toLowerCase().includes('vintage'));
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         product.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         product.brand?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    return matchesTab && matchesSearch && matchesCategory;
+    // Match by category
+    let matchesCategory = selectedCategory === 'ALL';
+    if (!matchesCategory && product.backendCategory) {
+      if (selectedCategory === 'MEN') matchesCategory = product.backendCategory === "Men's Collection";
+      else if (selectedCategory === 'WOMEN') matchesCategory = product.backendCategory === "Women's Collection";
+      else if (selectedCategory === 'SPORTSWEAR') matchesCategory = product.backendCategory === "Sportswear";
+      else if (selectedCategory === 'VINTAGE') matchesCategory = product.backendCategory === "Vintage";
+    }
+    
+    // Match by subcategory
+    const matchesSubcategory = selectedSubcategory === 'ALL' || 
+                                product.subcategory === selectedSubcategory;
+    
+    return matchesTab && matchesSearch && matchesCategory && matchesSubcategory;
   });
 
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
+    setSelectedSubcategory('ALL');
+    setActiveTab('ALL');
+    document.querySelector('.trending-products')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleSubcategoryClick = (subcategory) => {
+    setSelectedSubcategory(subcategory);
     setActiveTab('ALL');
     document.querySelector('.trending-products')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -842,53 +886,36 @@ function LandingPage() {
             }}
           >
             MEN'S COLLECTIONS
-            <span className="dropdown-arrow">▼</span>
           </a>
           {activeDropdown === 'men' && (
             <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-sidebar">
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Shop by Category →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Shop by Size →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Shop by Brand →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>New Arrivals →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Sale Items →</div>
-              </div>
               <div className="dropdown-content">
                 <div className="dropdown-section">
                   <h4>Tops</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Polos</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Hoodies</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Sweaters</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('T-Shirts'); setActiveDropdown(null); }}>T-Shirts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Shirts'); setActiveDropdown(null); }}>Shirts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Polos'); setActiveDropdown(null); }}>Polos</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Hoodies'); setActiveDropdown(null); }}>Hoodies</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sweaters'); setActiveDropdown(null); }}>Sweaters</li>
                   </ul>
                 </div>
                 <div className="dropdown-section">
                   <h4>Bottoms</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Jeans</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Shorts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Joggers</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Jeans'); setActiveDropdown(null); }}>Jeans</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Pants'); setActiveDropdown(null); }}>Pants</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Shorts'); setActiveDropdown(null); }}>Shorts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Joggers'); setActiveDropdown(null); }}>Joggers</li>
                   </ul>
                 </div>
                 <div className="dropdown-section">
                   <h4>Outerwear</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Jackets</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Coats</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Blazers</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Vests</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Accessories</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Belts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Hats</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Bags</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); setActiveDropdown(null); }}>Watches</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Jackets'); setActiveDropdown(null); }}>Jackets</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Coats'); setActiveDropdown(null); }}>Coats</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Blazers'); setActiveDropdown(null); }}>Blazers</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vests'); setActiveDropdown(null); }}>Vests</li>
                   </ul>
                 </div>
               </div>
@@ -907,110 +934,36 @@ function LandingPage() {
             }}
           >
             WOMEN'S COLLECTIONS
-            <span className="dropdown-arrow">▼</span>
           </a>
           {activeDropdown === 'women' && (
             <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-sidebar">
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Shop by Category →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Shop by Size →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Shop by Brand →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>New Arrivals →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Sale Items →</div>
-              </div>
               <div className="dropdown-content">
                 <div className="dropdown-section">
                   <h4>Tops</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Blouses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Sweaters</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Hoodies</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Tank Tops</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('T-Shirts'); setActiveDropdown(null); }}>T-Shirts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Blouses'); setActiveDropdown(null); }}>Blouses</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sweaters'); setActiveDropdown(null); }}>Sweaters</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Hoodies'); setActiveDropdown(null); }}>Hoodies</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Tank Tops'); setActiveDropdown(null); }}>Tank Tops</li>
                   </ul>
                 </div>
                 <div className="dropdown-section">
                   <h4>Bottoms</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Jeans</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Skirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Leggings</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Jeans'); setActiveDropdown(null); }}>Jeans</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Pants'); setActiveDropdown(null); }}>Pants</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Skirts'); setActiveDropdown(null); }}>Skirts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Leggings'); setActiveDropdown(null); }}>Leggings</li>
                   </ul>
                 </div>
                 <div className="dropdown-section">
                   <h4>Dresses</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Casual Dresses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Formal Dresses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Maxi Dresses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Mini Dresses</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Accessories</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Bags</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Jewelry</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Scarves</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); setActiveDropdown(null); }}>Sunglasses</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div 
-          className="collection-dropdown"
-        >
-          <a 
-            style={{cursor: 'pointer'}}
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveDropdown(activeDropdown === 'kids' ? null : 'kids');
-            }}
-          >
-            KID'S COLLECTIONS
-            <span className="dropdown-arrow">▼</span>
-          </a>
-          {activeDropdown === 'kids' && (
-            <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-sidebar">
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Shop by Age →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Shop by Size →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Boys Collection →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Girls Collection →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Sale Items →</div>
-              </div>
-              <div className="dropdown-content">
-                <div className="dropdown-section">
-                  <h4>Boys</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Shorts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Jackets</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Girls</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Dresses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Tops</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Skirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Leggings</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Jackets</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Accessories</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Hats</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Bags</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Socks</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); setActiveDropdown(null); }}>Gloves</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Casual Dresses'); setActiveDropdown(null); }}>Casual Dresses</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Formal Dresses'); setActiveDropdown(null); }}>Formal Dresses</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Maxi Dresses'); setActiveDropdown(null); }}>Maxi Dresses</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Mini Dresses'); setActiveDropdown(null); }}>Mini Dresses</li>
                   </ul>
                 </div>
               </div>
@@ -1029,50 +982,34 @@ function LandingPage() {
             }}
           >
             SPORTSWEAR COLLECTIONS
-            <span className="dropdown-arrow">▼</span>
           </a>
           {activeDropdown === 'sportswear' && (
             <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-sidebar">
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Shop by Sport →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Shop by Brand →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Performance Wear →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Training Gear →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Sale Items →</div>
-              </div>
               <div className="dropdown-content">
                 <div className="dropdown-section">
                   <h4>Athletic Wear</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Sports T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Tank Tops</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Jerseys</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Tracksuits</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sports T-Shirts'); setActiveDropdown(null); }}>Sports T-Shirts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Tank Tops'); setActiveDropdown(null); }}>Tank Tops</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Jerseys'); setActiveDropdown(null); }}>Jerseys</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Tracksuits'); setActiveDropdown(null); }}>Tracksuits</li>
                   </ul>
                 </div>
                 <div className="dropdown-section">
                   <h4>Bottoms</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Joggers</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Track Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Shorts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Leggings</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Joggers'); setActiveDropdown(null); }}>Joggers</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Track Pants'); setActiveDropdown(null); }}>Track Pants</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sports Shorts'); setActiveDropdown(null); }}>Shorts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Leggings'); setActiveDropdown(null); }}>Leggings</li>
                   </ul>
                 </div>
                 <div className="dropdown-section">
                   <h4>Outerwear</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Windbreakers</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Hoodies</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Jackets</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Accessories</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Sports Bags</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Headbands</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('SPORTSWEAR'); setActiveDropdown(null); }}>Wristbands</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Windbreakers'); setActiveDropdown(null); }}>Windbreakers</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sports Hoodies'); setActiveDropdown(null); }}>Hoodies</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sports Jackets'); setActiveDropdown(null); }}>Jackets</li>
                   </ul>
                 </div>
               </div>
@@ -1091,50 +1028,34 @@ function LandingPage() {
             }}
           >
             VINTAGE COLLECTIONS
-            <span className="dropdown-arrow">▼</span>
           </a>
           {activeDropdown === 'vintage' && (
             <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-sidebar">
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Shop by Era →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Shop by Size →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Rare Finds →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Designer Vintage →</div>
-                <div className="dropdown-sidebar-item" onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Sale Items →</div>
-              </div>
               <div className="dropdown-content">
                 <div className="dropdown-section">
                   <h4>Vintage Tops</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Sweaters</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Band Tees</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Tops'); setActiveDropdown(null); }}>Vintage T-Shirts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Tops'); setActiveDropdown(null); }}>Vintage Shirts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Tops'); setActiveDropdown(null); }}>Vintage Sweaters</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Tops'); setActiveDropdown(null); }}>Band Tees</li>
                   </ul>
                 </div>
                 <div className="dropdown-section">
                   <h4>Vintage Bottoms</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Jeans</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Shorts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Bottoms'); setActiveDropdown(null); }}>Vintage Jeans</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Bottoms'); setActiveDropdown(null); }}>Vintage Pants</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Bottoms'); setActiveDropdown(null); }}>Vintage Shorts</li>
                   </ul>
                 </div>
                 <div className="dropdown-section">
                   <h4>Vintage Outerwear</h4>
                   <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Jackets</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Coats</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Leather Jackets</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Denim Jackets</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Vintage Accessories</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Bags</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Hats</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('VINTAGE'); setActiveDropdown(null); }}>Vintage Belts</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Outerwear'); setActiveDropdown(null); }}>Vintage Jackets</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Outerwear'); setActiveDropdown(null); }}>Vintage Coats</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Outerwear'); setActiveDropdown(null); }}>Leather Jackets</li>
+                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Outerwear'); setActiveDropdown(null); }}>Denim Jackets</li>
                   </ul>
                 </div>
               </div>
@@ -1265,7 +1186,6 @@ function LandingPage() {
           <ul>
             <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); }}>Men's Outlet</li>
             <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); }}>Women's Outlet</li>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('KIDS'); }}>Kids Outlet</li>
           </ul>
         </div>
       </section>
@@ -1319,7 +1239,6 @@ function LandingPage() {
           <ul>
             <li onClick={() => handleCategoryClick('MEN')} style={{cursor: 'pointer'}}>Men</li>
             <li onClick={() => handleCategoryClick('WOMEN')} style={{cursor: 'pointer'}}>Women</li>
-            <li onClick={() => handleCategoryClick('KIDS')} style={{cursor: 'pointer'}}>Kids</li>
             <li onClick={handleExploreMore} style={{cursor: 'pointer'}}>Brands</li>
             <li onClick={handleExploreMore} style={{cursor: 'pointer'}}>On Sale</li>
           </ul>

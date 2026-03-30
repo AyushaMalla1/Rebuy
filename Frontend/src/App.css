@@ -322,7 +322,6 @@ input:focus-visible {
 }
 
 .empty-cart::before {
-  content: '🛒';
   display: block;
   font-size: 64px;
   margin-bottom: 20px;
@@ -498,7 +497,7 @@ input:focus-visible {
 .collections-nav {
   display: flex;
   justify-content: center;
-  gap: 40px;
+  gap: 70px;
   padding: 20px 50px;
   background-color: #fff;
   border-bottom: 1px solid #e0e0e0;
@@ -846,11 +845,21 @@ input:focus-visible {
 /* Footer */
 .footer {
   display: flex;
-  justify-content:center;
-  padding: 200px;
+  justify-content: center;
+  gap: 100px;
+  padding: 80px 20px;
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);
   background-color: #565555;
   color: white;
   position: relative;
+  box-sizing: border-box;
+}
+
+.footer-section {
+  flex: 1;
+  min-width: 200px;
+  max-width: 250px;
 }
 
 .footer-section h4 {
@@ -1502,9 +1511,9 @@ input:focus-visible {
 .dropdown-menu {
   position: absolute;
   top: 100%;
-  left: 0;
-  right: 0;
-  width: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1200px;
   background: rgba(26, 26, 26, 0.97);
   backdrop-filter: blur(10px);
   border-top: 3px solid #00bcd4;
@@ -1529,9 +1538,9 @@ input:focus-visible {
 }
 
 .dropdown-sidebar {
-  background: rgba(13, 13, 13, 0.95);
+  background: rgba(252, 252, 252, 0.95);
   backdrop-filter: blur(10px);
-  width: 250px;
+  width: 50px;
   padding: 30px 0;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -1556,19 +1565,19 @@ input:focus-visible {
 
 .dropdown-content {
   flex: 1;
-  padding: 40px 50px;
+  padding: 20px 30px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 30px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
   background: rgba(26, 26, 26, 0.95);
   backdrop-filter: blur(10px);
 }
 
 .dropdown-section h4 {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: #00bcd4;
-  margin: 0 0 15px 0;
+  margin: 0 0 10px 0;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -1580,8 +1589,8 @@ input:focus-visible {
 }
 
 .dropdown-section ul li {
-  padding: 8px 0;
-  font-size: 13px;
+  padding: 6px 0;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   transition: all 0.2s;
