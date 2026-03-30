@@ -1,8 +1,28 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const Customer = require('../models/Customer');
 const User = require('../models/User');
 const { upload, cloudinary } = require('../config/cloudinary');
+
+// Middleware to extract user ID from token
+const extractUserId = (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      req.userId = decoded.id;
+    } else if (req.headers['x-user-id']) {
+      req.userId = req.headers['x-user-id'];
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Token verification error:', error);
+    next();
+  }
+};
 
 // Upload profile image
 router.post('/:userId/profile-image', upload.single('profileImage'), async (req, res) => {
@@ -78,6 +98,28 @@ router.delete('/:userId/profile-image', async (req, res) => {
     res.json({ message: 'Profile image deleted successfully' });
   } catch (error) {
     console.error('Error deleting profile image:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get customer profile (authenticated route)
+router.get('/profile', extractUserId, async (req, res) => {
+  try {
+    const userId = req.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    const customer = await Customer.findOne({ user: userId }).populate('user', 'fullName email');
+    
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer profile not found' });
+    }
+    
+    res.json({ customer });
+  } catch (error) {
+    console.error('Error fetching customer profile:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -168,7 +210,72 @@ router.get('/:userId/addresses', async (req, res) => {
   }
 });
 
-// Add new address
+// Add new address (authenticated route)
+router.post('/addresses', extractUserId, async (req, res) => {
+  try {
+    const userId = req.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    
+    const { label, fullName, phone, state, district, municipality, landmark, isDefault } = req.body;
+    
+    // Validate required fields
+    if (!fullName || !phone || !state || !district || !municipality || !landmark) {
+      return res.status(400).json({ message: 'All address fields are required' });
+    }
+    
+    let customer = await Customer.findOne({ user: userId });
+    
+    if (!customer) {
+      // Create customer if doesn't exist
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      customer = new Customer({
+        user: userId,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone || '',
+        addresses: []
+      });
+    }
+    
+    // If this is set as default, unset other defaults
+    if (isDefault) {
+      customer.addresses.forEach(addr => {
+        addr.isDefault = false;
+      });
+    }
+    
+    // Add new address
+    const newAddress = {
+      label: label || 'Home',
+      fullName,
+      phone,
+      state,
+      district,
+      municipality,
+      city: municipality, // Use municipality as city for compatibility
+      landmark,
+      deliveryType: label?.toLowerCase() === 'office' ? 'office' : 'home',
+      isDefault: isDefault || customer.addresses.length === 0
+    };
+    
+    customer.addresses.push(newAddress);
+    await customer.save();
+    
+    res.status(201).json({ addresses: customer.addresses });
+  } catch (error) {
+    console.error('Error adding address:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Add new address by user ID
 router.post('/:userId/addresses', async (req, res) => {
   try {
     const { label, fullName, phone, state, district, municipality, city, landmark, deliveryType, isDefault } = req.body;
@@ -389,22 +496,35 @@ router.patch('/:userId/status', async (req, res) => {
       return res.status(400).json({ message: 'Invalid status' });
     }
     
-    const customer = await Customer.findOne({ user: req.params.userId });
-    
-    if (!customer) {
-      return res.status(404).json({ message: 'Customer not found' });
+    // Check if it's a customer or seller
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
     
-    customer.accountStatus = status;
-    await customer.save();
-    
-    // Also update User model
+    // Update User model
     await User.findByIdAndUpdate(req.params.userId, {
       isActive: status === 'active',
       deactivatedAt: status === 'deactivated' ? new Date() : null
     });
     
-    res.json({ message: 'Account status updated', status: customer.accountStatus });
+    // Try to update Customer if exists
+    const customer = await Customer.findOne({ user: req.params.userId });
+    if (customer) {
+      customer.accountStatus = status;
+      await customer.save();
+    }
+    
+    // Try to update Seller if exists
+    const Seller = require('../models/Seller');
+    const seller = await Seller.findById(req.params.userId);
+    if (seller) {
+      seller.isActive = status === 'active';
+      seller.deactivatedAt = status === 'deactivated' ? new Date() : null;
+      await seller.save();
+    }
+    
+    res.json({ message: 'Account status updated', status });
   } catch (error) {
     console.error('Error updating account status:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

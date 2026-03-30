@@ -26,7 +26,19 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Missing required order information' });
     }
     
-    if (!shippingAddress || !shippingAddress.address || !shippingAddress.city) {
+    // Support both old and new address formats
+    if (!shippingAddress) {
+      return res.status(400).json({ message: 'Shipping address is required' });
+    }
+    
+    // Check for new format (state, district, municipality, landmark)
+    const hasNewFormat = shippingAddress.state && shippingAddress.district && 
+                         shippingAddress.municipality && shippingAddress.landmark;
+    
+    // Check for old format (address, city)
+    const hasOldFormat = shippingAddress.address && shippingAddress.city;
+    
+    if (!hasNewFormat && !hasOldFormat) {
       return res.status(400).json({ message: 'Complete shipping address is required' });
     }
     
@@ -192,18 +204,24 @@ router.post('/:orderId/verify-condition', async (req, res) => {
       return res.status(400).json({ message: 'Can only verify delivered orders' });
     }
     
+    // Convert boolean to string if needed for backward compatibility
+    let matchesDescriptionValue = matchesDescription;
+    if (typeof matchesDescription === 'boolean') {
+      matchesDescriptionValue = matchesDescription ? 'yes' : 'no';
+    }
+    
     order.conditionVerification = {
       verified: true,
       verifiedAt: Date.now(),
-      matchesDescription,
-      customerNotes,
-      images: images || []
+      matchesDescription: matchesDescriptionValue,
+      customerFeedback: customerNotes,
+      verificationImages: images || []
     };
     
     await order.save();
     
-    // Award bonus points for verification
-    if (matchesDescription) {
+    // Award bonus points for positive verification
+    if (matchesDescriptionValue === 'yes') {
       const loyaltyAccount = await LoyaltyPoints.findOne({ customer: order.customer });
       if (loyaltyAccount) {
         loyaltyAccount.totalPoints += 50; // Bonus points for positive verification
@@ -211,6 +229,7 @@ router.post('/:orderId/verify-condition', async (req, res) => {
           points: 50,
           type: 'earned',
           reason: 'Condition verification bonus',
+          date: Date.now(),
           order: order._id
         });
         loyaltyAccount.updateTier();
@@ -221,7 +240,7 @@ router.post('/:orderId/verify-condition', async (req, res) => {
     res.json({ 
       message: 'Condition verification submitted', 
       order,
-      bonusPoints: matchesDescription ? 50 : 0
+      bonusPoints: matchesDescriptionValue === 'yes' ? 50 : 0
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
