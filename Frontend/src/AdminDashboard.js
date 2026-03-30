@@ -28,6 +28,40 @@ function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [pendingSellers, setPendingSellers] = useState([]);
   const [suspiciousActivities, setSuspiciousActivities] = useState([]);
+  const [fraudAlerts, setFraudAlerts] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [loyaltyRecords, setLoyaltyRecords] = useState([]);
+  const [settings, setSettings] = useState({
+    siteName: 'Rebuy',
+    siteEmail: '',
+    sitePhone: '',
+    currency: 'NPR',
+    taxRate: 13,
+    shippingFee: 100,
+    freeShippingThreshold: 5000,
+    maintenanceMode: false,
+    allowSellerRegistration: true,
+    requireProductApproval: true,
+    minOrderAmount: 100,
+    maxOrderAmount: 100000,
+    loyaltyPointsEnabled: true,
+    pointsPerRupee: 1,
+    paymentGateway: {
+      provider: 'none',
+      apiKey: '',
+      secretKey: '',
+      merchantId: '',
+      isEnabled: false,
+      testMode: true
+    }
+  });
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showUserModal, setShowUserModal] = useState(false);
   const [adminStats, setAdminStats] = useState({
     totalUsers: 0,
     totalSellers: 0,
@@ -90,7 +124,7 @@ function AdminDashboard() {
 
       console.log('Fetching admin data from backend...');
 
-      const [statsRes, usersRes, sellersRes, productsRes, ordersRes] = await Promise.all([
+      const [statsRes, usersRes, sellersRes, productsRes, ordersRes, fraudRes, auditRes, announcementsRes, loyaltyRes, settingsRes] = await Promise.all([
         fetch('http://localhost:5000/api/admin/stats', { headers }).catch(err => {
           console.error('Stats fetch error:', err);
           return { ok: false, status: 500 };
@@ -110,6 +144,26 @@ function AdminDashboard() {
         fetch('http://localhost:5000/api/admin/orders', { headers }).catch(err => {
           console.error('Orders fetch error:', err);
           return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/fraud-alerts', { headers }).catch(err => {
+          console.error('Fraud alerts fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/audit-logs', { headers }).catch(err => {
+          console.error('Audit logs fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/announcements', { headers }).catch(err => {
+          console.error('Announcements fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/loyalty-points', { headers }).catch(err => {
+          console.error('Loyalty points fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/settings', { headers }).catch(err => {
+          console.error('Settings fetch error:', err);
+          return { ok: false, status: 500 };
         })
       ]);
 
@@ -118,7 +172,12 @@ function AdminDashboard() {
         users: usersRes.status,
         sellers: sellersRes.status,
         products: productsRes.status,
-        orders: ordersRes.status
+        orders: ordersRes.status,
+        fraud: fraudRes.status,
+        audit: auditRes.status,
+        announcements: announcementsRes.status,
+        loyalty: loyaltyRes.status,
+        settings: settingsRes.status
       });
 
       // Check for authentication errors
@@ -135,8 +194,13 @@ function AdminDashboard() {
       const sellersData = await sellersRes.json().catch(() => ({ success: false }));
       const productsData = await productsRes.json().catch(() => ({ success: false }));
       const ordersData = await ordersRes.json().catch(() => ({ success: false }));
+      const fraudData = await fraudRes.json().catch(() => ({ success: false }));
+      const auditData = await auditRes.json().catch(() => ({ success: false }));
+      const announcementsData = await announcementsRes.json().catch(() => ({ success: false }));
+      const loyaltyData = await loyaltyRes.json().catch(() => ({ success: false }));
+      const settingsData = await settingsRes.json().catch(() => ({ success: false }));
 
-      console.log('Parsed data:', { stats, usersData, sellersData, productsData, ordersData });
+      console.log('Parsed data:', { stats, usersData, sellersData, productsData, ordersData, fraudData, auditData, announcementsData, loyaltyData, settingsData });
 
       if (stats.success) setAdminStats(stats.stats);
       if (usersData.success) {
@@ -181,6 +245,21 @@ function AdminDashboard() {
           status: o.status || 'Processing',
           date: new Date(o.orderDate || o.createdAt).toLocaleDateString()
         })));
+      }
+      if (fraudData.success) {
+        setFraudAlerts(fraudData.alerts || []);
+      }
+      if (auditData.success) {
+        setAuditLogs(auditData.logs || []);
+      }
+      if (announcementsData.success) {
+        setAnnouncements(announcementsData.announcements || []);
+      }
+      if (loyaltyData.success) {
+        setLoyaltyRecords(loyaltyData.loyaltyRecords || []);
+      }
+      if (settingsData.success) {
+        setSettings(settingsData.settings || settings);
       }
 
       console.log('Admin data loaded successfully');
@@ -228,7 +307,7 @@ function AdminDashboard() {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/products/${id}`, {
+        const response = await fetch(`http://localhost:5000/api/admin/products/${id}`, {
           method: 'DELETE',
           headers: { 
             'Authorization': `Bearer ${token}`
@@ -248,12 +327,78 @@ function AdminDashboard() {
     }
   };
 
+  const handleViewProduct = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/products/${id}`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const product = await response.json();
+        setSelectedProduct(product);
+        setShowProductModal(true);
+      } else {
+        alert('Failed to load product details');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error loading product');
+    }
+  };
+
+  const handleViewUser = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/admin/users/${id}`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setSelectedUser(userData);
+        setShowUserModal(true);
+      } else {
+        alert('Failed to load user details');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error loading user');
+    }
+  };
+
+  const handleViewOrder = async (orderId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/orders/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const order = await response.json();
+        setSelectedOrder(order);
+        setShowOrderModal(true);
+      } else {
+        alert('Failed to load order details');
+      }
+    } catch (error) {
+      console.error('Error loading order:', error);
+      alert('Error loading order details');
+    }
+  };
+
   const handleApproveSeller = async (id) => {
     if (window.confirm('Approve this seller application?')) {
       try {
         const token = localStorage.getItem('token');
         const row = pendingSellers.find(s => s.id === id);
-        const response = await fetch(`http://localhost:5000/api/sellers/${id}/status`, {
+        const response = await fetch(`http://localhost:5000/api/admin/sellers/${id}/status`, {
           method: 'PATCH',
           headers: { 
             'Content-Type': 'application/json',
@@ -280,7 +425,7 @@ function AdminDashboard() {
     if (reason && window.confirm('Reject this seller application?')) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/sellers/${id}/status`, {
+        const response = await fetch(`http://localhost:5000/api/admin/sellers/${id}/status`, {
           method: 'PATCH',
           headers: { 
             'Content-Type': 'application/json',
@@ -325,6 +470,177 @@ function AdminDashboard() {
         console.error(err);
         alert('Error blocking user');
       }
+    }
+  };
+
+  const handleInvestigateFraud = async (alertId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/admin/fraud-alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'investigating' })
+      });
+      
+      if (response.ok) {
+        alert('Fraud alert marked as investigating');
+        fetchAdminData();
+      } else {
+        alert('Failed to update fraud alert');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating fraud alert');
+    }
+  };
+
+  const handleBlockFraudUser = async (alertId) => {
+    if (window.confirm('Block this user and mark alert as resolved?')) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/admin/fraud-alerts/${alertId}`, {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'blocked' })
+        });
+        
+        if (response.ok) {
+          alert('User blocked and alert resolved');
+          fetchAdminData();
+        } else {
+          alert('Failed to block user');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error blocking user');
+      }
+    }
+  };
+
+  const handleCreateAnnouncement = async (data) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/admin/announcements', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (response.ok) {
+        alert('Announcement created successfully');
+        fetchAdminData();
+      } else {
+        alert('Failed to create announcement');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error creating announcement');
+    }
+  };
+
+  const handleToggleAnnouncement = async (id, isActive) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/admin/announcements/${id}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ isActive })
+      });
+      
+      if (response.ok) {
+        alert(`Announcement ${isActive ? 'activated' : 'deactivated'}`);
+        fetchAdminData();
+      } else {
+        alert('Failed to update announcement');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating announcement');
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id) => {
+    if (window.confirm('Delete this announcement?')) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/admin/announcements/${id}`, {
+          method: 'DELETE',
+          headers: { 
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          alert('Announcement deleted');
+          fetchAdminData();
+        } else {
+          alert('Failed to delete announcement');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error deleting announcement');
+      }
+    }
+  };
+
+  const handleUpdateLoyaltyPoints = async (userId, points) => {
+    try {
+      const token = localStorage.getItem('token');
+      const action = points > 0 ? 'add' : 'subtract';
+      const response = await fetch(`http://localhost:5000/api/admin/loyalty-points/${userId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ points: Math.abs(points), action })
+      });
+      
+      if (response.ok) {
+        alert('Loyalty points updated');
+        fetchAdminData();
+      } else {
+        alert('Failed to update loyalty points');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error updating loyalty points');
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(settings)
+      });
+      
+      if (response.ok) {
+        alert('Settings saved successfully');
+        fetchAdminData();
+      } else {
+        alert('Failed to save settings');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error saving settings');
     }
   };
 
@@ -391,7 +707,7 @@ function AdminDashboard() {
       );
     }
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(u => u.type.toLowerCase() === filterStatus);
+      filtered = filtered.filter(u => u.type.toLowerCase() === filterStatus.toLowerCase());
     }
     return filtered;
   };
@@ -847,7 +1163,7 @@ function AdminDashboard() {
                         <td>{user.joined}</td>
                         <td>
                           <div className="action-buttons">
-                            <button className="view-btn" title="View Details">
+                            <button className="view-btn" onClick={() => handleViewUser(user.id)} title="View Details">
                               <FiEye />
                             </button>
                             <button className="edit-btn" title="Edit User">
@@ -943,7 +1259,7 @@ function AdminDashboard() {
                                 </button>
                               </>
                             )}
-                            <button className="view-btn" title="View Details">
+                            <button className="view-btn" onClick={() => handleViewProduct(product.id)} title="View Details">
                               <FiEye />
                             </button>
                             <button className="delete-btn" onClick={() => handleDeleteProduct(product.id)} title="Delete">
@@ -1026,7 +1342,11 @@ function AdminDashboard() {
                         <td>{order.date}</td>
                         <td>
                           <div className="action-buttons">
-                            <button className="view-btn" title="View Details">
+                            <button 
+                              className="view-btn" 
+                              title="View Details"
+                              onClick={() => handleViewOrder(order._id || order.id)}
+                            >
                               <FiEye />
                             </button>
                             <button className="edit-btn" title="Update Status">
@@ -1121,49 +1441,27 @@ function AdminDashboard() {
             {/* Analytics Stats */}
             <div className="analytics-grid">
               <div className="analytics-card revenue">
-                <div className="analytics-icon">
-                  <MdAttachMoney />
-                </div>
-                <div className="analytics-content">
-                  <p className="analytics-label">Total Revenue</p>
-                  <h3>Rs. {salesData.totalRevenue.toLocaleString()}</h3>
-                  <span className="growth-badge positive">
-                    <FiTrendingUp /> +{salesData.monthlyGrowth}%
-                  </span>
-                </div>
+                <p className="analytics-label">Total Revenue</p>
+                <h3>Rs. {salesData.totalRevenue.toLocaleString()}</h3>
+                <span className="analytics-detail">+{salesData.monthlyGrowth}%</span>
               </div>
 
               <div className="analytics-card orders">
-                <div className="analytics-icon">
-                  <FiShoppingBag />
-                </div>
-                <div className="analytics-content">
-                  <p className="analytics-label">Total Orders</p>
-                  <h3>{salesData.totalOrders}</h3>
-                  <span className="analytics-detail">This month</span>
-                </div>
+                <p className="analytics-label">Total Orders</p>
+                <h3>{salesData.totalOrders}</h3>
+                <span className="analytics-detail">This month</span>
               </div>
 
               <div className="analytics-card sellers">
-                <div className="analytics-icon">
-                  <MdStorefront />
-                </div>
-                <div className="analytics-content">
-                  <p className="analytics-label">Active Sellers</p>
-                  <h3>{salesData.totalSellers}</h3>
-                  <span className="analytics-detail">Verified</span>
-                </div>
+                <p className="analytics-label">Active Sellers</p>
+                <h3>{salesData.totalSellers}</h3>
+                <span className="analytics-detail">Verified</span>
               </div>
 
               <div className="analytics-card customers">
-                <div className="analytics-icon">
-                  <MdPeople />
-                </div>
-                <div className="analytics-content">
-                  <p className="analytics-label">Total Customers</p>
-                  <h3>{salesData.totalCustomers}</h3>
-                  <span className="analytics-detail">Registered</span>
-                </div>
+                <p className="analytics-label">Total Customers</p>
+                <h3>{salesData.totalCustomers}</h3>
+                <span className="analytics-detail">Registered</span>
               </div>
             </div>
 
@@ -1206,39 +1504,48 @@ function AdminDashboard() {
         {activeTab === 'fraud' && (
           <div className="content-section">
             <div className="fraud-alerts">
-              {suspiciousActivities.map(activity => (
-                <div key={activity.id} className={`fraud-card risk-${activity.riskLevel.toLowerCase()}`}>
+              {fraudAlerts.map(alert => (
+                <div key={alert._id} className={`fraud-card risk-${alert.riskLevel}`}>
                   <div className="fraud-header">
                     <div className="fraud-icon">
                       <FiAlertCircle />
                     </div>
                     <div className="fraud-info">
-                      <h3>{activity.user}</h3>
-                      <p>{activity.activity}</p>
+                      <h3>{alert.type.replace(/_/g, ' ').toUpperCase()}</h3>
+                      <p>{alert.description}</p>
                     </div>
-                    <span className={`risk-badge ${activity.riskLevel.toLowerCase()}`}>
-                      {activity.riskLevel} Risk
+                    <span className={`risk-badge ${alert.riskLevel}`}>
+                      {alert.riskLevel} Risk
                     </span>
                   </div>
 
                   <div className="fraud-details">
                     <div className="fraud-detail-item">
                       <FiClock />
-                      <span>{activity.date}</span>
+                      <span>{new Date(alert.createdAt).toLocaleString()}</span>
                     </div>
                     <div className="fraud-detail-item">
                       <FiActivity />
-                      <span>Status: {activity.status}</span>
+                      <span>Status: {alert.status}</span>
                     </div>
+                    {alert.amount && (
+                      <div className="fraud-detail-item">
+                        <MdAttachMoney />
+                        <span>Rs. {alert.amount.toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="fraud-actions">
-                    <button className="investigate-btn">
+                    <button 
+                      className="investigate-btn"
+                      onClick={() => handleInvestigateFraud(alert._id)}
+                    >
                       <FiEye /> Investigate
                     </button>
                     <button 
                       className="block-btn"
-                      onClick={() => handleBlockUser(activity.id)}
+                      onClick={() => handleBlockFraudUser(alert._id)}
                     >
                       <FiXCircle /> Block User
                     </button>
@@ -1247,7 +1554,7 @@ function AdminDashboard() {
               ))}
             </div>
 
-            {suspiciousActivities.length === 0 && (
+            {fraudAlerts.length === 0 && (
               <div className="empty-state-card">
                 <FiShield size={64} />
                 <h3>No Suspicious Activities</h3>
@@ -1394,35 +1701,662 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* Other Tabs */}
-        {(activeTab === 'loyalty' || activeTab === 'announcements' || activeTab === 'settings') && (
+        {/* Announcements Tab */}
+        {activeTab === 'announcements' && (
           <div className="content-section">
-            <div className="empty-state-card">
-              {activeTab === 'loyalty' && (
-                <>
-                  <FiAward size={64} />
-                  <h3>Loyalty Points</h3>
-                  <p>Manage customer loyalty rewards program</p>
-                </>
-              )}
-              {activeTab === 'announcements' && (
-                <>
-                  <FiBell size={64} />
-                  <h3>Announcements</h3>
-                  <p>Create and manage platform announcements</p>
-                </>
-              )}
-              {activeTab === 'settings' && (
-                <>
-                  <FiSettings size={64} />
-                  <h3>Settings</h3>
-                  <p>Configure platform settings and preferences</p>
-                </>
-              )}
+            <button 
+              className="export-btn" 
+              style={{marginBottom: '20px'}}
+              onClick={() => {
+                const title = prompt('Announcement Title:');
+                const message = prompt('Announcement Message:');
+                const type = prompt('Type (info/warning/success/error):', 'info');
+                const targetAudience = prompt('Target (all/sellers/customers):', 'all');
+                if (title && message) {
+                  handleCreateAnnouncement({ title, message, type, targetAudience });
+                }
+              }}
+            >
+              <FiBell /> Create Announcement
+            </button>
+
+            <div className="announcements-list">
+              {announcements.map(announcement => (
+                <div key={announcement._id} className={`announcement-card ${announcement.type}`}>
+                  <div className="announcement-header">
+                    <h3>{announcement.title}</h3>
+                    <span className={`type-badge ${announcement.type}`}>{announcement.type}</span>
+                  </div>
+                  <p className="announcement-message">{announcement.message}</p>
+                  <div className="announcement-meta">
+                    <span>Target: {announcement.targetAudience}</span>
+                    <span>Priority: {announcement.priority}</span>
+                    <span>{new Date(announcement.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="announcement-actions">
+                    <button 
+                      className={announcement.isActive ? 'deactivate-btn' : 'activate-btn'}
+                      onClick={() => handleToggleAnnouncement(announcement._id, !announcement.isActive)}
+                    >
+                      {announcement.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button 
+                      className="delete-btn"
+                      onClick={() => handleDeleteAnnouncement(announcement._id)}
+                    >
+                      <FiTrash2 /> Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {announcements.length === 0 && (
+              <div className="empty-state-card">
+                <FiBell size={64} />
+                <h3>No Announcements</h3>
+                <p>Create announcements to notify users</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Loyalty Points Tab */}
+        {activeTab === 'loyalty' && (
+          <div className="content-section">
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Email</th>
+                    <th>Points</th>
+                    <th>Tier</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loyaltyRecords.map(record => (
+                    <tr key={record._id}>
+                      <td className="user-name">{record.userId?.fullName || 'Unknown'}</td>
+                      <td>{record.userId?.email || 'N/A'}</td>
+                      <td><strong>{record.points}</strong></td>
+                      <td>
+                        <span className="type-badge">
+                          {record.points >= 1000 ? 'Gold' : record.points >= 500 ? 'Silver' : 'Bronze'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button 
+                            className="edit-btn"
+                            onClick={() => {
+                              const points = prompt('Add/Subtract points:', '0');
+                              if (points) {
+                                handleUpdateLoyaltyPoints(record.userId._id, parseInt(points));
+                              }
+                            }}
+                          >
+                            <FiEdit2 />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {loyaltyRecords.length === 0 && (
+              <div className="empty-state-card">
+                <FiAward size={64} />
+                <h3>No Loyalty Records</h3>
+                <p>Loyalty points will appear here</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="content-section">
+            <div className="settings-form">
+              <div className="settings-section">
+                <h3>General Settings</h3>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Site Name</label>
+                    <input 
+                      type="text" 
+                      value={settings.siteName}
+                      onChange={(e) => setSettings({...settings, siteName: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Site Email</label>
+                    <input 
+                      type="email" 
+                      value={settings.siteEmail}
+                      onChange={(e) => setSettings({...settings, siteEmail: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Site Phone</label>
+                    <input 
+                      type="text" 
+                      value={settings.sitePhone}
+                      onChange={(e) => setSettings({...settings, sitePhone: e.target.value})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Currency</label>
+                    <input 
+                      type="text" 
+                      value={settings.currency}
+                      onChange={(e) => setSettings({...settings, currency: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h3>Financial Settings</h3>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Tax Rate (%)</label>
+                    <input 
+                      type="number" 
+                      value={settings.taxRate}
+                      onChange={(e) => setSettings({...settings, taxRate: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Shipping Fee (Rs.)</label>
+                    <input 
+                      type="number" 
+                      value={settings.shippingFee}
+                      onChange={(e) => setSettings({...settings, shippingFee: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Free Shipping Threshold (Rs.)</label>
+                    <input 
+                      type="number" 
+                      value={settings.freeShippingThreshold}
+                      onChange={(e) => setSettings({...settings, freeShippingThreshold: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Min Order Amount (Rs.)</label>
+                    <input 
+                      type="number" 
+                      value={settings.minOrderAmount}
+                      onChange={(e) => setSettings({...settings, minOrderAmount: parseFloat(e.target.value)})}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h3>Platform Controls</h3>
+                <div className="form-group-checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.maintenanceMode}
+                      onChange={(e) => setSettings({...settings, maintenanceMode: e.target.checked})}
+                    />
+                    Maintenance Mode
+                  </label>
+                </div>
+                <div className="form-group-checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.allowSellerRegistration}
+                      onChange={(e) => setSettings({...settings, allowSellerRegistration: e.target.checked})}
+                    />
+                    Allow Seller Registration
+                  </label>
+                </div>
+                <div className="form-group-checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.requireProductApproval}
+                      onChange={(e) => setSettings({...settings, requireProductApproval: e.target.checked})}
+                    />
+                    Require Product Approval
+                  </label>
+                </div>
+                <div className="form-group-checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.loyaltyPointsEnabled}
+                      onChange={(e) => setSettings({...settings, loyaltyPointsEnabled: e.target.checked})}
+                    />
+                    Enable Loyalty Points
+                  </label>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h3>Payment Gateway Configuration</h3>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Payment Provider</label>
+                    <select 
+                      value={settings.paymentGateway?.provider || 'none'}
+                      onChange={(e) => setSettings({
+                        ...settings, 
+                        paymentGateway: {...settings.paymentGateway, provider: e.target.value}
+                      })}
+                    >
+                      <option value="none">None</option>
+                      <option value="stripe">Stripe</option>
+                      <option value="paypal">PayPal</option>
+                      <option value="esewa">eSewa</option>
+                      <option value="khalti">Khalti</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Merchant ID</label>
+                    <input 
+                      type="text" 
+                      value={settings.paymentGateway?.merchantId || ''}
+                      onChange={(e) => setSettings({
+                        ...settings, 
+                        paymentGateway: {...settings.paymentGateway, merchantId: e.target.value}
+                      })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>API Key</label>
+                    <input 
+                      type="password" 
+                      value={settings.paymentGateway?.apiKey || ''}
+                      onChange={(e) => setSettings({
+                        ...settings, 
+                        paymentGateway: {...settings.paymentGateway, apiKey: e.target.value}
+                      })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Secret Key</label>
+                    <input 
+                      type="password" 
+                      value={settings.paymentGateway?.secretKey || ''}
+                      onChange={(e) => setSettings({
+                        ...settings, 
+                        paymentGateway: {...settings.paymentGateway, secretKey: e.target.value}
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="form-group-checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.paymentGateway?.isEnabled || false}
+                      onChange={(e) => setSettings({
+                        ...settings, 
+                        paymentGateway: {...settings.paymentGateway, isEnabled: e.target.checked}
+                      })}
+                    />
+                    Enable Payment Gateway
+                  </label>
+                </div>
+                <div className="form-group-checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={settings.paymentGateway?.testMode || false}
+                      onChange={(e) => setSettings({
+                        ...settings, 
+                        paymentGateway: {...settings.paymentGateway, testMode: e.target.checked}
+                      })}
+                    />
+                    Test Mode
+                  </label>
+                </div>
+              </div>
+
+              <button 
+                className="save-settings-btn"
+                onClick={handleSaveSettings}
+              >
+                <FiCheckCircle /> Save Settings
+              </button>
             </div>
           </div>
         )}
       </main>
+
+      {/* Order Details Modal */}
+      {showOrderModal && selectedOrder && (
+        <div className="modal-overlay" onClick={() => setShowOrderModal(false)}>
+          <div className="order-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Order Details</h2>
+              <button className="close-btn" onClick={() => setShowOrderModal(false)}>
+                <FiXCircle />
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="order-info-section">
+                <h3>Order Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Order ID:</label>
+                    <span>#{selectedOrder._id}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Date:</label>
+                    <span>{new Date(selectedOrder.orderDate).toLocaleDateString()}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Status:</label>
+                    <span className={`status-badge ${selectedOrder.status.toLowerCase()}`}>
+                      {selectedOrder.status}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Payment Method:</label>
+                    <span>{selectedOrder.paymentMethod?.toUpperCase()}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Payment Status:</label>
+                    <span className={`status-badge ${selectedOrder.paymentStatus?.toLowerCase()}`}>
+                      {selectedOrder.paymentStatus}
+                    </span>
+                  </div>
+                  {selectedOrder.transactionId && (
+                    <div className="info-item">
+                      <label>Transaction ID:</label>
+                      <span>{selectedOrder.transactionId}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Customer Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Name:</label>
+                    <span>{selectedOrder.customerName}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Email:</label>
+                    <span>{selectedOrder.customerEmail}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Phone:</label>
+                    <span>{selectedOrder.customerPhone}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Shipping Address</h3>
+                <p>{selectedOrder.shippingAddress?.fullName}</p>
+                <p>{selectedOrder.shippingAddress?.address}</p>
+                <p>{selectedOrder.shippingAddress?.city} {selectedOrder.shippingAddress?.postalCode}</p>
+                <p>{selectedOrder.shippingAddress?.phone}</p>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Order Items</h3>
+                <div className="order-items-list">
+                  {selectedOrder.items?.map((item, index) => (
+                    <div key={index} className="order-item">
+                      <img src={item.productImage} alt={item.productName} />
+                      <div className="item-info">
+                        <h4>{item.productName}</h4>
+                        <p>Seller: {item.sellerName}</p>
+                        <p>Quantity: {item.quantity}</p>
+                      </div>
+                      <div className="item-price">
+                        Rs. {item.subtotal?.toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Order Summary</h3>
+                <div className="order-totals">
+                  <div className="total-row">
+                    <span>Subtotal:</span>
+                    <span>Rs. {selectedOrder.subtotal?.toLocaleString()}</span>
+                  </div>
+                  <div className="total-row">
+                    <span>Shipping:</span>
+                    <span>Rs. {selectedOrder.shippingCost?.toLocaleString()}</span>
+                  </div>
+                  <div className="total-row final">
+                    <span>Total:</span>
+                    <span>Rs. {selectedOrder.total?.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Details Modal */}
+      {showProductModal && selectedProduct && (
+        <div className="modal-overlay" onClick={() => setShowProductModal(false)}>
+          <div className="order-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Product Details</h2>
+              <button className="close-btn" onClick={() => setShowProductModal(false)}>
+                <FiXCircle />
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="order-info-section">
+                <h3>Product Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Product ID:</label>
+                    <span>#{selectedProduct._id}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Name:</label>
+                    <span>{selectedProduct.name}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Category:</label>
+                    <span>{selectedProduct.category}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Subcategory:</label>
+                    <span>{selectedProduct.subcategory || 'N/A'}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Price:</label>
+                    <span>Rs. {selectedProduct.price?.toLocaleString()}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Stock:</label>
+                    <span>{selectedProduct.stock} units</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Size:</label>
+                    <span>{selectedProduct.size}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Condition:</label>
+                    <span>{selectedProduct.condition}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Brand:</label>
+                    <span>{selectedProduct.brand || 'Unbranded'}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Status:</label>
+                    <span className={`status-badge ${selectedProduct.status?.toLowerCase()}`}>
+                      {selectedProduct.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Seller Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Seller Name:</label>
+                    <span>{selectedProduct.sellerName}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Store Name:</label>
+                    <span>{selectedProduct.storeName}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Description</h3>
+                <p>{selectedProduct.description}</p>
+              </div>
+
+              {selectedProduct.story && (
+                <div className="order-info-section">
+                  <h3>Product Story</h3>
+                  <p>{selectedProduct.story}</p>
+                </div>
+              )}
+
+              <div className="order-info-section">
+                <h3>Product Images</h3>
+                <div className="product-images-grid">
+                  {selectedProduct.images?.map((img, index) => (
+                    <img key={index} src={img} alt={`Product ${index + 1}`} style={{width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px'}} />
+                  ))}
+                </div>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Payment Options</h3>
+                <p>{selectedProduct.paymentOptions?.join(', ').toUpperCase() || 'N/A'}</p>
+              </div>
+
+              {selectedProduct.discount?.active && (
+                <div className="order-info-section">
+                  <h3>Discount</h3>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>Percentage:</label>
+                      <span>{selectedProduct.discount.percentage}%</span>
+                    </div>
+                    <div className="info-item">
+                      <label>Start Date:</label>
+                      <span>{new Date(selectedProduct.discount.startDate).toLocaleDateString()}</span>
+                    </div>
+                    <div className="info-item">
+                      <label>End Date:</label>
+                      <span>{new Date(selectedProduct.discount.endDate).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {showUserModal && selectedUser && (
+        <div className="modal-overlay" onClick={() => setShowUserModal(false)}>
+          <div className="order-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>User Details</h2>
+              <button className="close-btn" onClick={() => setShowUserModal(false)}>
+                <FiXCircle />
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="order-info-section">
+                <h3>User Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>User ID:</label>
+                    <span>#{selectedUser._id}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Name:</label>
+                    <span>{selectedUser.fullName || selectedUser.name}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Email:</label>
+                    <span>{selectedUser.email}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>User Type:</label>
+                    <span className={`type-badge ${selectedUser.userType?.toLowerCase()}`}>
+                      {selectedUser.userType}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Status:</label>
+                    <span className={`status-badge ${selectedUser.isActive ? 'active' : 'inactive'}`}>
+                      {selectedUser.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Joined Date:</label>
+                    <span>{new Date(selectedUser.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {selectedUser.phone && (
+                <div className="order-info-section">
+                  <h3>Contact Information</h3>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>Phone:</label>
+                      <span>{selectedUser.phone}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedUser.storeName && (
+                <div className="order-info-section">
+                  <h3>Seller Information</h3>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>Store Name:</label>
+                      <span>{selectedUser.storeName}</span>
+                    </div>
+                    {selectedUser.address && (
+                      <div className="info-item">
+                        <label>Address:</label>
+                        <span>{selectedUser.address}</span>
+                      </div>
+                    )}
+                    {selectedUser.city && (
+                      <div className="info-item">
+                        <label>City:</label>
+                        <span>{selectedUser.city}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chatbot */}
       <Chatbot />
