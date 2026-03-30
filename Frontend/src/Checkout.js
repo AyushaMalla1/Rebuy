@@ -7,17 +7,24 @@ import { orderAPI } from './services/api';
 function Checkout() {
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([]);
-  const [step, setStep] = useState(1);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressIndex, setSelectedAddressIndex] = useState(null);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [showEsewaModal, setShowEsewaModal] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [addressConfirmed, setAddressConfirmed] = useState(false); // Track if user confirmed address
 
   const [shippingAddress, setShippingAddress] = useState({
     fullName: '',
-    phone: '',
-    address: '',
-    city: '',
-    postalCode: ''
+    phone: '+977',
+    addressLabel: 'Home',
+    state: '',
+    district: '',
+    municipality: '',
+    landmark: '',
+    isDefault: false
   });
 
   const [paymentMethod, setPaymentMethod] = useState('cod');
@@ -57,15 +64,48 @@ function Checkout() {
     
     setCartItems(normalizedCart);
 
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    if (user.fullName) {
-      setShippingAddress(prev => ({
-        ...prev,
-        fullName: user.fullName,
-        phone: user.phone || ''
-      }));
-    }
+    // Load addresses from backend
+    loadAddressesFromBackend();
   }, []);
+
+  const loadAddressesFromBackend = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/customers/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.customer && data.customer.addresses) {
+          setSavedAddresses(data.customer.addresses);
+          
+          // Set default address data but don't show it until user confirms
+          const defaultAddr = data.customer.addresses.find(addr => addr.isDefault);
+          if (defaultAddr) {
+            setSelectedAddressIndex(data.customer.addresses.indexOf(defaultAddr));
+            setShippingAddress({
+              fullName: defaultAddr.fullName,
+              phone: defaultAddr.phone,
+              addressLabel: defaultAddr.label || 'Home',
+              state: defaultAddr.state,
+              district: defaultAddr.district,
+              municipality: defaultAddr.municipality,
+              landmark: defaultAddr.landmark,
+              isDefault: defaultAddr.isDefault
+            });
+            // Don't set addressConfirmed to true here - let user confirm it
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading addresses:', error);
+    }
+  };
 
   const calculateTotal = () => {
     return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -74,7 +114,7 @@ function Checkout() {
   const shippingCost = calculateTotal() >= 2000 ? 0 : 100;
   const finalTotal = calculateTotal() + shippingCost;
 
-  const handleAddressSubmit = (e) => {
+  const handleAddressSubmit = async (e) => {
     e.preventDefault();
     
     // Validate required fields
@@ -96,107 +136,209 @@ function Checkout() {
       return;
     }
     
-    if (!shippingAddress.address.trim()) {
-      alert('Please enter your address');
+    if (!shippingAddress.state.trim()) {
+      alert('Please select a state');
       return;
     }
     
-    if (!shippingAddress.city.trim()) {
-      alert('Please enter your city');
+    if (!shippingAddress.district.trim()) {
+      alert('Please select a district');
       return;
     }
     
-    setStep(2);
+    if (!shippingAddress.municipality.trim()) {
+      alert('Please select a municipality');
+      return;
+    }
+    
+    if (!shippingAddress.landmark.trim()) {
+      alert('Please enter a landmark');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      if (!token || !user) {
+        alert('Please login to save address');
+        return;
+      }
+
+      // Save address to backend
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/customers/addresses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-user-id': user._id
+        },
+        body: JSON.stringify({
+          label: shippingAddress.addressLabel,
+          fullName: shippingAddress.fullName,
+          phone: shippingAddress.phone,
+          state: shippingAddress.state,
+          district: shippingAddress.district,
+          municipality: shippingAddress.municipality,
+          landmark: shippingAddress.landmark,
+          isDefault: shippingAddress.isDefault
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSavedAddresses(data.addresses);
+        setSelectedAddressIndex(data.addresses.length - 1);
+        setAddressConfirmed(true); // Mark as confirmed when new address is saved
+        setShowAddressForm(false);
+        alert('Address saved successfully!');
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Failed to save address');
+      }
+    } catch (error) {
+      console.error('Error saving address:', error);
+      alert('Failed to save address. Please try again.');
+    }
+  };
+
+  const handleSelectAddress = (index) => {
+    setSelectedAddressIndex(index);
+    const addr = savedAddresses[index];
+    setShippingAddress({
+      fullName: addr.fullName,
+      phone: addr.phone,
+      addressLabel: addr.label || 'Home',
+      state: addr.state,
+      district: addr.district,
+      municipality: addr.municipality,
+      landmark: addr.landmark,
+      isDefault: addr.isDefault
+    });
+  };
+
+  const handleEditAddress = (index) => {
+    const addr = savedAddresses[index];
+    setShippingAddress({
+      fullName: addr.fullName,
+      phone: addr.phone,
+      addressLabel: addr.label || 'Home',
+      state: addr.state,
+      district: addr.district,
+      municipality: addr.municipality,
+      landmark: addr.landmark,
+      isDefault: addr.isDefault
+    });
+    setShowAddressForm(true);
+  };
+
+  const handleConfirmAddress = () => {
+    // If an address is already selected, confirm it
+    if (selectedAddressIndex !== null) {
+      setAddressConfirmed(true);
+      setShowAddressModal(false);
+    } 
+    // If no address is selected but there's a default address loaded, use it
+    else if (shippingAddress.fullName && shippingAddress.state) {
+      setAddressConfirmed(true);
+      setShowAddressModal(false);
+    }
+    // Otherwise, show error
+    else {
+      alert('Please select an address first');
+    }
   };
 
   const handlePaymentSubmit = (e) => {
     e.preventDefault();
-    setStep(3);
-  };
-
-  const handleEsewaPayment = () => {
-    console.log('Opening eSewa modal...');
-    setShowEsewaModal(true);
-  };
-
-  const processEsewaPayment = () => {
-    setPaymentProcessing(true);
-
-    // Note: eSewa test environment (uat.esewa.com.np) is currently unavailable
-    // For development, we'll simulate the payment
-    // For production, use: https://esewa.com.np/epay/main with real merchant code
     
-    const isProduction = false; // Set to true when you have real eSewa merchant account
-    
-    if (isProduction) {
-      // Production eSewa Payment
-      const path = 'https://esewa.com.np/epay/main';
-      
-      const params = {
-        amt: finalTotal,
-        psc: 0,
-        pdc: 0,
-        txAmt: 0,
-        tAmt: finalTotal,
-        pid: `REBUY-${Date.now()}`,
-        scd: 'YOUR_MERCHANT_CODE', // Replace with your actual merchant code
-        su: `${window.location.origin}/payment-success?orderId=${Date.now()}`,
-        fu: `${window.location.origin}/payment-failure`
-      };
-
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = path;
-
-      Object.keys(params).forEach(key => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = params[key];
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      
-      // Store order data before redirect
-      sessionStorage.setItem('pendingOrder', JSON.stringify({
-        cartItems,
-        shippingAddress,
-        paymentMethod,
-        subtotal: calculateTotal(),
-        shippingCost,
-        total: finalTotal
-      }));
-      
-      form.submit();
-      document.body.removeChild(form);
-    } else {
-      // Development mode - simulate payment
-      console.log('Development Mode: Simulating eSewa payment');
-      
-      // Simulate successful payment after 2 seconds
-      setTimeout(() => {
-        setShowEsewaModal(false);
-        setPaymentProcessing(false);
-        completeOrder();
-      }, 2000);
+    // Check if address is filled
+    if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.address || !shippingAddress.city) {
+      alert('Please add a delivery address first');
+      setShowAddressModal(true);
+      return;
     }
   };
 
-  const handlePlaceOrder = () => {
-    if (paymentMethod === 'esewa') {
-      handleEsewaPayment();
+  const handleEsewaPayment = async (orderId) => {
+    try {
+      setPaymentProcessing(true);
+      
+      // Call backend to initiate payment
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payment/initiate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ orderId })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.paymentUrl && data.paymentData) {
+        // Create form and submit to eSewa
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.paymentUrl;
+
+        Object.keys(data.paymentData).forEach(key => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = data.paymentData[key];
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+      } else {
+        alert('Payment gateway not configured. Please contact support.');
+        setPaymentProcessing(false);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Failed to initiate payment. Please try again.');
+      setPaymentProcessing(false);
+    }
+  };
+
+  const handleKhaltiPayment = async (orderId) => {
+    // Khalti removed - only COD and eSewa supported
+    alert('Khalti payment is not available. Please use eSewa or Cash on Delivery.');
+  };
+
+  const handlePlaceOrder = async () => {
+    // Check if address is filled
+    if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.state || !shippingAddress.district || !shippingAddress.municipality || !shippingAddress.landmark) {
+      alert('Please add a delivery address first by clicking the "+ Add New Delivery Address" button');
+      setShowAddressModal(true);
+      setShowAddressForm(true);
+      // Reset form to blank
+      setShippingAddress({
+        fullName: '',
+        phone: '+977',
+        addressLabel: 'Home',
+        state: '',
+        district: '',
+        municipality: '',
+        landmark: '',
+        isDefault: false
+      });
       return;
     }
 
-    completeOrder();
-  };
-
-  const completeOrder = async () => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));
       
-      // Prepare order data for backend
+      if (!user || !user._id) {
+        alert('Please login to place an order');
+        navigate('/login');
+        return;
+      }
+      
+      // Prepare order data for backend with new address format
       const orderData = {
         customerId: user._id,
         customerName: shippingAddress.fullName,
@@ -213,7 +355,15 @@ function Checkout() {
           price: item.price,
           subtotal: item.price * item.quantity
         })),
-        shippingAddress,
+        shippingAddress: {
+          fullName: shippingAddress.fullName,
+          phone: shippingAddress.phone,
+          state: shippingAddress.state,
+          district: shippingAddress.district,
+          municipality: shippingAddress.municipality,
+          landmark: shippingAddress.landmark,
+          label: shippingAddress.addressLabel
+        },
         paymentMethod,
         subtotal: calculateTotal(),
         shippingCost,
@@ -221,42 +371,73 @@ function Checkout() {
         customerNotes: ''
       };
 
-      // Create order in backend
+      console.log('Creating order with data:', orderData);
+
+      // Create order in backend first
       const response = await orderAPI.create(orderData);
       
-      // Save order to localStorage for immediate display
-      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-      orders.push({
-        id: response.order._id,
-        items: cartItems,
-        shippingAddress,
-        paymentMethod,
-        total: finalTotal,
-        date: new Date().toISOString(),
-        status: 'Processing',
-        paymentStatus: paymentMethod === 'cod' ? 'Pending' : 'Paid',
-        trackingNumber: response.order.trackingNumber,
-        estimatedDelivery: response.order.estimatedDelivery
-      });
-      localStorage.setItem('orders', JSON.stringify(orders));
-
-      // Clear cart
-      localStorage.setItem('cart', JSON.stringify([]));
-
-      setOrderPlaced(true);
-
-      // Show points earned
-      if (response.pointsEarned) {
-        alert(`Order placed successfully! You earned ${response.pointsEarned} loyalty points!`);
+      if (!response || !response.order) {
+        throw new Error('Invalid response from server');
+      }
+      
+      const orderId = response.order._id;
+      
+      console.log('Order created successfully! Order ID:', orderId);
+      console.log('Full order details:', response.order);
+      
+      // Store order ID in localStorage for manual verification
+      localStorage.setItem('lastOrderId', orderId);
+      
+      // Handle payment based on method
+      if (paymentMethod === 'esewa') {
+        await handleEsewaPayment(orderId);
+        return;
+      } else if (paymentMethod === 'khalti') {
+        await handleKhaltiPayment(orderId);
+        return;
       }
 
-      setTimeout(() => {
-        navigate('/profile?tab=orders');
-      }, 3000);
+      // For COD, complete order directly
+      completeOrderSuccess(response.order);
     } catch (error) {
       console.error('Error placing order:', error);
-      alert('Failed to place order. Please try again.');
+      alert(`Failed to place order: ${error.message || 'Please try again'}`);
     }
+  };
+
+  const completeOrderSuccess = (order) => {
+    // Save order to localStorage for immediate display
+    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+    orders.push({
+      id: order._id,
+      items: cartItems,
+      shippingAddress: {
+        fullName: shippingAddress.fullName,
+        phone: shippingAddress.phone,
+        state: shippingAddress.state,
+        district: shippingAddress.district,
+        municipality: shippingAddress.municipality,
+        landmark: shippingAddress.landmark,
+        label: shippingAddress.addressLabel
+      },
+      paymentMethod,
+      total: finalTotal,
+      date: new Date().toISOString(),
+      status: order.status || 'Processing',
+      paymentStatus: order.paymentStatus || 'Pending',
+      trackingNumber: order.trackingNumber,
+      estimatedDelivery: order.estimatedDelivery
+    });
+    localStorage.setItem('orders', JSON.stringify(orders));
+
+    // Clear cart
+    localStorage.setItem('cart', JSON.stringify([]));
+
+    setOrderPlaced(true);
+
+    setTimeout(() => {
+      navigate('/profile?tab=orders');
+    }, 3000);
   };
 
   if (orderPlaced) {
@@ -285,268 +466,370 @@ function Checkout() {
           <h1>Checkout</h1>
         </div>
 
-        <div className="checkout-steps">
-          <div className={`step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}>
-            <div className="step-number">1</div>
-            <span>Shipping Address</span>
-          </div>
-          <div className="step-line"></div>
-          <div className={`step ${step >= 2 ? 'active' : ''} ${step > 2 ? 'completed' : ''}`}>
-            <div className="step-number">2</div>
-            <span>Payment Method</span>
-          </div>
-          <div className="step-line"></div>
-          <div className={`step ${step >= 3 ? 'active' : ''}`}>
-            <div className="step-number">3</div>
-            <span>Review Order</span>
-          </div>
-        </div>
-
         <div className="checkout-content">
           <div className="checkout-main">
-            {step === 1 && (
-              <div className="checkout-section">
-                <div className="section-header">
-                  <FiMapPin />
-                  <h2>Shipping Address</h2>
-                </div>
-                <form onSubmit={handleAddressSubmit}>
-                  <div className="form-group">
-                    <label>Full Name *</label>
-                    <input
-                      type="text"
-                      value={shippingAddress.fullName}
-                      onChange={(e) => setShippingAddress({...shippingAddress, fullName: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Phone Number *</label>
-                    <input
-                      type="tel"
-                      value={shippingAddress.phone}
-                      onChange={(e) => setShippingAddress({...shippingAddress, phone: e.target.value})}
-                      placeholder="9812345678 or +9779812345678"
-                      pattern="(\+977)?[9][6-9]\d{8}"
-                      title="Enter a valid Nepal phone number"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Address *</label>
-                    <input
-                      type="text"
-                      placeholder="Street address, apartment, suite, etc."
-                      value={shippingAddress.address}
-                      onChange={(e) => setShippingAddress({...shippingAddress, address: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>City *</label>
-                      <input
-                        type="text"
-                        value={shippingAddress.city}
-                        onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Postal Code</label>
-                      <input
-                        type="text"
-                        value={shippingAddress.postalCode}
-                        onChange={(e) => setShippingAddress({...shippingAddress, postalCode: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                  <button type="submit" className="continue-btn">
-                    Continue to Payment
+            {/* Add Address Button */}
+            <button className="add-address-btn" onClick={() => {
+              // Reset form to blank when adding new address
+              setShippingAddress({
+                fullName: '',
+                phone: '+977',
+                addressLabel: 'Home',
+                state: '',
+                district: '',
+                municipality: '',
+                landmark: '',
+                isDefault: false
+              });
+              setShowAddressModal(true);
+              setShowAddressForm(true);
+            }}>
+              <FiMapPin />
+              <span>+ Add New Delivery Address</span>
+            </button>
+
+            {/* Show selected address if exists and confirmed */}
+            {addressConfirmed && shippingAddress.fullName && shippingAddress.state && (
+              <div className="selected-address-display">
+                <div className="selected-address-header">
+                  <h3>Selected Delivery Address</h3>
+                  <button onClick={() => {
+                    setShowAddressModal(true);
+                    setShowAddressForm(false);
+                  }} className="change-address-btn">
+                    Change
                   </button>
-                </form>
+                </div>
+                <div className="selected-address-content">
+                  <p><strong>{shippingAddress.fullName}</strong></p>
+                  <p>{shippingAddress.phone}</p>
+                  <p>{shippingAddress.state}, {shippingAddress.district}, {shippingAddress.municipality}</p>
+                  <p>{shippingAddress.landmark}</p>
+                  <span className="address-label-badge">{shippingAddress.addressLabel}</span>
+                </div>
               </div>
             )}
 
-            {step === 2 && (
-              <div className="checkout-section">
-                <div className="section-header">
-                  <FiCreditCard />
-                  <h2>Payment Method</h2>
-                </div>
-                <form onSubmit={handlePaymentSubmit}>
-                  <div className="payment-options">
-                    <label className={`payment-option ${paymentMethod === 'esewa' ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="payment"
-                        value="esewa"
-                        checked={paymentMethod === 'esewa'}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                      />
-                      <div className="option-content">
-                        <div className="option-icon">
-                          <img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" style={{width: '60px'}} />
-                        </div>
-                        <div>
-                          <h3>eSewa</h3>
-                          <p>Pay securely with eSewa wallet</p>
-                        </div>
-                      </div>
-                    </label>
-
-                    <label className={`payment-option ${paymentMethod === 'khalti' ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="payment"
-                        value="khalti"
-                        checked={paymentMethod === 'khalti'}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                      />
-                      <div className="option-content">
-                        <div className="option-icon">
-                          <img src="https://web.khalti.com/static/img/logo1.png" alt="Khalti" style={{width: '60px'}} />
-                        </div>
-                        <div>
-                          <h3>Khalti</h3>
-                          <p>Pay with Khalti digital wallet</p>
-                        </div>
-                      </div>
-                    </label>
-
-                    <label className={`payment-option ${paymentMethod === 'card' ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="payment"
-                        value="card"
-                        checked={paymentMethod === 'card'}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                      />
-                      <div className="option-content">
-                        <div className="option-icon">💳</div>
-                        <div>
-                          <h3>Credit/Debit Card</h3>
-                          <p>Visa, Mastercard, American Express</p>
-                        </div>
-                      </div>
-                    </label>
-
-                    <label className={`payment-option ${paymentMethod === 'cod' ? 'selected' : ''}`}>
-                      <input
-                        type="radio"
-                        name="payment"
-                        value="cod"
-                        checked={paymentMethod === 'cod'}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                      />
-                      <div className="option-content">
-                        <div className="option-icon">💵</div>
-                        <div>
-                          <h3>Cash on Delivery</h3>
-                          <p>Pay when you receive your order</p>
-                        </div>
-                      </div>
-                    </label>
+            {/* Product List */}
+            <div className="checkout-section">
+              <h2 style={{fontSize: '18px', color: '#333', marginBottom: '20px', fontWeight: '600'}}>Order Items</h2>
+              {Array.isArray(cartItems) && cartItems.map((item, index) => (
+                <div key={item.id || index} className="product-card-checkout">
+                  <img 
+                    src={item.image || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg'} 
+                    alt={item.name || item.productName || 'Product'}
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg';
+                    }}
+                  />
+                  <div className="product-card-details">
+                    <h4>{item.name || item.productName || 'Product'}</h4>
+                    <p className="qty">Qty: {item.quantity || 1}</p>
                   </div>
-
-                  <div className="form-actions">
-                    <button type="button" onClick={() => setStep(1)} className="back-step-btn">
-                      Back
-                    </button>
-                    <button type="submit" className="continue-btn">
-                      Review Order
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="checkout-section">
-                <div className="section-header">
-                  <FiPackage />
-                  <h2>Review Your Order</h2>
-                </div>
-
-                <div className="review-section">
-                  <h3>Shipping Address</h3>
-                  <div className="review-card">
-                    <p><strong>{shippingAddress.fullName}</strong></p>
-                    <p>{shippingAddress.phone}</p>
-                    <p>{shippingAddress.address}</p>
-                    <p>{shippingAddress.city} {shippingAddress.postalCode}</p>
-                    <button onClick={() => setStep(1)} className="edit-btn">Edit</button>
+                  <div className="product-card-price">
+                    <span className="current-price">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString()}</span>
+                    {item.originalPrice && item.originalPrice > item.price && (
+                      <span className="original-price">Rs. {(item.originalPrice * (item.quantity || 1)).toLocaleString()}</span>
+                    )}
                   </div>
                 </div>
-
-                <div className="review-section">
-                  <h3>Payment Method</h3>
-                  <div className="review-card">
-                    <p><strong>
-                      {paymentMethod === 'esewa' && 'eSewa'}
-                      {paymentMethod === 'card' && 'Credit/Debit Card'}
-                      {paymentMethod === 'cod' && 'Cash on Delivery'}
-                    </strong></p>
-                    <p>
-                      {paymentMethod === 'cod' ? 'Pay when you receive' : 'Pay now securely'}
-                    </p>
-                    <button onClick={() => setStep(2)} className="edit-btn">Edit</button>
-                  </div>
-                </div>
-
-                <button onClick={handlePlaceOrder} className="place-order-btn">
-                  {paymentMethod === 'cod' ? 'Place Order' : 'Proceed to Payment'}
-                </button>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
 
           <div className="checkout-sidebar">
+            {/* Payment Method */}
             <div className="order-summary">
-              <h2>Order Summary</h2>
-              
-              <div className="summary-items">
-                {Array.isArray(cartItems) && cartItems.map((item, index) => (
-                  <div key={item.id || index} className="summary-item">
-                    <img 
-                      src={item.image || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg'} 
-                      alt={item.name || item.productName || 'Product'}
-                      loading="lazy"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg';
-                      }}
-                    />
-                    <div className="item-details">
-                      <h4>{item.name || item.productName || 'Product'}</h4>
-                      <p>Qty: {item.quantity || 1}</p>
+              <h2>Select A Payment Method</h2>
+              <div className="payment-options">
+                <label className={`payment-option ${paymentMethod === 'cod' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="cod"
+                    checked={paymentMethod === 'cod'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  />
+                  <div className="option-content">
+                    <div className="option-icon">
+                      <FiPackage style={{fontSize: '24px', color: '#00bcd4'}} />
                     </div>
-                    <span className="item-price">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString()}</span>
+                    <div>
+                      <h3>Cash on Delivery (COD)</h3>
+                    </div>
                   </div>
-                ))}
-              </div>
+                </label>
 
+                <label className={`payment-option ${paymentMethod === 'esewa' ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="payment"
+                    value="esewa"
+                    checked={paymentMethod === 'esewa'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  />
+                  <div className="option-content">
+                    <div className="option-icon">
+                      <img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" style={{width: '50px'}} />
+                    </div>
+                    <div>
+                      <h3>eSewa</h3>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Order Summary */}
+            <div className="order-summary" style={{marginTop: '20px'}}>
+              <h2>Order Summary</h2>
               <div className="summary-totals">
                 <div className="total-row">
-                  <span>Subtotal</span>
+                  <span>Items Total</span>
                   <span>Rs. {calculateTotal().toLocaleString()}</span>
                 </div>
                 <div className="total-row">
-                  <span>Shipping</span>
+                  <span>Delivery Charge</span>
                   <span>{shippingCost === 0 ? 'FREE' : `Rs. ${shippingCost}`}</span>
                 </div>
                 {shippingCost === 0 && (
                   <p className="free-shipping-note">🎉 You got free shipping!</p>
                 )}
                 <div className="total-row final">
-                  <span>Total</span>
+                  <span>Total Payment</span>
                   <span>Rs. {finalTotal.toLocaleString()}</span>
                 </div>
               </div>
+
+              <button onClick={handlePlaceOrder} className="place-order-btn">
+                Place Order
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Address List Modal - Shows when no form is open */}
+      {showAddressModal && !showAddressForm && (
+        <div className="address-modal-overlay" onClick={(e) => {
+          if (e.target.className === 'address-modal-overlay') {
+            setShowAddressModal(false);
+          }
+        }}>
+          <div className="address-modal">
+            <div className="address-modal-header">
+              <h2>Select Your Shipping Address</h2>
+              <button className="modal-close" onClick={() => setShowAddressModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            
+            <div className="address-modal-body">
+              {/* Always show Add New Address button */}
+              <button className="add-new-address-btn" onClick={() => {
+                // Reset form to blank when adding new address
+                setShippingAddress({
+                  fullName: '',
+                  phone: '+977',
+                  addressLabel: 'Home',
+                  state: '',
+                  district: '',
+                  municipality: '',
+                  landmark: '',
+                  isDefault: false
+                });
+                setShowAddressForm(true);
+              }}>
+                <FiMapPin />
+                <span>Add New Address</span>
+              </button>
+
+              {/* Show saved addresses if any exist */}
+              {savedAddresses.length > 0 && (
+                <>
+                  <div className="saved-addresses-list">
+                    {savedAddresses.map((addr, index) => (
+                      <div 
+                        key={index} 
+                        className={`saved-address-card ${selectedAddressIndex === index ? 'selected' : ''}`}
+                        onClick={() => handleSelectAddress(index)}
+                      >
+                        <div className="address-content">
+                          <h4>{addr.fullName}</h4>
+                          <p>{addr.phone}</p>
+                          <p>{addr.state}, {addr.district}, {addr.municipality}</p>
+                          <p>{addr.landmark}</p>
+                          {addr.isDefault && <span className="default-badge">Default</span>}
+                        </div>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditAddress(index);
+                          }} 
+                          className="edit-address-btn"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Show confirm button if address is selected OR if there's a default address */}
+                  {(selectedAddressIndex !== null || (shippingAddress.fullName && shippingAddress.state)) && (
+                    <button className="confirm-address-btn" onClick={handleConfirmAddress}>
+                      Confirm Address
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Address Form Modal */}
+      {showAddressForm && (
+        <div className="address-modal-overlay" onClick={(e) => {
+          if (e.target.className === 'address-modal-overlay') {
+            setShowAddressForm(false);
+          }
+        }}>
+          <div className="address-modal">
+            <div className="address-modal-header">
+              <button className="back-to-list-btn" onClick={() => setShowAddressForm(false)}>
+                <FiArrowLeft />
+              </button>
+              <h2>Add New Delivery Address</h2>
+              <button className="modal-close" onClick={() => {
+                setShowAddressForm(false);
+                setShowAddressModal(false);
+              }}>
+                <FiX />
+              </button>
+            </div>
+            
+            <div className="address-modal-body">
+              <form onSubmit={handleAddressSubmit}>
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input
+                    type="text"
+                    value={shippingAddress.fullName}
+                    onChange={(e) => setShippingAddress({...shippingAddress, fullName: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Primary Number *</label>
+                  <input
+                    type="tel"
+                    value={shippingAddress.phone}
+                    onChange={(e) => setShippingAddress({...shippingAddress, phone: e.target.value})}
+                    placeholder="+977"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Select a label for effective delivery</label>
+                  <div className="label-options">
+                    <button
+                      type="button"
+                      className={`label-btn ${shippingAddress.addressLabel === 'Home' ? 'active' : ''}`}
+                      onClick={() => setShippingAddress({...shippingAddress, addressLabel: 'Home'})}
+                    >
+                      Home
+                    </button>
+                    <button
+                      type="button"
+                      className={`label-btn ${shippingAddress.addressLabel === 'Office' ? 'active' : ''}`}
+                      onClick={() => setShippingAddress({...shippingAddress, addressLabel: 'Office'})}
+                    >
+                      Office
+                    </button>
+                    <button
+                      type="button"
+                      className={`label-btn ${shippingAddress.addressLabel === 'Other' ? 'active' : ''}`}
+                      onClick={() => setShippingAddress({...shippingAddress, addressLabel: 'Other'})}
+                    >
+                      Other
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Address *</label>
+                  <div className="address-selects">
+                    <select
+                      value={shippingAddress.state}
+                      onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                      required
+                    >
+                      <option value="">Select State</option>
+                      <option value="Province 1">Province 1</option>
+                      <option value="Madhesh">Madhesh</option>
+                      <option value="Bagmati">Bagmati</option>
+                      <option value="Gandaki">Gandaki</option>
+                      <option value="Lumbini">Lumbini</option>
+                      <option value="Karnali">Karnali</option>
+                      <option value="Sudurpashchim">Sudurpashchim</option>
+                    </select>
+                    <select
+                      value={shippingAddress.district}
+                      onChange={(e) => setShippingAddress({...shippingAddress, district: e.target.value})}
+                      required
+                    >
+                      <option value="">Select District</option>
+                      <option value="Kathmandu">Kathmandu</option>
+                      <option value="Lalitpur">Lalitpur</option>
+                      <option value="Bhaktapur">Bhaktapur</option>
+                    </select>
+                    <select
+                      value={shippingAddress.municipality}
+                      onChange={(e) => setShippingAddress({...shippingAddress, municipality: e.target.value})}
+                      required
+                    >
+                      <option value="">Select Municipality</option>
+                      <option value="Kathmandu Metropolitan">Kathmandu Metropolitan</option>
+                      <option value="Lalitpur Metropolitan">Lalitpur Metropolitan</option>
+                      <option value="Bhaktapur Municipality">Bhaktapur Municipality</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Landmark *</label>
+                  <input
+                    type="text"
+                    value={shippingAddress.landmark}
+                    onChange={(e) => setShippingAddress({...shippingAddress, landmark: e.target.value})}
+                    placeholder="Near landmark or building"
+                    required
+                  />
+                </div>
+
+                <div className="form-group checkbox-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={shippingAddress.isDefault}
+                      onChange={(e) => setShippingAddress({...shippingAddress, isDefault: e.target.checked})}
+                    />
+                    <span>Is Default Shipping</span>
+                  </label>
+                </div>
+
+                <button type="submit" className="continue-btn">
+                  SAVE ADDRESS
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showEsewaModal && (
         <div className="payment-modal-overlay" onClick={(e) => {
@@ -597,10 +880,13 @@ function Checkout() {
 
               <button 
                 className="esewa-pay-btn"
-                onClick={processEsewaPayment}
+                onClick={() => {
+                  setShowEsewaModal(false);
+                  setPaymentProcessing(false);
+                }}
                 disabled={paymentProcessing}
               >
-                {paymentProcessing ? 'Processing...' : 'Pay with eSewa Web'}
+                {paymentProcessing ? 'Processing...' : 'Close'}
               </button>
 
               <p className="payment-note">
