@@ -2,39 +2,68 @@ const express = require('express');
 const router = express.Router();
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
-const { calculateDiscountedPrice } = require('../utils/discount');
+
+// Helper function to calculate discounted price
+const calculateDiscountedPrice = (price, discount) => {
+  if (!discount) return price;
+  
+  const percentage = typeof discount === 'object' ? discount.percentage : discount;
+  if (!percentage || percentage <= 0) return price;
+  
+  return Math.round(price * (1 - percentage / 100));
+};
 
 // Get customer cart
 router.get('/:customerId', async (req, res) => {
   try {
     const cart = await Cart.findOne({ customer: req.params.customerId })
-      .populate('items.product', 'name price images stock seller sellerName storeName discount');
+      .populate({
+        path: 'items.product',
+        select: 'name price images stock seller sellerName storeName discount condition category'
+      });
     
     if (!cart) {
       return res.json({ items: [] });
     }
     
-    // Calculate discounted prices for cart items
+    // Filter out items with deleted products and calculate discounted prices
+    const validItems = cart.items.filter(item => item.product != null);
+    
     const cartWithDiscounts = {
       ...cart.toObject(),
-      items: cart.items.map(item => {
+      items: validItems.map(item => {
         const product = item.product;
-        if (product && product.discount) {
-          const discountedPrice = calculateDiscountedPrice(product.price, product.discount);
-          return {
-            ...item,
-            product: {
-              ...product,
-              discountedPrice
-            }
-          };
+        let discountedPrice = product.price;
+        
+        if (product.discount) {
+          discountedPrice = calculateDiscountedPrice(product.price, product.discount);
         }
-        return item;
+        
+        return {
+          _id: item._id,
+          quantity: item.quantity,
+          addedAt: item.addedAt,
+          product: {
+            _id: product._id,
+            name: product.name,
+            price: product.price,
+            discountedPrice: discountedPrice,
+            images: product.images || [],
+            stock: product.stock,
+            seller: product.seller,
+            sellerName: product.sellerName,
+            storeName: product.storeName,
+            discount: product.discount,
+            condition: product.condition,
+            category: product.category
+          }
+        };
       })
     };
     
     res.json(cartWithDiscounts);
   } catch (error) {
+    console.error('Get cart error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -236,6 +265,7 @@ router.delete('/:customerId/remove/:productId', async (req, res) => {
     
     res.json({ message: 'Item removed from cart', cart: cartWithDiscounts });
   } catch (error) {
+    console.error('Remove from cart error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -253,6 +283,24 @@ router.delete('/:customerId/clear', async (req, res) => {
     
     res.json({ message: 'Cart cleared', cart });
   } catch (error) {
+    console.error('Clear cart error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get cart count
+router.get('/:customerId/count', async (req, res) => {
+  try {
+    const cart = await Cart.findOne({ customer: req.params.customerId });
+    
+    if (!cart) {
+      return res.json({ count: 0 });
+    }
+    
+    const count = cart.items.reduce((total, item) => total + item.quantity, 0);
+    res.json({ count });
+  } catch (error) {
+    console.error('Get cart count error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
