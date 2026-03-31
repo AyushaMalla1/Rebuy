@@ -273,15 +273,14 @@ router.delete('/:customerId/remove/:productId', async (req, res) => {
 // Clear cart
 router.delete('/:customerId/clear', async (req, res) => {
   try {
-    const cart = await Cart.findOne({ customer: req.params.customerId });
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
+    // Delete the entire cart document instead of just clearing items
+    const result = await Cart.findOneAndDelete({ customer: req.params.customerId });
+    
+    if (!result) {
+      return res.json({ message: 'Cart already empty', items: [] });
     }
     
-    cart.items = [];
-    await cart.save();
-    
-    res.json({ message: 'Cart cleared', cart });
+    res.json({ message: 'Cart cleared', items: [] });
   } catch (error) {
     console.error('Clear cart error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

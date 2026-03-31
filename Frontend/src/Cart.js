@@ -13,6 +13,7 @@ function Cart() {
   const [user, setUser] = useState(null);
   const [showAddedModal, setShowAddedModal] = useState(false);
   const [addedProduct, setAddedProduct] = useState(null);
+  const [selectedItems, setSelectedItems] = useState([]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -28,16 +29,22 @@ function Cart() {
     try {
       const userData = localStorage.getItem('user');
       if (!userData) {
+        console.log('No user data found in localStorage');
         setCart([]);
         setLoading(false);
         return;
       }
       
       const user = JSON.parse(userData);
+      console.log('Loading cart for user:', user._id, user.email);
+      
       const response = await cartAPI.get(user._id);
+      console.log('Cart response:', response);
       
       if (!response.items || response.items.length === 0) {
+        console.log('Cart is empty');
         setCart([]);
+        localStorage.setItem('cart', JSON.stringify([]));
         setLoading(false);
         return;
       }
@@ -61,10 +68,14 @@ function Cart() {
           };
         });
       
+      console.log('Formatted cart:', formattedCart);
       setCart(formattedCart);
+      // Save to localStorage for checkout
+      localStorage.setItem('cart', JSON.stringify(formattedCart));
     } catch (error) {
       console.error('Error loading cart:', error);
       setCart([]);
+      localStorage.setItem('cart', JSON.stringify([]));
     } finally {
       setLoading(false);
     }
@@ -159,21 +170,30 @@ function Cart() {
     
     if (window.confirm('Are you sure you want to clear your cart?')) {
       try {
-        await cartAPI.clear(user._id);
+        console.log('Clearing cart for user:', user._id);
+        const response = await cartAPI.clear(user._id);
+        console.log('Clear cart response:', response);
         setCart([]);
+        // Clear localStorage cart as well
+        localStorage.removeItem('cart');
+        // Reload cart from backend to ensure it's actually cleared
+        await loadCart();
       } catch (error) {
         console.error('Error clearing cart:', error);
+        alert('Failed to clear cart. Please try again.');
       }
     }
   };
 
   const getTotalSavings = () => {
-    return cart.reduce((total, item) => {
-      if (item.discount && item.originalPrice > item.price) {
-        return total + ((item.originalPrice - item.price) * item.quantity);
-      }
-      return total;
-    }, 0);
+    return cart
+      .filter(item => selectedItems.includes(item.id))
+      .reduce((total, item) => {
+        if (item.discount && item.originalPrice > item.price) {
+          return total + ((item.originalPrice - item.price) * item.quantity);
+        }
+        return total;
+      }, 0);
   };
 
   const getEstimatedDelivery = () => {
@@ -200,11 +220,13 @@ function Cart() {
   };
 
   const getSubtotal = () => {
-    return cart.reduce((total, item) => {
-      const price = Number(item.price) || 0;
-      const quantity = Number(item.quantity) || 0;
-      return total + (price * quantity);
-    }, 0);
+    return cart
+      .filter(item => selectedItems.includes(item.id))
+      .reduce((total, item) => {
+        const price = Number(item.price) || 0;
+        const quantity = Number(item.quantity) || 0;
+        return total + (price * quantity);
+      }, 0);
   };
 
   const getShipping = () => {
@@ -221,7 +243,34 @@ function Cart() {
       alert('Your cart is empty!');
       return;
     }
+    
+    if (selectedItems.length === 0) {
+      alert('Please select at least one item to checkout!');
+      return;
+    }
+    
+    // Save only selected items to localStorage for checkout
+    const itemsToCheckout = cart.filter(item => selectedItems.includes(item.id));
+    localStorage.setItem('cart', JSON.stringify(itemsToCheckout));
     navigate('/checkout');
+  };
+
+  const toggleSelectItem = (itemId) => {
+    setSelectedItems(prev => {
+      if (prev.includes(itemId)) {
+        return prev.filter(id => id !== itemId);
+      } else {
+        return [...prev, itemId];
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItems.length === cart.length) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(cart.map(item => item.id));
+    }
   };
 
   const getProductImage = (item) => {
@@ -261,7 +310,15 @@ function Cart() {
               {cart.length > 0 && (
                 <>
                   <div className="cart-header-row">
-                    <h2>Shopping Cart ({cart.length} {cart.length === 1 ? 'item' : 'items'})</h2>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedItems.length === cart.length && cart.length > 0}
+                        onChange={toggleSelectAll}
+                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                      />
+                      <h2>Shopping Cart ({cart.length} {cart.length === 1 ? 'item' : 'items'})</h2>
+                    </div>
                     <button className="clear-cart-btn" onClick={clearCart}>
                       <FiTrash2 /> Clear Cart
                     </button>
@@ -270,77 +327,42 @@ function Cart() {
                   <div className="cart-items-list">
                     {Object.entries(groupItemsBySeller()).map(([sellerId, sellerData]) => (
                       <div key={sellerId} className="seller-group">
-                        <div className="seller-header">
-                          <span className="seller-name">{sellerData.storeName}</span>
-                          <span className="seller-items">
-                            {sellerData.items.length} {sellerData.items.length === 1 ? 'item' : 'items'}
-                          </span>
-                        </div>
-
                         {sellerData.items.map(item => (
                           <div key={item.id} className="cart-item-card">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedItems.includes(item.id)}
+                              onChange={() => toggleSelectItem(item.id)}
+                              className="item-checkbox"
+                            />
                             <img 
                               src={getProductImage(item)} 
                               alt={item.name}
+                              className="item-image"
                               onClick={() => navigate(`/product/${item.id}`)}
-                              style={{cursor: 'pointer'}}
                               onError={(e) => {
                                 e.target.onerror = null;
                                 e.target.src = 'https://via.placeholder.com/150?text=No+Image';
                               }}
                             />
-                            <div className="item-details">
-                              <h3 onClick={() => navigate(`/product/${item.id}`)} style={{cursor: 'pointer'}}>
-                                {item.name}
-                              </h3>
-                              
-                              <div className="price-section">
-                                {item.discount && item.originalPrice > item.price ? (
-                                  <>
-                                    <span className="item-price">Rs. {(item.price || 0).toLocaleString()}</span>
-                                    <span className="original-price">Rs. {(item.originalPrice || 0).toLocaleString()}</span>
-                                    <span className="discount-badge">{item.discount}% OFF</span>
-                                  </>
+                            <div className="item-info">
+                              <h3 onClick={() => navigate(`/product/${item.id}`)}>{item.name}</h3>
+                              <div className="item-price">Rs. {(item.price || 0).toLocaleString()}</div>
+                              <div className="item-stock">
+                                {item.stock === 0 ? (
+                                  <span className="out-of-stock"><FiAlertCircle /> Out of Stock</span>
                                 ) : (
-                                  <span className="item-price">Rs. {(item.price || 0).toLocaleString()}</span>
+                                  <span className="in-stock"><FiCheck /> In Stock</span>
                                 )}
                               </div>
-
-                              {item.stock !== undefined && (
-                                <div className="stock-info">
-                                  {item.stock === 0 ? (
-                                    <span className="out-of-stock">
-                                      <FiAlertCircle /> Out of Stock
-                                    </span>
-                                  ) : item.stock < 5 ? (
-                                    <span className="low-stock">
-                                      <FiAlertCircle /> Only {item.stock} left in stock
-                                    </span>
-                                  ) : (
-                                    <span className="in-stock">
-                                      <FiCheck /> In Stock
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="item-meta">
-                                <span className="delivery-info">
-                                  <FiTruck /> Delivery by {getEstimatedDelivery()}
-                                </span>
+                              <div className="item-delivery">
+                                <FiTruck /> Delivery by {getEstimatedDelivery()}
                               </div>
-
-                              <div className="item-secondary-actions">
-                                <button 
-                                  className="save-later-btn" 
-                                  onClick={() => saveForLater(item.id)}
-                                >
-                                  <FiHeart /> Save for later
-                                </button>
-                              </div>
+                              <button className="save-later-btn" onClick={() => saveForLater(item.id)}>
+                                <FiHeart /> Save for later
+                              </button>
                             </div>
-
-                            <div className="item-actions">
+                            <div className="item-right">
                               <div className="quantity-controls">
                                 <button 
                                   onClick={() => updateQuantity(item.id, -1)}
@@ -356,7 +378,7 @@ function Cart() {
                                   +
                                 </button>
                               </div>
-                              <p className="item-total">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString()}</p>
+                              <div className="item-total">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString()}</div>
                               <button 
                                 className="remove-item-btn" 
                                 onClick={() => removeFromCart(item.id)}
@@ -416,7 +438,7 @@ function Cart() {
                 
                 <div className="summary-details">
                   <div className="summary-row">
-                    <span>Subtotal ({cart.length} {cart.length === 1 ? 'item' : 'items'})</span>
+                    <span>Subtotal ({selectedItems.length} {selectedItems.length === 1 ? 'item' : 'items'} selected)</span>
                     <span>Rs. {getSubtotal().toLocaleString()}</span>
                   </div>
                   
@@ -436,11 +458,11 @@ function Cart() {
                     <div className="free-shipping-note success">
                       <FiCheck /> You got free shipping!
                     </div>
-                  ) : (
+                  ) : getSubtotal() > 0 ? (
                     <div className="free-shipping-note info">
                       <FiTruck /> Add Rs. {(2000 - getSubtotal()).toLocaleString()} more for free shipping
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="summary-divider"></div>
@@ -453,7 +475,7 @@ function Cart() {
                 <button 
                   className="checkout-btn" 
                   onClick={handleCheckout}
-                  disabled={cart.some(item => item.stock === 0)}
+                  disabled={selectedItems.length === 0 || cart.filter(item => selectedItems.includes(item.id)).some(item => item.stock === 0)}
                 >
                   Proceed to Checkout
                 </button>
