@@ -878,13 +878,12 @@
 
 .address-modal {
   background: white;
-  border-radius: 16px;
-  max-width: 950px;
+  border-radius: 12px;
+  max-width: 700px;
   width: 95%;
-  max-height: 85vh;
+  max-height: 90vh;
   overflow-y: auto;
-  border: 1px solid #e8e8e8;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.3s ease;
 }
 
@@ -893,20 +892,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 15px;
-  padding: 24px 40px;
-  border-bottom: 2px solid #f0f0f0;
-  position: relative;
-  background: linear-gradient(to bottom, #ffffff, #fafafa);
+  padding: 20px 24px;
+  border-bottom: 1px solid #e8e8e8;
+  background: #fafafa;
 }
 
 .address-modal-header svg {
-  font-size: 28px;
-  color: #00bcd4;
+  font-size: 20px;
+  color: #666;
 }
 
 .address-modal-header h2 {
-  font-size: 22px;
-  color: #2c3e50;
+  font-size: 18px;
+  color: #333;
   margin: 0;
   font-weight: 600;
   flex: 1;
@@ -914,36 +912,41 @@
 }
 
 .address-modal-body {
-  padding: 32px 40px;
+  padding: 24px;
 }
 
-/* Address Form Grid Layout */
 .address-modal-body form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
 .address-modal-body .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 0;
 }
 
 .address-modal-body .form-group label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #2c3e50;
+  color: #555;
 }
 
 .address-modal-body .form-group input,
 .address-modal-body .form-group select {
-  padding: 12px 14px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
   font-size: 14px;
-  transition: all 0.3s;
+  transition: all 0.2s;
   background: white;
 }
 
@@ -951,16 +954,22 @@
 .address-modal-body .form-group select:focus {
   outline: none;
   border-color: #00bcd4;
-  box-shadow: 0 0 0 4px rgba(0, 188, 212, 0.1);
-  background: #fafafa;
+  box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
 }
 
-/* Full width form groups */
-.address-modal-body .label-options,
-.address-modal-body .address-selects,
-.address-modal-body .checkbox-group,
-.address-modal-body .continue-btn {
-  grid-column: 1 / -1;
+.address-selects-compact {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.address-selects-compact select {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
 }
 
 /* Product Card in Checkout */
@@ -1200,21 +1209,20 @@
 /* Label Selection Buttons */
 .label-options {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 10px;
 }
 
 .label-btn {
   flex: 1;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: white;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
   color: #666;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s;
 }
 
 .label-btn:hover {
@@ -1223,9 +1231,47 @@
 }
 
 .label-btn.active {
-  background: linear-gradient(135deg, #00bcd4 0%, #00acc1 100%);
+  background: #00bcd4;
   border-color: #00bcd4;
   color: white;
+}
+
+.checkbox-group {
+  margin: 4px 0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.continue-btn {
+  width: 100%;
+  padding: 12px;
+  background: #00bcd4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.continue-btn:hover {
+  background: #00acc1;
+  transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 188, 212, 0.3);
 }
 
@@ -1321,74 +1367,73 @@
   box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
 }
 
-/* Selected Address Display */
-.selected-address-display {
-  background: linear-gradient(135deg, #e0f7fa 0%, #f0f9fa 100%);
-  border: 2px solid #00bcd4;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 12px rgba(0, 188, 212, 0.15);
-}
-
-.selected-address-header {
+/* Selected Address Display - Compact */
+.selected-address-compact {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid rgba(0, 188, 212, 0.2);
+  justify-content: space-between;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
 }
 
-.selected-address-header h3 {
-  font-size: 16px;
-  color: #00838f;
-  margin: 0;
+.address-info {
+  flex: 1;
+}
+
+.address-header-compact {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.address-icon {
+  color: #00bcd4;
+  font-size: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.address-details {
+  flex: 1;
+}
+
+.deliver-to {
+  font-size: 14px;
+  color: #333;
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+
+.deliver-to strong {
   font-weight: 600;
+  color: #000;
 }
 
-.change-address-btn {
+.address-text {
+  font-size: 13px;
+  color: #666;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.change-btn-compact {
   background: white;
   color: #00bcd4;
-  border: 2px solid #00bcd4;
-  padding: 8px 20px;
-  border-radius: 8px;
-  font-size: 14px;
+  border: 1px solid #00bcd4;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: 16px;
 }
 
-.change-address-btn:hover {
+.change-btn-compact:hover {
   background: #00bcd4;
   color: white;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 188, 212, 0.3);
-}
-
-.selected-address-content {
-  color: #2c3e50;
-}
-
-.selected-address-content p {
-  margin: 6px 0;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.selected-address-content strong {
-  font-size: 16px;
-  color: #00838f;
-}
-
-.address-label-badge {
-  display: inline-block;
-  background: #00bcd4;
-  color: white;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  margin-top: 8px;
-  text-transform: uppercase;
 }

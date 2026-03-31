@@ -6,6 +6,22 @@ import './OrderStatus.css';
 function OrderStatus() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [paymentStatus, setPaymentStatus] = useState(null);
+
+  useEffect(() => {
+    // Check for payment callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    
+    if (status === 'success' || status === 'failed') {
+      setPaymentStatus(status);
+      
+      // Auto redirect after 5 seconds
+      setTimeout(() => {
+        navigate('/profile?tab=orders');
+      }, 5000);
+    }
+  }, [navigate]);
 
   const orderStatuses = [
     {
@@ -65,6 +81,27 @@ function OrderStatus() {
 
   return (
     <div className="order-status-page">
+      {paymentStatus && (
+        <div className={`payment-callback-banner ${paymentStatus}`}>
+          {paymentStatus === 'success' ? (
+            <>
+              <FiCheckCircle size={48} />
+              <h2>Payment Successful!</h2>
+              <p>Your payment has been processed successfully. Redirecting to your orders...</p>
+            </>
+          ) : (
+            <>
+              <FiAlertCircle size={48} />
+              <h2>Payment Failed</h2>
+              <p>Your payment could not be processed. Please try again or contact support.</p>
+              <button onClick={() => navigate('/cart')} className="retry-btn">
+                Return to Cart
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       <button className="back-btn" onClick={() => navigate('/')}>
         <FiArrowLeft /> Back to Home
       </button>

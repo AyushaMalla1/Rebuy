@@ -191,6 +191,7 @@ function Checkout() {
         setSelectedAddressIndex(data.addresses.length - 1);
         setAddressConfirmed(true); // Mark as confirmed when new address is saved
         setShowAddressForm(false);
+        setShowAddressModal(true); // Show address list after saving
         alert('Address saved successfully!');
       } else {
         const error = await response.json();
@@ -405,39 +406,60 @@ function Checkout() {
     }
   };
 
-  const completeOrderSuccess = (order) => {
-    // Save order to localStorage for immediate display
-    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-    orders.push({
-      id: order._id,
-      items: cartItems,
-      shippingAddress: {
-        fullName: shippingAddress.fullName,
-        phone: shippingAddress.phone,
-        state: shippingAddress.state,
-        district: shippingAddress.district,
-        municipality: shippingAddress.municipality,
-        landmark: shippingAddress.landmark,
-        label: shippingAddress.addressLabel
-      },
-      paymentMethod,
-      total: finalTotal,
-      date: new Date().toISOString(),
-      status: order.status || 'Processing',
-      paymentStatus: order.paymentStatus || 'Pending',
-      trackingNumber: order.trackingNumber,
-      estimatedDelivery: order.estimatedDelivery
-    });
-    localStorage.setItem('orders', JSON.stringify(orders));
+  const completeOrderSuccess = async (order) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      // Save order to localStorage for immediate display
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      orders.push({
+        id: order._id,
+        items: cartItems,
+        shippingAddress: {
+          fullName: shippingAddress.fullName,
+          phone: shippingAddress.phone,
+          state: shippingAddress.state,
+          district: shippingAddress.district,
+          municipality: shippingAddress.municipality,
+          landmark: shippingAddress.landmark,
+          label: shippingAddress.addressLabel
+        },
+        paymentMethod,
+        total: finalTotal,
+        date: new Date().toISOString(),
+        status: order.status || 'Processing',
+        paymentStatus: order.paymentStatus || 'Pending',
+        trackingNumber: order.trackingNumber,
+        estimatedDelivery: order.estimatedDelivery
+      });
+      localStorage.setItem('orders', JSON.stringify(orders));
 
-    // Clear cart
-    localStorage.setItem('cart', JSON.stringify([]));
+      // Clear cart from localStorage
+      localStorage.setItem('cart', JSON.stringify([]));
+      
+      // Clear cart from backend database
+      if (user && user._id) {
+        try {
+          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/cart/${user._id}/clear`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log('Backend cart cleared:', response.ok);
+        } catch (error) {
+          console.error('Error clearing backend cart:', error);
+        }
+      }
 
-    setOrderPlaced(true);
+      setOrderPlaced(true);
 
-    setTimeout(() => {
-      navigate('/profile?tab=orders');
-    }, 3000);
+      setTimeout(() => {
+        navigate('/profile?tab=orders');
+      }, 3000);
+    } catch (error) {
+      console.error('Error in completeOrderSuccess:', error);
+    }
   };
 
   if (orderPlaced) {
@@ -468,45 +490,46 @@ function Checkout() {
 
         <div className="checkout-content">
           <div className="checkout-main">
-            {/* Add Address Button */}
-            <button className="add-address-btn" onClick={() => {
-              // Reset form to blank when adding new address
-              setShippingAddress({
-                fullName: '',
-                phone: '+977',
-                addressLabel: 'Home',
-                state: '',
-                district: '',
-                municipality: '',
-                landmark: '',
-                isDefault: false
-              });
-              setShowAddressModal(true);
-              setShowAddressForm(true);
-            }}>
-              <FiMapPin />
-              <span>+ Add New Delivery Address</span>
-            </button>
+            {/* Add Address Button - Only show if no address is confirmed */}
+            {!addressConfirmed && (
+              <button className="add-address-btn" onClick={() => {
+                // Reset form to blank when adding new address
+                setShippingAddress({
+                  fullName: '',
+                  phone: '+977',
+                  addressLabel: 'Home',
+                  state: '',
+                  district: '',
+                  municipality: '',
+                  landmark: '',
+                  isDefault: false
+                });
+                setShowAddressModal(true);
+                setShowAddressForm(false);
+              }}>
+                <FiMapPin />
+                <span>+ Add New Delivery Address</span>
+              </button>
+            )}
 
             {/* Show selected address if exists and confirmed */}
             {addressConfirmed && shippingAddress.fullName && shippingAddress.state && (
-              <div className="selected-address-display">
-                <div className="selected-address-header">
-                  <h3>Selected Delivery Address</h3>
-                  <button onClick={() => {
-                    setShowAddressModal(true);
-                    setShowAddressForm(false);
-                  }} className="change-address-btn">
-                    Change
-                  </button>
+              <div className="selected-address-compact">
+                <div className="address-info">
+                  <div className="address-header-compact">
+                    <FiMapPin className="address-icon" />
+                    <div className="address-details">
+                      <p className="deliver-to">Deliver To: <strong>{shippingAddress.fullName}</strong> ({shippingAddress.phone})</p>
+                      <p className="address-text">{shippingAddress.landmark}, {shippingAddress.municipality}, {shippingAddress.district} - {shippingAddress.state}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="selected-address-content">
-                  <p><strong>{shippingAddress.fullName}</strong></p>
-                  <p>{shippingAddress.phone}</p>
-                  <p>{shippingAddress.state}, {shippingAddress.district}, {shippingAddress.municipality}</p>
-                  <p>{shippingAddress.landmark}</p>
-                  <span className="address-label-badge">{shippingAddress.addressLabel}</span>
-                </div>
+                <button onClick={() => {
+                  setShowAddressModal(true);
+                  setShowAddressForm(false);
+                }} className="change-btn-compact">
+                  Change
+                </button>
               </div>
             )}
 
@@ -712,25 +735,27 @@ function Checkout() {
             
             <div className="address-modal-body">
               <form onSubmit={handleAddressSubmit}>
-                <div className="form-group">
-                  <label>Full Name *</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.fullName}
-                    onChange={(e) => setShippingAddress({...shippingAddress, fullName: e.target.value})}
-                    required
-                  />
-                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Full Name *</label>
+                    <input
+                      type="text"
+                      value={shippingAddress.fullName}
+                      onChange={(e) => setShippingAddress({...shippingAddress, fullName: e.target.value})}
+                      required
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label>Primary Number *</label>
-                  <input
-                    type="tel"
-                    value={shippingAddress.phone}
-                    onChange={(e) => setShippingAddress({...shippingAddress, phone: e.target.value})}
-                    placeholder="+977"
-                    required
-                  />
+                  <div className="form-group">
+                    <label>Primary Number *</label>
+                    <input
+                      type="tel"
+                      value={shippingAddress.phone}
+                      onChange={(e) => setShippingAddress({...shippingAddress, phone: e.target.value})}
+                      placeholder="+977"
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -762,7 +787,7 @@ function Checkout() {
 
                 <div className="form-group">
                   <label>Address *</label>
-                  <div className="address-selects">
+                  <div className="address-selects-compact">
                     <select
                       value={shippingAddress.state}
                       onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
@@ -818,7 +843,7 @@ function Checkout() {
                       checked={shippingAddress.isDefault}
                       onChange={(e) => setShippingAddress({...shippingAddress, isDefault: e.target.checked})}
                     />
-                    <span>Is Default Shipping</span>
+                    <span>Set as Default Shipping Address</span>
                   </label>
                 </div>
 

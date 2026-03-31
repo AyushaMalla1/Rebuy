@@ -250,7 +250,77 @@ router.get('/esewa/failure', async (req, res) => {
   }
 });
 
-module.exports = router;
+// eSewa Frontend Verification — called by PaymentSuccess page after eSewa redirects with ?data=
+router.post('/esewa/verify-frontend', async (req, res) => {
+  try {
+    const { data, order_id } = req.body;
+
+    if (!data) {
+      return res.json({ success: false, message: 'No payment data received from eSewa' });
+    }
+
+    const settings = await Settings.findOne();
+    const result = await verifyEsewaPayment({ data }, settings);
+
+    if (!result.success) {
+      if (order_id) {
+        await Payment.findOneAndUpdate(
+          { order: order_id, status: 'pending' },
+          { status: 'failed', failedAt: new Date(), notes: result.message }
+        );
+        const failedOrder = await Order.findById(order_id);
+        if (failedOrder) {
+          failedOrder.paymentStatus = 'Failed';
+          await failedOrder.save();
+        }
+      }
+      return res.json({ success: false, message: result.message });
+    }
+
+    // Mark order as paid
+    const order = await Order.findById(order_id);
+    if (order) {
+      order.paymentStatus = 'Paid';
+      order.status = 'Confirmed';
+      order.paymentMethod = 'esewa';
+      order.transactionId = result.transactionId;
+      order.paymentDetails = {
+        transactionCode: result.transactionId,
+        transactionUuid: result.transactionUuid,
+        completedAt: new Date()
+      };
+      await order.save();
+
+      let payment = await Payment.findOne({ order: order_id, transactionUuid: result.transactionUuid });
+      if (payment) {
+        payment.status = 'completed';
+        payment.transactionId = result.transactionId;
+        payment.completedAt = new Date();
+        payment.paymentGatewayResponse = result;
+      } else {
+        payment = new Payment({
+          order: order._id,
+          customer: order.customer,
+          transactionId: result.transactionId,
+          transactionUuid: result.transactionUuid,
+          paymentMethod: 'esewa',
+          amount: order.total,
+          status: 'completed',
+          completedAt: new Date(),
+          paymentGatewayResponse: result,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent']
+        });
+      }
+      await payment.save();
+    }
+
+    return res.json({ success: true, transactionId: result.transactionId, message: 'Payment verified successfully' });
+  } catch (error) {
+    console.error('eSewa frontend verification error:', error);
+    return res.status(500).json({ success: false, message: 'Payment verification failed' });
+  }
+});
 
 // Get all payments for a customer
 router.get('/customer/:customerId', async (req, res) => {
@@ -370,7 +440,6 @@ router.post('/:paymentId/refund', async (req, res) => {
     
     await payment.save();
     
-    // Update order status
     await Order.findByIdAndUpdate(payment.order, {
       paymentStatus: 'Refunded',
       status: 'Cancelled'
@@ -382,3 +451,5 @@ router.post('/:paymentId/refund', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+module.exports = router;
