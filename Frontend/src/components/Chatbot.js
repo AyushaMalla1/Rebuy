@@ -47,13 +47,13 @@ function Chatbot() {
     
     setUserRole(determinedRole);
 
-    let welcomeText = "Hi! I'm Rebuy AI Assistant powered by Google AI. How can I help you today?";
+    let welcomeText = "Hi! I'm Rebuy AI Assistant. How can I help you today?";
     if (determinedRole === 'Seller') {
-      welcomeText = "Hi! I'm Rebuy AI Assistant. For Sellers, I offer insights on trending products, low-stock alerts, promotional ideas, and performance suggestions to help you manage your store effectively. How can I help today?";
+      welcomeText = "Hi! I'm Rebuy AI Assistant. I can help you with trending products, low-stock alerts, promotional ideas, and performance insights. What would you like to know?";
     } else if (determinedRole === 'Customer') {
-      welcomeText = "Hi! I'm Rebuy AI Assistant. For Customers, I assist with order tracking, payments, product recommendations, and delivery-related queries. How can I help today?";
+      welcomeText = "Hi! I'm Rebuy AI Assistant. I can help with product recommendations, orders, payments, and delivery. What can I help you with?";
     } else if (determinedRole === 'Admin') {
-      welcomeText = "Hi! I'm Rebuy AI Assistant. For Admins, I provide instant analytics, summarized reports, and system performance updates. How can I help today?";
+      welcomeText = "Hi! I'm Rebuy AI Assistant. I provide analytics, reports, and system performance updates. How can I assist you?";
     }
 
     setMessages([
@@ -93,9 +93,9 @@ function Chatbot() {
       }
 
       const data = await response.json();
-      return data.reply || "I am Rebuy's AI assistant, and I can only provide information related to thrift fashion, your store, and Rebuy services.";
+      return data.reply || "I'm here to help with Rebuy! You can ask me about products, orders, payments, or shipping.";
     } catch (error) {
-      return "I'm currently receiving too many requests or experiencing a network error. Please try again in a few seconds!";
+      return "I'm having a bit of trouble connecting right now. Please try again in a moment! 😊";
     }
   };
 
@@ -128,7 +128,7 @@ function Chatbot() {
       console.error('Error getting bot response:', error);
       const errorResponse = {
         id: messages.length + 2,
-        text: "I'm currently experiencing high traffic or a temporary error. Please try again in a moment.",
+        text: "I'm having a bit of trouble right now. Please try again in a moment! 😊",
         sender: 'bot',
         timestamp: new Date()
       };

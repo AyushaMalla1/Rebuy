@@ -1,75 +1,60 @@
 const express = require('express');
 const router = express.Router();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const Product = require('../models/Product');
-const Order = require('../models/Order');
-const User = require('../models/User');
+const axios = require('axios');
+const { getEnhancedContext, forceRefreshCache } = require('../utils/chatbotContext');
 
-// Initialize Google AI
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY);
+// Force refresh cache on module load
+forceRefreshCache().then(() => {
+  console.log('[Chatbot] Context cache initialized');
+}).catch(err => {
+  console.error('[Chatbot] Failed to initialize cache:', err);
+});
 
-async function getProductContext(role, userId) {
-    const contextParts = [];
-    
-    try {
-        if (role === 'Seller' && userId && userId !== 'guest') {
-            // Get seller's products
-            const products = await Product.find({ seller: userId })
-                .select('name price stock sold')
-                .sort({ sold: -1 })
-                .limit(20);
-            
-            if (products.length > 0) {
-                const lowStock = products.filter(p => p.stock < 5).length;
-                const totalSold = products.reduce((sum, p) => sum + (p.sold || 0), 0);
-                
-                contextParts.push(`Your store has ${products.length} products.`);
-                contextParts.push(`Total units sold: ${totalSold}`);
-                contextParts.push(`Products with low stock: ${lowStock}`);
-                
-                contextParts.push('\nTop selling products:');
-                products.slice(0, 5).forEach(p => {
-                    contextParts.push(`- ${p.name}: NPR ${p.price}, Sold: ${p.sold || 0}`);
-                });
-            }
-        } else if (role === 'Customer' || role === 'Guest') {
-            // Get recent products
-            const products = await Product.find({ status: { $ne: 'deleted' } })
-                .select('name price category')
-                .limit(15);
-            
-            if (products.length > 0) {
-                contextParts.push(`We have ${products.length}+ products available.`);
-                contextParts.push('\nSome of our products:');
-                products.slice(0, 10).forEach(p => {
-                    contextParts.push(`- ${p.name}: NPR ${p.price}`);
-                });
-            }
-        } else if (role === 'Admin') {
-            // Get platform stats
-            const totalProducts = await Product.countDocuments({});
-            const totalOrders = await Order.countDocuments({});
-            const totalUsers = await User.countDocuments({});
-            
-            contextParts.push('Platform Statistics:');
-            contextParts.push(`- Total products: ${totalProducts}`);
-            contextParts.push(`- Total orders: ${totalOrders}`);
-            contextParts.push(`- Total users: ${totalUsers}`);
-        }
-    } catch (error) {
-        console.error('Error getting context:', error);
-    }
-    
-    // Add general policies
-    contextParts.push('\nGeneral Information:');
-    contextParts.push('- Shipping: 3-5 days across Nepal');
-    contextParts.push('- Returns: Within 7 days of delivery');
-    contextParts.push('- Payment: Cash on Delivery, eSewa, Khalti');
-    contextParts.push('- To become a seller: Visit the "Become a Seller" page');
-    contextParts.push('- To order: Browse products, add to cart, and checkout');
-    
-    return contextParts.join('\n');
+// OpenRouter API configuration
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
+
+// Conversation history storage (in production, use Redis or database)
+const conversationHistory = new Map();
+
+// ─── Off-topic guard ────────────────────────────────────────────────────────
+// Keywords that are clearly unrelated to Rebuy / e-commerce / fashion
+const OFF_TOPIC_PATTERNS = [
+    // Programming / coding
+    /\b(code|coding|program|programming|javascript|python|java|c\+\+|html|css|sql|algorithm|function|variable|debug|compiler|react|node\.?js|api|github|git|stackoverflow)\b/i,
+    // Math / science homework
+    /\b(solve|equation|theorem|calculus|derivative|integral|algebra|geometry|chemistry|physics|biology|formula|calculate)\b/i,
+    // Geography / history / general knowledge
+    /\b(capital of|president of|history of|population of|when was|who invented|world war|continent|country|currency of|language of)\b/i,
+    // Entertainment unrelated to Rebuy
+    /\b(movie|films?|series|anime|netflix|song|music|artist|band|cricket|football|soccer|sport|game|gaming|chess|poker)\b/i,
+    // Medical / health advice
+    /\b(symptom|disease|medicine|doctor|hospital|health|diet|exercise|calories|weight loss|therapy)\b/i,
+    // Weather / news
+    /\b(weather|forecast|temperature|news|politics|election|government|nepal government)\b/i,
+    // Cooking / recipes
+    /\b(recipe|ingredient|cook|bake|dal|rice|food|restaurant|hotel)\b/i,
+    // Finance / crypto (not Rebuy related)
+    /\b(bitcoin|crypto|nft|stock market|invest|forex|trading|mutual fund)\b/i,
+];
+
+// Keywords that ARE related to Rebuy — these override the off-topic check
+const REBUY_PATTERNS = [
+    /\b(rebuy|product|item|fashion|thrift|cloth|dress|shirt|pant|shoe|bag|order|cart|payment|shipping|delivery|return|refund|seller|buyer|customer|account|profile|esewa|khalti|cod|cash on delivery|store|listing|stock|price|discount|offer|category|brand|size|color|Nepal|kathmandu)\b/i,
+    // Simple greetings / pleasantries are also allowed
+    /^(hi|hello|hey|namaste|good morning|good afternoon|good evening|thanks|thank you|okay|ok|sure|great|yes|no|bye|goodbye|how are you)[!?.]*$/i,
+];
+
+function isOffTopic(message) {
+    const trimmed = message.trim();
+    // If it matches any Rebuy keyword, it's on-topic
+    if (REBUY_PATTERNS.some(re => re.test(trimmed))) return false;
+    // If it matches any off-topic pattern, reject it
+    if (OFF_TOPIC_PATTERNS.some(re => re.test(trimmed))) return true;
+    // Short vague messages are allowed (the AI will handle them)
+    if (trimmed.length < 40) return false;
+    return false;
 }
+// ────────────────────────────────────────────────────────────────────────────
 
 router.post('/', async (req, res) => {
     try {
@@ -81,8 +66,20 @@ router.post('/', async (req, res) => {
 
         console.log(`[Chatbot] Received: "${message}" from ${role || 'Guest'}`);
 
-        // Get context from database
-        const context = await getProductContext(role || 'Guest', user_id);
+        // ── Off-topic check ──────────────────────────────────────────────────
+        if (isOffTopic(message)) {
+            console.log(`[Chatbot] Off-topic message blocked: "${message}"`);
+            return res.json({
+                reply: "Sorry, I only give Rebuy related answers. You can ask me about products, orders, shipping, payments, returns, or anything related to the Rebuy platform! 😊"
+            });
+        }
+        // ────────────────────────────────────────────────────────────────────
+
+        // Get enhanced context with latest data from database
+        const context = await getEnhancedContext(role || 'Guest', user_id);
+        
+        console.log(`[Chatbot] Context length: ${context.length} characters`);
+        console.log(`[Chatbot] Context preview: ${context.substring(0, 200)}...`);
         
         let roleInstructions = '';
         if (role === 'Guest') {
@@ -105,39 +102,121 @@ router.post('/', async (req, res) => {
 - If the question is unrelated to shopping/fashion/Rebuy, politely redirect to relevant topics.`;
         }
 
-        // Build prompt
-        const prompt = `You are Rebuy AI Assistant, a helpful assistant for Rebuy - a sustainable thrift fashion marketplace in Nepal.
+        // System persona — clear and direct instructions
+        const systemMessage = `You are Rebuy AI Assistant for Rebuy - a thrift fashion marketplace in Nepal.
+
+YOUR IDENTITY:
+- You are ONLY "Rebuy AI Assistant" - nothing else
+- NEVER say you are powered by Google AI, OpenAI, ChatGPT, Claude, or any other AI company
+- NEVER mention any AI provider in your responses
+- You are simply the Rebuy AI Assistant
+
+CRITICAL RULES - READ CAREFULLY:
+1. ONLY use information from the "DATABASE CONTEXT" section below
+2. The database context shows ALL available products and categories
+3. If something is NOT in the database context, it does NOT exist on Rebuy
+4. NEVER invent or assume products, categories, or details
+5. If asked about unavailable items, say "We don't have that right now, but check back soon!"
+6. Answer ONLY what was asked - be brief and direct
+7. Keep responses 1-3 sentences unless more detail is specifically requested
 
 User Role: ${role || 'Guest'}
-
-Context from our database:
-${context}
-
-User Question: ${message}
-
-Instructions:
-- Be friendly, helpful, and concise (2-4 sentences).
-- If the user sends a simple pleasantry or acknowledgment (e.g., "thank you", "okay", "hi"), keep your response extremely brief (1 sentence), simply acknowledging them and asking if they need further help. Do NOT repeat product or store information.
 ${roleInstructions}
 
-Your response:`;
+DATABASE CONTEXT (Complete list - nothing else exists):
+${context}
 
-        // Generate response using Google AI
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const reply = response.text();
-        
-        console.log(`[Chatbot] Response: ${reply.substring(0, 100)}...`);
-        
-        res.json({ reply });
+RESPONSE STYLE:
+- Direct and concise
+- Friendly but professional
+- Answer the specific question asked
+- Don't list everything unless asked
+- If it's not in the database context above, it doesn't exist`;
+
+        // Generate response using OpenRouter AI
+        // Using GPT-4 for ChatGPT-like quality and speed
+        const MODELS = [
+            'openai/gpt-4o-mini',  // Fastest GPT-4 model, excellent quality
+            'openai/gpt-3.5-turbo',  // Fallback - reliable and fast
+            'anthropic/claude-3-haiku',  // Fast Claude model
+        ];
+
+        let reply = null;
+        let lastError = null;
+
+        for (const model of MODELS) {
+            try {
+                console.log(`[Chatbot] Trying model: ${model}`);
+                const response = await axios.post(
+                    'https://openrouter.ai/api/v1/chat/completions',
+                    {
+                        model,
+                        messages: [
+                            { role: 'system', content: systemMessage },
+                            { role: 'user', content: message }
+                        ],
+                        max_tokens: 250,  // More tokens for complete, natural responses
+                        temperature: 0.7,  // More natural, conversational tone
+                        top_p: 0.9,  // Better response quality
+                    },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                            'Content-Type': 'application/json',
+                            'HTTP-Referer': 'http://localhost:3000',
+                            'X-Title': 'Rebuy Chatbot'
+                        },
+                        timeout: 10000  // 10 second timeout for better quality
+                    }
+                );
+                reply = response.data?.choices?.[0]?.message?.content;
+                if (reply) {
+                    console.log(`[Chatbot] Success with model ${model}: ${reply.substring(0, 100)}...`);
+                    
+                    // Check if reply is too short or incomplete
+                    if (reply.trim().length < 10) {
+                        console.log(`[Chatbot] Reply too short (${reply.trim().length} chars), trying next model...`);
+                        continue;
+                    }
+                    
+                    break;  // Got a good reply — stop trying other models
+                }
+            } catch (modelError) {
+                const status = modelError.response?.status;
+                const errorMsg = modelError.response?.data?.error?.message || modelError.message;
+                console.log(`[Chatbot] Model ${model} failed (${status || errorMsg}), trying next...`);
+                lastError = modelError;
+                // Continue to next model on any error
+                continue;
+            }
+        }
+
+        if (reply && reply.trim().length >= 15) {
+            res.json({ reply: reply.trim() });
+        } else {
+            // All models failed — return a clean, friendly message
+            console.error('[Chatbot] All models failed. Last error:', lastError?.response?.data || lastError?.message);
+            res.json({
+                reply: "I'm experiencing high traffic right now. Please try again in a moment! 😊"
+            });
+        }
 
     } catch (error) {
-        console.error('Chatbot error:', error);
-        res.status(500).json({ 
-            error: 'Failed to generate response',
-            details: error.message 
+        console.error('Chatbot route error:', error.message);
+        res.json({ 
+            reply: "I'm having a bit of trouble right now. Please try again in a moment! 😊"
         });
+    }
+});
+
+// Endpoint to manually refresh chatbot context cache
+router.post('/refresh-context', async (req, res) => {
+    try {
+        await forceRefreshCache();
+        res.json({ success: true, message: 'Chatbot context refreshed with latest data' });
+    } catch (error) {
+        console.error('Refresh context error:', error);
+        res.status(500).json({ success: false, message: 'Failed to refresh context' });
     }
 });
 
