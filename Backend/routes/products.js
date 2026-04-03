@@ -2,8 +2,11 @@ const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
 const Seller = require('../models/Seller');
+const User = require('../models/User');
 const { validatePaymentOptions } = require('../utils/paymentOptions');
 const { validateDiscount, calculateDiscountedPrice } = require('../utils/discount');
+const { logAudit } = require('../utils/auditLogger');
+const { sendBundleDealAlert, sendLowStockAlert, sendOutOfStockAlert } = require('../utils/emailService');
 
 // Advanced search endpoint
 router.get('/search', async (req, res) => {
@@ -118,8 +121,16 @@ router.get('/suggestions', async (req, res) => {
   try {
     const { q } = req.query;
     
-    if (!q || q.trim().length < 2) {
-      return res.json({ success: true, suggestions: [] });
+    if (!q || q.trim().length < 1) {
+      return res.json({ 
+        success: true, 
+        suggestions: {
+          products: [],
+          brands: [],
+          categories: [],
+          sellers: []
+        }
+      });
     }
     
     // Get product suggestions with images
@@ -149,7 +160,7 @@ router.get('/suggestions', async (req, res) => {
         { fullName: { $regex: q, $options: 'i' } }
       ]
     })
-    .select('storeName fullName')
+    .select('_id storeName fullName')
     .limit(3);
     
     res.json({
@@ -165,7 +176,13 @@ router.get('/suggestions', async (req, res) => {
         })),
         brands: brandSuggestions.slice(0, 3).map(b => ({ name: b, type: 'brand' })),
         categories: categorySuggestions.slice(0, 3).map(c => ({ name: c, type: 'category' })),
-        sellers: sellerSuggestions.map(s => ({ name: s.storeName || s.fullName, type: 'seller' }))
+        sellers: sellerSuggestions.map(s => ({ 
+          _id: s._id,
+          id: s._id,
+          name: s.fullName,
+          storeName: s.storeName || s.fullName, 
+          type: 'seller' 
+        }))
       }
     });
   } catch (error) {
@@ -323,6 +340,34 @@ router.post('/', async (req, res) => {
     seller.totalProducts = (seller.totalProducts || 0) + 1;
     await seller.save();
     
+    // Send bundle deal alert to customers if it's a bundle deal
+    if (product.isBundleDeal && product.bundleDiscount > 0) {
+      // Get all customer emails (you can filter by preferences later)
+      User.find({ userType: { $in: ['customer', 'buyer'] } })
+        .select('email')
+        .limit(100) // Limit to avoid spam
+        .then(customers => {
+          const emails = customers.map(c => c.email).filter(Boolean);
+          if (emails.length > 0) {
+            sendBundleDealAlert(product.toObject(), emails).catch(err =>
+              console.error('Failed to send bundle deal alerts:', err)
+            );
+          }
+        })
+        .catch(err => console.error('Error fetching customers for bundle alert:', err));
+    }
+    
+    // Log audit
+    await logAudit({
+      action: 'Product Created',
+      actionType: 'product',
+      performedBy: sellerId,
+      targetId: product._id,
+      targetModel: 'Product',
+      description: `Seller added new product: ${name}`,
+      ipAddress: req.ip
+    }).catch(console.error);
+
     res.status(201).json({ message: 'Product created successfully', product });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -352,8 +397,8 @@ router.put('/:id', async (req, res) => {
       });
     }
     
-    // Validate discount if provided
-    if (discount !== undefined && discount !== null) {
+    // Validate discount if provided and has values
+    if (discount !== undefined && discount !== null && typeof discount === 'object' && Object.keys(discount).length > 0 && discount.percentage !== undefined) {
       const discountValidation = validateDiscount(discount);
       if (!discountValidation.isValid) {
         return res.status(400).json({ 
@@ -364,7 +409,10 @@ router.put('/:id', async (req, res) => {
     }
     
     // Update fields
-    const updates = ['name', 'description', 'price', 'category', 'condition', 'size', 'brand', 'stock', 'images', 'story', 'paymentOptions', 'discount'];
+    const updates = ['name', 'description', 'price', 'category', 'condition', 'size', 'brand', 'stock', 'images', 'story', 'paymentOptions', 'discount', 'bundleDeal'];
+    const oldStock = product.stock;
+    const wasBundleDeal = product.isBundleDeal;
+    
     updates.forEach(field => {
       if (req.body[field] !== undefined) {
         product[field] = req.body[field];
@@ -373,6 +421,55 @@ router.put('/:id', async (req, res) => {
     
     await product.save();
     
+    // Check if bundle deal was just enabled
+    if (!wasBundleDeal && product.isBundleDeal && product.bundleDiscount > 0) {
+      // Send bundle deal alert to customers
+      User.find({ userType: { $in: ['customer', 'buyer'] } })
+        .select('email')
+        .limit(100)
+        .then(customers => {
+          const emails = customers.map(c => c.email).filter(Boolean);
+          if (emails.length > 0) {
+            sendBundleDealAlert(product.toObject(), emails).catch(err =>
+              console.error('Failed to send bundle deal alerts:', err)
+            );
+          }
+        })
+        .catch(err => console.error('Error fetching customers for bundle alert:', err));
+    }
+    
+    // Check stock levels and send alerts to seller
+    const newStock = product.stock;
+    if (newStock !== oldStock) {
+      const seller = await Seller.findById(sellerId).select('email fullName storeName');
+      
+      if (seller) {
+        // Out of stock alert
+        if (newStock === 0 && oldStock > 0) {
+          sendOutOfStockAlert(seller, [product.toObject()]).catch(err =>
+            console.error('Failed to send out of stock alert:', err)
+          );
+        }
+        // Low stock alert (less than 5)
+        else if (newStock > 0 && newStock < 5 && oldStock >= 5) {
+          sendLowStockAlert(seller, [product.toObject()]).catch(err =>
+            console.error('Failed to send low stock alert:', err)
+          );
+        }
+      }
+    }
+    
+    // Log audit
+    await logAudit({
+      action: 'Product Updated',
+      actionType: 'product',
+      performedBy: sellerId,
+      targetId: product._id,
+      targetModel: 'Product',
+      description: `Seller updated product: ${product.name}`,
+      ipAddress: req.ip
+    }).catch(console.error);
+
     res.json({ message: 'Product updated successfully', product });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -404,6 +501,17 @@ router.delete('/:id', async (req, res) => {
       await seller.save();
     }
     
+    // Log audit
+    await logAudit({
+      action: 'Product Deleted',
+      actionType: 'product',
+      performedBy: sellerId,
+      targetId: req.params.id,
+      targetModel: 'Product',
+      description: `Seller deleted product: ${product.name}`,
+      ipAddress: req.ip
+    }).catch(console.error);
+
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

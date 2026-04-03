@@ -148,6 +148,73 @@ router.get('/sellers/pending', async (req, res) => {
   }
 });
 
+// Get approved sellers
+router.get('/sellers/approved', async (req, res) => {
+  try {
+    const sellers = await Seller.find({ status: 'approved' })
+      .sort({ createdAt: -1 });
+    res.json({ success: true, sellers });
+  } catch (error) {
+    console.error('Get approved sellers error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get suspended sellers
+router.get('/sellers/suspended', async (req, res) => {
+  try {
+    const sellers = await Seller.find({ status: 'suspended' })
+      .sort({ createdAt: -1 });
+    res.json({ success: true, sellers });
+  } catch (error) {
+    console.error('Get suspended sellers error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get rejected sellers
+router.get('/sellers/rejected', async (req, res) => {
+  try {
+    const sellers = await Seller.find({ status: 'rejected' })
+      .sort({ createdAt: -1 });
+    res.json({ success: true, sellers });
+  } catch (error) {
+    console.error('Get rejected sellers error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get all sellers (with optional status filter)
+router.get('/sellers', async (req, res) => {
+  try {
+    const { status } = req.query;
+    const query = status && status !== 'all' ? { status } : {};
+    
+    const sellers = await Seller.find(query)
+      .sort({ createdAt: -1 });
+    res.json({ success: true, sellers });
+  } catch (error) {
+    console.error('Get sellers error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get seller by ID
+router.get('/sellers/:id', async (req, res) => {
+  try {
+    const seller = await Seller.findById(req.params.id).select('-password');
+    
+    if (!seller) {
+      return res.status(404).json({ success: false, message: 'Seller not found' });
+    }
+    
+    res.json({ success: true, seller });
+  } catch (error) {
+    console.error('Get seller error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Get all products with filtering
 router.get('/products', async (req, res) => {
   try {
@@ -233,6 +300,22 @@ router.patch('/users/:id/status', async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
     
+    // Log audit
+    await logAudit({
+      action: status === 'active' ? 'User Activated' : 'User Deactivated',
+      actionType: 'user',
+      performedBy: req.user?.id || 'admin',
+      targetId: user._id,
+      targetModel: 'User',
+      description: `User ${user.username} status changed to ${status === 'active' ? 'active' : 'inactive'}`,
+      ipAddress: req.ip,
+      metadata: {
+        username: user.username,
+        email: user.email,
+        newStatus: status
+      }
+    });
+    
     res.json({ success: true, user });
   } catch (error) {
     console.error('Update user status error:', error);
@@ -244,31 +327,75 @@ router.patch('/users/:id/status', async (req, res) => {
 router.patch('/sellers/:id/status', async (req, res) => {
   try {
     const { status, reason } = req.body;
-    const seller = await Seller.findByIdAndUpdate(
-      req.params.id,
-      { 
-        status,
-        ...(reason && { rejectionReason: reason })
-      },
-      { new: true }
-    );
     
-    if (!seller) {
+    // Get current seller status before update
+    const currentSeller = await Seller.findById(req.params.id);
+    if (!currentSeller) {
       return res.status(404).json({ success: false, message: 'Seller not found' });
     }
-
-    // Log audit entry (skip if no user context)
-    if (req.user?.id) {
-      await logAudit({
-        action: status === 'approved' ? 'Seller Approved' : 'Seller Rejected',
-        actionType: 'seller',
-        performedBy: req.user.id,
-        targetId: seller._id,
-        targetModel: 'Seller',
-        description: `Admin ${status} seller application for ${seller.fullName || seller.name}`,
-        ipAddress: req.ip
-      }).catch(err => console.error('Audit log failed:', err));
+    
+    const previousStatus = currentSeller.status;
+    
+    const updateData = { 
+      status,
+      ...(reason && status === 'rejected' && { 'approvalData.rejectionReason': reason }),
+      ...(reason && status === 'suspended' && { 'approvalData.suspensionReason': reason })
+    };
+    
+    // If approving, set approval timestamp
+    if (status === 'approved') {
+      updateData['approvalData.approvedAt'] = new Date();
+      if (req.user?.id) {
+        updateData['approvalData.approvedBy'] = req.user.id;
+      }
     }
+    
+    // If suspending, set deactivation timestamp
+    if (status === 'suspended') {
+      updateData['deactivatedAt'] = new Date();
+    }
+    
+    const seller = await Seller.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true }
+    );
+
+    // Log audit entry
+    let action = '';
+    let description = '';
+    
+    // Detect reactivation (suspended -> approved)
+    if (status === 'approved' && previousStatus === 'suspended') {
+      action = 'Seller Reactivated';
+      description = `Seller "${seller.storeName}" reactivated from suspension`;
+    } else if (status === 'approved') {
+      action = 'Seller Approved';
+      description = `Seller "${seller.storeName}" approved`;
+    } else if (status === 'rejected') {
+      action = 'Seller Rejected';
+      description = `Seller "${seller.storeName}" rejected${reason ? `: ${reason}` : ''}`;
+    } else if (status === 'suspended') {
+      action = 'Seller Suspended';
+      description = `Seller "${seller.storeName}" suspended${reason ? `: ${reason}` : ''}`;
+    }
+    
+    await logAudit({
+      action,
+      actionType: 'seller',
+      performedBy: req.user?.id || 'admin',
+      targetId: seller._id,
+      targetModel: 'Seller',
+      description,
+      ipAddress: req.ip,
+      metadata: {
+        storeName: seller.storeName,
+        email: seller.email,
+        previousStatus,
+        newStatus: status,
+        ...(reason && { reason })
+      }
+    });
     
     res.json({ success: true, seller });
   } catch (error) {
@@ -294,6 +421,33 @@ router.patch('/products/:id/status', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
     
+    // Log audit
+    let action = 'Product Updated';
+    let description = `Product "${product.name}" status changed to ${status}`;
+    
+    if (status === 'approved') {
+      action = 'Product Approved';
+      description = `Product "${product.name}" approved`;
+    } else if (status === 'rejected') {
+      action = 'Product Rejected';
+      description = `Product "${product.name}" rejected${reason ? `: ${reason}` : ''}`;
+    }
+    
+    await logAudit({
+      action,
+      actionType: 'product',
+      performedBy: req.user?.id || 'admin',
+      targetId: product._id,
+      targetModel: 'Product',
+      description,
+      ipAddress: req.ip,
+      metadata: {
+        productName: product.name,
+        newStatus: status,
+        ...(reason && { reason })
+      }
+    });
+    
     res.json({ success: true, product });
   } catch (error) {
     console.error('Update product status error:', error);
@@ -309,6 +463,22 @@ router.delete('/products/:id', async (req, res) => {
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+    
+    // Log audit
+    await logAudit({
+      action: 'Product Deleted',
+      actionType: 'product',
+      performedBy: req.user?.id || 'admin',
+      targetId: product._id,
+      targetModel: 'Product',
+      description: `Product "${product.name}" deleted from system`,
+      ipAddress: req.ip,
+      metadata: {
+        productName: product.name,
+        category: product.category,
+        price: product.price
+      }
+    });
     
     res.json({ success: true, message: 'Product deleted successfully' });
   } catch (error) {
@@ -358,10 +528,24 @@ router.get('/analytics', async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // Fraud Detection Routes
 const FraudAlert = require('../models/FraudAlert');
+const { runFraudDetection } = require('../utils/fraudDetection');
+
+// Run fraud detection manually
+router.post('/fraud-detection/run', async (req, res) => {
+  try {
+    const alerts = await runFraudDetection();
+    res.json({ 
+      success: true, 
+      message: `Fraud detection complete. ${alerts.length} alerts created.`,
+      alertsCreated: alerts.length
+    });
+  } catch (error) {
+    console.error('Run fraud detection error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 router.get('/fraud-alerts', async (req, res) => {
   try {
@@ -538,11 +722,21 @@ router.get('/loyalty-points', async (req, res) => {
     const query = {};
     
     const loyaltyRecords = await LoyaltyPoints.find(query)
-      .populate('userId', 'fullName email')
-      .sort({ points: -1 })
+      .populate('customer', 'fullName email')
+      .sort({ totalPoints: -1 })
       .limit(100);
+    
+    // Map to match frontend expectations
+    const formattedRecords = loyaltyRecords.map(record => ({
+      _id: record._id,
+      userId: record.customer, // Map customer to userId for frontend
+      points: record.totalPoints, // Map totalPoints to points for frontend
+      tier: record.tier,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt
+    }));
       
-    res.json({ success: true, loyaltyRecords });
+    res.json({ success: true, loyaltyRecords: formattedRecords });
   } catch (error) {
     console.error('Get loyalty points error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -553,20 +747,21 @@ router.patch('/loyalty-points/:userId', async (req, res) => {
   try {
     const { points, action } = req.body;
     
-    let loyaltyRecord = await LoyaltyPoints.findOne({ userId: req.params.userId });
+    let loyaltyRecord = await LoyaltyPoints.findOne({ customer: req.params.userId });
     
     if (!loyaltyRecord) {
-      loyaltyRecord = new LoyaltyPoints({ userId: req.params.userId, points: 0 });
+      loyaltyRecord = new LoyaltyPoints({ customer: req.params.userId, totalPoints: 0 });
     }
     
     if (action === 'add') {
-      loyaltyRecord.points += points;
+      loyaltyRecord.totalPoints += points;
     } else if (action === 'subtract') {
-      loyaltyRecord.points = Math.max(0, loyaltyRecord.points - points);
+      loyaltyRecord.totalPoints = Math.max(0, loyaltyRecord.totalPoints - points);
     } else {
-      loyaltyRecord.points = points;
+      loyaltyRecord.totalPoints = points;
     }
     
+    loyaltyRecord.updateTier();
     await loyaltyRecord.save();
     
     res.json({ success: true, loyaltyRecord });
@@ -674,3 +869,400 @@ router.patch('/profile', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+// Sales Reports Endpoint
+router.get('/sales-reports', async (req, res) => {
+  try {
+    // Get total revenue
+    const orders = await Order.find({ status: { $nin: ['Cancelled', 'Pending'] } });
+    const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
+    const totalOrders = orders.length;
+
+    // Get active sellers
+    const activeSellers = await Seller.countDocuments({ status: 'approved' });
+
+    // Get total customers
+    const totalCustomers = await User.countDocuments({ userType: 'customer' });
+
+    // Calculate average order value
+    const averageOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+
+    // Calculate platform commission (5% of total revenue from non-cancelled orders)
+    const commissionRate = 5; // 5% commission
+    const platformCommission = (totalRevenue * commissionRate) / 100;
+
+    // Get top category by revenue
+    const categoryRevenue = await Order.aggregate([
+      { $match: { status: { $nin: ['Cancelled'] } } },
+      { $unwind: '$items' },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'items.product',
+          foreignField: '_id',
+          as: 'productInfo'
+        }
+      },
+      { $unwind: { path: '$productInfo', preserveNullAndEmptyArrays: true } },
+      { $match: { 'productInfo.category': { $exists: true, $ne: null } } },
+      {
+        $group: {
+          _id: '$productInfo.category',
+          revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } }
+        }
+      },
+      { $sort: { revenue: -1 } },
+      { $limit: 1 }
+    ]);
+    
+    const topCategory = categoryRevenue.length > 0 && categoryRevenue[0]._id 
+      ? categoryRevenue[0]._id 
+      : "Men's Collection"; // Default to Men's Collection instead of N/A
+
+    // Revenue growth (last 30 days vs previous 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+    const recentRevenue = await Order.aggregate([
+      { $match: { orderDate: { $gte: thirtyDaysAgo }, status: { $nin: ['Cancelled'] } } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+
+    const previousRevenue = await Order.aggregate([
+      { $match: { orderDate: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo }, status: { $nin: ['Cancelled'] } } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]);
+
+    const recentTotal = recentRevenue[0]?.total || 0;
+    const previousTotal = previousRevenue[0]?.total || 1;
+    const revenueGrowth = previousTotal > 0 ? (((recentTotal - previousTotal) / previousTotal) * 100).toFixed(1) : 0;
+
+    // Revenue data for last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const revenueByDay = await Order.aggregate([
+      { $match: { orderDate: { $gte: sevenDaysAgo }, status: { $nin: ['Cancelled'] } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%a', date: '$orderDate' } },
+          revenue: { $sum: '$total' }
+        }
+      },
+      { $sort: { '_id': 1 } }
+    ]);
+
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const revenueData = days.map(day => {
+      const found = revenueByDay.find(r => r._id === day);
+      return { day, revenue: found ? found.revenue : 0 };
+    });
+
+    // Top selling products
+    const topProducts = await Order.aggregate([
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.product',
+          sales: { $sum: '$items.quantity' }
+        }
+      },
+      { $sort: { sales: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productInfo'
+        }
+      },
+      { $unwind: '$productInfo' },
+      {
+        $project: {
+          name: '$productInfo.name',
+          sales: 1
+        }
+      }
+    ]);
+
+    // Category performance
+    const categoryPerformance = await Product.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+      { $project: { category: '$_id', count: 1, _id: 0 } }
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        totalRevenue,
+        totalOrders,
+        activeSellers,
+        totalCustomers,
+        averageOrderValue,
+        commissionRate: parseFloat(commissionRate.toFixed(1)),
+        platformCommission,
+        topCategory,
+        revenueGrowth: parseFloat(revenueGrowth)
+      },
+      revenueData,
+      topProducts,
+      categoryPerformance
+    });
+  } catch (error) {
+    console.error('Sales reports error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Export Sales Report as CSV
+router.get('/export-sales-report', async (req, res) => {
+  try {
+    const orders = await Order.find({ status: { $nin: ['Cancelled'] } })
+      .populate('customer', 'fullName email')
+      .populate('items.product', 'name category')
+      .sort({ orderDate: -1 });
+
+    // Create CSV content
+    let csv = 'Order ID,Date,Customer,Email,Product,Category,Quantity,Price,Total,Status\n';
+    
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        csv += `${order._id},`;
+        csv += `${new Date(order.orderDate).toLocaleDateString()},`;
+        csv += `${order.customer?.fullName || 'N/A'},`;
+        csv += `${order.customer?.email || 'N/A'},`;
+        csv += `${item.product?.name || 'N/A'},`;
+        csv += `${item.product?.category || 'N/A'},`;
+        csv += `${item.quantity},`;
+        csv += `${item.price},`;
+        csv += `${order.total},`;
+        csv += `${order.status}\n`;
+      });
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=sales-report.csv');
+    res.send(csv);
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ success: false, message: 'Export failed' });
+  }
+});
+
+// Get Analytics Data for Dashboard Charts
+router.get('/analytics-data', async (req, res) => {
+  try {
+    // Revenue data for last 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const revenueByDay = await Order.aggregate([
+      { $match: { orderDate: { $gte: sevenDaysAgo }, status: { $nin: ['Cancelled'] } } },
+      {
+        $group: {
+          _id: { $dayOfWeek: '$orderDate' }, // 1=Sunday, 2=Monday, etc.
+          revenue: { $sum: '$total' }
+        }
+      }
+    ]);
+
+    // Map day numbers to day names
+    const dayMap = { 1: 'Sun', 2: 'Mon', 3: 'Tue', 4: 'Wed', 5: 'Thu', 6: 'Fri', 7: 'Sat' };
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const revenue = days.map(day => {
+      const dayNum = Object.keys(dayMap).find(key => dayMap[key] === day);
+      const found = revenueByDay.find(r => r._id === parseInt(dayNum));
+      return { day, revenue: found ? found.revenue : 0 };
+    });
+
+    // Top 5 selling products
+    const topProducts = await Order.aggregate([
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.product',
+          sales: { $sum: '$items.quantity' }
+        }
+      },
+      { $sort: { sales: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productInfo'
+        }
+      },
+      { $unwind: '$productInfo' },
+      {
+        $project: {
+          name: '$productInfo.name',
+          sales: 1
+        }
+      }
+    ]);
+
+    // Category distribution
+    const categories = await Product.aggregate([
+      { $group: { _id: '$category', value: { $sum: 1 } } },
+      { $project: { name: '$_id', value: 1, _id: 0 } },
+      { $sort: { value: -1 } },
+      { $limit: 5 }
+    ]);
+
+    // User growth (last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const userGrowth = await User.aggregate([
+      { $match: { createdAt: { $gte: sixMonthsAgo }, userType: { $ne: 'admin' } } },
+      {
+        $group: {
+          _id: { $month: '$createdAt' },
+          newUsers: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id': 1 } }
+    ]);
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonth = new Date().getMonth();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const monthIndex = (currentMonth - i + 12) % 12;
+      months.push(monthNames[monthIndex]);
+    }
+
+    let cumulativeUsers = await User.countDocuments({ 
+      createdAt: { $lt: sixMonthsAgo },
+      userType: { $ne: 'admin' }
+    });
+
+    const userGrowthData = months.map((month, index) => {
+      const monthNum = (currentMonth - 5 + index + 12) % 12 + 1;
+      const found = userGrowth.find(u => u._id === monthNum);
+      const newUsers = found ? found.newUsers : 0;
+      cumulativeUsers += newUsers;
+      return { month, users: cumulativeUsers, newUsers };
+    });
+
+    // Seller stats (last 6 months)
+    const sellerGrowth = await Seller.aggregate([
+      { $match: { createdAt: { $gte: sixMonthsAgo }, status: 'approved' } },
+      {
+        $group: {
+          _id: { $month: '$createdAt' },
+          newSellers: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id': 1 } }
+    ]);
+
+    let cumulativeSellers = await Seller.countDocuments({ 
+      createdAt: { $lt: sixMonthsAgo },
+      status: 'approved'
+    });
+
+    const sellerStats = months.map((month, index) => {
+      const monthNum = (currentMonth - 5 + index + 12) % 12 + 1;
+      const found = sellerGrowth.find(s => s._id === monthNum);
+      const newSellers = found ? found.newSellers : 0;
+      cumulativeSellers += newSellers;
+      return { month, sellers: cumulativeSellers, newSellers };
+    });
+
+    // Product distribution by status
+    const productDistribution = await Product.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          value: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          name: '$_id',
+          value: 1,
+          _id: 0
+        }
+      }
+    ]);
+
+    // Orders trend (last 7 days)
+    const ordersTrend = await Order.aggregate([
+      { $match: { orderDate: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { 
+            day: { $dayOfWeek: '$orderDate' },
+            status: '$status'
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const ordersTrendData = days.map(day => {
+      const dayNum = Object.keys(dayMap).find(key => dayMap[key] === day);
+      const dayOrders = ordersTrend.filter(o => o._id.day === parseInt(dayNum));
+      const total = dayOrders.reduce((sum, o) => sum + o.count, 0);
+      const completed = dayOrders.find(o => o._id.status === 'Delivered')?.count || 0;
+      return { day, orders: total, completed };
+    });
+
+    // Revenue breakdown by category
+    const revenueBreakdown = await Order.aggregate([
+      { $match: { status: { $nin: ['Cancelled'] } } },
+      { $unwind: '$items' },
+      {
+        $lookup: {
+          from: 'products',
+          localField: 'items.product',
+          foreignField: '_id',
+          as: 'productInfo'
+        }
+      },
+      { $unwind: '$productInfo' },
+      {
+        $group: {
+          _id: '$productInfo.category',
+          value: { $sum: { $multiply: ['$items.quantity', '$items.price'] } }
+        }
+      },
+      {
+        $project: {
+          name: '$_id',
+          value: 1,
+          _id: 0
+        }
+      },
+      { $sort: { value: -1 } },
+      { $limit: 5 }
+    ]);
+
+    res.json({
+      success: true,
+      chartData: {
+        revenue,
+        topProducts,
+        categories,
+        userGrowth: userGrowthData,
+        sellerStats,
+        productDistribution,
+        ordersTrend: ordersTrendData,
+        revenueBreakdown
+      }
+    });
+  } catch (error) {
+    console.error('Analytics data error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+module.exports = router;

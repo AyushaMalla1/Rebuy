@@ -5,28 +5,43 @@ import {
   FiSettings, FiLogOut, FiHome, FiShield, FiEdit2, FiTrash2, 
   FiEye, FiCheckCircle, FiXCircle, FiSearch, FiFilter, FiDownload,
   FiBarChart2, FiPieChart, FiActivity, FiClock, FiAlertCircle,
-  FiUserCheck, FiMonitor, FiAward, FiBell, FiMessageSquare, FiGrid, FiUser
+  FiUserCheck, FiMonitor, FiAward, FiBell, FiMessageSquare, FiGrid, FiUser, FiChevronRight
 } from 'react-icons/fi';
 import { 
   MdPeople, MdStorefront, MdInventory, MdAttachMoney, MdShowChart, MdAccessTime
 } from 'react-icons/md';
 import './AdminDashboard.css';
 import Chatbot from './components/Chatbot';
-import { RevenueTrendChart, TopProductsChart, CategoryPerformanceChart, StockLevelsChart } from './components/Charts';
+import { 
+  RevenueTrendChart, 
+  TopProductsChart, 
+  CategoryPerformanceChart, 
+  StockLevelsChart,
+  UserGrowthChart,
+  SellerStatsChart,
+  ProductDistributionChart,
+  OrdersTrendChart,
+  RevenueBreakdownChart
+} from './components/Charts';
 
 function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedMetric, setSelectedMetric] = useState(null); // null, 'revenue', 'orders', 'sellers', 'customers', 'avgOrder', 'commission', 'topCategory'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [auditFilter, setAuditFilter] = useState('all');
 
   // State
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [pendingSellers, setPendingSellers] = useState([]);
+  const [approvedSellers, setApprovedSellers] = useState([]);
+  const [suspendedSellers, setSuspendedSellers] = useState([]);
+  const [rejectedSellers, setRejectedSellers] = useState([]);
   const [suspiciousActivities, setSuspiciousActivities] = useState([]);
   const [fraudAlerts, setFraudAlerts] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -62,6 +77,8 @@ function AdminDashboard() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedSeller, setSelectedSeller] = useState(null);
+  const [showSellerModal, setShowSellerModal] = useState(false);
   const [adminStats, setAdminStats] = useState({
     totalUsers: 0,
     totalSellers: 0,
@@ -70,40 +87,117 @@ function AdminDashboard() {
     totalOrders: 0,
     totalRevenue: 0
   });
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: '',
+    message: '',
+    type: 'info',
+    targetAudience: 'all',
+    priority: 'medium',
+    expiresAt: ''
+  });
 
   // Chart data
   const [chartData, setChartData] = useState({
-    revenue: [
-      { day: 'Mon', revenue: 1200 },
-      { day: 'Tue', revenue: 1900 },
-      { day: 'Wed', revenue: 1500 },
-      { day: 'Thu', revenue: 2200 },
-      { day: 'Fri', revenue: 2800 },
-      { day: 'Sat', revenue: 3200 },
-      { day: 'Sun', revenue: 2600 }
-    ],
-    topProducts: [
-      { name: 'Vintage Jacket', sales: 45 },
-      { name: 'Retro Shoes', sales: 38 },
-      { name: 'Classic Watch', sales: 32 },
-      { name: 'Denim Jeans', sales: 28 },
-      { name: 'Leather Bag', sales: 25 }
-    ],
-    categories: [
-      { name: 'Vintage', value: 35 },
-      { name: 'Retro', value: 25 },
-      { name: 'Classic', value: 20 },
-      { name: 'Modern', value: 15 },
-      { name: 'Other', value: 5 }
-    ]
+    revenue: [],
+    topProducts: [],
+    categories: [],
+    userGrowth: [],
+    sellerStats: [],
+    productDistribution: [],
+    ordersTrend: [],
+    revenueBreakdown: []
+  });
+  const [salesStats, setSalesStats] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    activeSellers: 0,
+    totalCustomers: 0,
+    averageOrderValue: 0,
+    commissionRate: 5,
+    platformCommission: 0,
+    topCategory: "Men's Collection",
+    revenueGrowth: 0
   });
 
   React.useEffect(() => {
     fetchAdminData();
+    fetchAnalyticsData();
+    fetchNotifications();
     // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchAdminData, 30000);
+    const interval = setInterval(() => {
+      fetchAdminData();
+      fetchAnalyticsData();
+      fetchNotifications();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        console.log('❌ No token found for analytics data');
+        return;
+      }
+
+      const headers = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      console.log('📊 Fetching analytics data from backend...');
+      const response = await fetch('http://localhost:5000/api/admin/analytics-data', { headers });
+      
+      console.log('📡 Analytics response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Analytics data received:', data);
+        
+        if (data.success && data.chartData) {
+          console.log('📈 Chart data structure:', {
+            revenue: data.chartData.revenue?.length || 0,
+            topProducts: data.chartData.topProducts?.length || 0,
+            categories: data.chartData.categories?.length || 0,
+            userGrowth: data.chartData.userGrowth?.length || 0,
+            sellerStats: data.chartData.sellerStats?.length || 0,
+            productDistribution: data.chartData.productDistribution?.length || 0,
+            ordersTrend: data.chartData.ordersTrend?.length || 0,
+            revenueBreakdown: data.chartData.revenueBreakdown?.length || 0
+          });
+          setChartData(data.chartData);
+          console.log('✅ Chart data set successfully!');
+        } else {
+          console.log('❌ No chart data in response:', data);
+        }
+      } else {
+        const errorText = await response.text();
+        console.log('❌ Analytics response not OK:', response.status, errorText);
+      }
+
+      // Fetch sales stats
+      console.log('📊 Fetching sales stats...');
+      const salesResponse = await fetch('http://localhost:5000/api/admin/sales-reports', { headers });
+      
+      if (salesResponse.ok) {
+        const salesData = await salesResponse.json();
+        console.log('✅ Sales stats received:', salesData);
+        
+        if (salesData.success && salesData.stats) {
+          setSalesStats(salesData.stats);
+          console.log('✅ Sales stats set successfully!');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching analytics data:', error);
+    }
+  };
 
   const fetchAdminData = async () => {
     try {
@@ -124,7 +218,7 @@ function AdminDashboard() {
 
       console.log('Fetching admin data from backend...');
 
-      const [statsRes, usersRes, sellersRes, productsRes, ordersRes, fraudRes, auditRes, announcementsRes, loyaltyRes, settingsRes] = await Promise.all([
+      const [statsRes, usersRes, pendingSellersRes, approvedSellersRes, suspendedSellersRes, rejectedSellersRes, productsRes, ordersRes, fraudRes, auditRes, announcementsRes, loyaltyRes, settingsRes] = await Promise.all([
         fetch('http://localhost:5000/api/admin/stats', { headers }).catch(err => {
           console.error('Stats fetch error:', err);
           return { ok: false, status: 500 };
@@ -134,7 +228,19 @@ function AdminDashboard() {
           return { ok: false, status: 500 };
         }),
         fetch('http://localhost:5000/api/admin/sellers/pending', { headers }).catch(err => {
-          console.error('Sellers fetch error:', err);
+          console.error('Pending sellers fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/sellers/approved', { headers }).catch(err => {
+          console.error('Approved sellers fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/sellers/suspended', { headers }).catch(err => {
+          console.error('Suspended sellers fetch error:', err);
+          return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/sellers/rejected', { headers }).catch(err => {
+          console.error('Rejected sellers fetch error:', err);
           return { ok: false, status: 500 };
         }),
         fetch('http://localhost:5000/api/admin/products', { headers }).catch(err => {
@@ -170,7 +276,10 @@ function AdminDashboard() {
       console.log('API Response statuses:', {
         stats: statsRes.status,
         users: usersRes.status,
-        sellers: sellersRes.status,
+        pendingSellers: pendingSellersRes.status,
+        approvedSellers: approvedSellersRes.status,
+        suspendedSellers: suspendedSellersRes.status,
+        rejectedSellers: rejectedSellersRes.status,
         products: productsRes.status,
         orders: ordersRes.status,
         fraud: fraudRes.status,
@@ -191,7 +300,10 @@ function AdminDashboard() {
 
       const stats = await statsRes.json().catch(() => ({ success: false }));
       const usersData = await usersRes.json().catch(() => ({ success: false }));
-      const sellersData = await sellersRes.json().catch(() => ({ success: false }));
+      const pendingSellersData = await pendingSellersRes.json().catch(() => ({ success: false }));
+      const approvedSellersData = await approvedSellersRes.json().catch(() => ({ success: false }));
+      const suspendedSellersData = await suspendedSellersRes.json().catch(() => ({ success: false }));
+      const rejectedSellersData = await rejectedSellersRes.json().catch(() => ({ success: false }));
       const productsData = await productsRes.json().catch(() => ({ success: false }));
       const ordersData = await ordersRes.json().catch(() => ({ success: false }));
       const fraudData = await fraudRes.json().catch(() => ({ success: false }));
@@ -200,7 +312,7 @@ function AdminDashboard() {
       const loyaltyData = await loyaltyRes.json().catch(() => ({ success: false }));
       const settingsData = await settingsRes.json().catch(() => ({ success: false }));
 
-      console.log('Parsed data:', { stats, usersData, sellersData, productsData, ordersData, fraudData, auditData, announcementsData, loyaltyData, settingsData });
+      console.log('Parsed data:', { stats, usersData, pendingSellersData, approvedSellersData, suspendedSellersData, rejectedSellersData, productsData, ordersData, fraudData, auditData, announcementsData, loyaltyData, settingsData });
 
       if (stats.success) setAdminStats(stats.stats);
       if (usersData.success) {
@@ -213,8 +325,8 @@ function AdminDashboard() {
           joined: new Date(u.createdAt).toLocaleDateString()
         })));
       }
-      if (sellersData.success) {
-        setPendingSellers(sellersData.sellers.map(s => ({
+      if (pendingSellersData.success) {
+        setPendingSellers(pendingSellersData.sellers.map(s => ({
           id: s._id,
           name: s.fullName || s.name || 'Unknown',
           email: s.email,
@@ -224,6 +336,47 @@ function AdminDashboard() {
           appliedDate: new Date(s.createdAt).toLocaleDateString(),
           documents: s.documentsVerified ? 'Verified' : 'Pending',
           experience: s.experience || 'Not specified'
+        })));
+      }
+      if (approvedSellersData.success) {
+        setApprovedSellers(approvedSellersData.sellers.map(s => ({
+          id: s._id,
+          name: s.fullName || s.name || 'Unknown',
+          email: s.email,
+          storeName: s.storeName || 'N/A',
+          phone: s.phone || 'N/A',
+          address: s.address || 'N/A',
+          approvedDate: s.approvalData?.approvedAt ? new Date(s.approvalData.approvedAt).toLocaleDateString() : new Date(s.createdAt).toLocaleDateString(),
+          totalSales: s.totalSales || 0,
+          totalProducts: s.totalProducts || 0,
+          rating: s.rating || 0,
+          trustScore: s.trustScore?.score || 50
+        })));
+      }
+      if (suspendedSellersData.success) {
+        setSuspendedSellers(suspendedSellersData.sellers.map(s => ({
+          id: s._id,
+          name: s.fullName || s.name || 'Unknown',
+          email: s.email,
+          storeName: s.storeName || 'N/A',
+          phone: s.phone || 'N/A',
+          address: s.address || 'N/A',
+          suspendedDate: s.deactivatedAt ? new Date(s.deactivatedAt).toLocaleDateString() : 'N/A',
+          suspensionReason: s.approvalData?.suspensionReason || 'Not specified',
+          totalSales: s.totalSales || 0,
+          totalProducts: s.totalProducts || 0
+        })));
+      }
+      if (rejectedSellersData.success) {
+        setRejectedSellers(rejectedSellersData.sellers.map(s => ({
+          id: s._id,
+          name: s.fullName || s.name || 'Unknown',
+          email: s.email,
+          storeName: s.storeName || 'N/A',
+          phone: s.phone || 'N/A',
+          address: s.address || 'N/A',
+          rejectedDate: new Date(s.createdAt).toLocaleDateString(),
+          rejectionReason: s.approvalData?.rejectionReason || 'Not specified'
         })));
       }
       if (productsData.success) {
@@ -473,6 +626,81 @@ function AdminDashboard() {
     }
   };
 
+  const handleViewSeller = async (sellerId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/admin/sellers/${sellerId}`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedSeller(data.seller);
+        setShowSellerModal(true);
+      } else {
+        alert('Failed to load seller details');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error loading seller details');
+    }
+  };
+
+  const handleSuspendSeller = async (sellerId) => {
+    const reason = prompt('Please provide a reason for suspension:');
+    if (reason && window.confirm('Suspend this seller?')) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/admin/sellers/${sellerId}/status`, {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'suspended', reason })
+        });
+        
+        if (response.ok) {
+          alert('Seller suspended successfully');
+          fetchAdminData();
+        } else {
+          alert('Failed to suspend seller');
+        }
+      } catch (err) { 
+        console.error(err);
+        alert('Error suspending seller');
+      }
+    }
+  };
+
+  const handleReactivateSeller = async (sellerId) => {
+    if (window.confirm('Reactivate this seller?')) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`http://localhost:5000/api/admin/sellers/${sellerId}/status`, {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'approved' })
+        });
+        
+        if (response.ok) {
+          alert('Seller reactivated successfully');
+          fetchAdminData();
+        } else {
+          alert('Failed to reactivate seller');
+        }
+      } catch (err) { 
+        console.error(err);
+        alert('Error reactivating seller');
+      }
+    }
+  };
+
   const handleInvestigateFraud = async (alertId) => {
     try {
       const token = localStorage.getItem('token');
@@ -523,44 +751,76 @@ function AdminDashboard() {
     }
   };
 
-  const handleCreateAnnouncement = async (data) => {
+  const handleAnnouncementFormChange = (e) => {
+    const { name, value } = e.target;
+    setAnnouncementForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCreateAnnouncementForm = async (e) => {
+    e.preventDefault();
+    
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/admin/announcements', {
+      const userData = JSON.parse(localStorage.getItem('user'));
+      
+      console.log('Creating announcement with data:', {
+        ...announcementForm,
+        createdBy: userData._id
+      });
+      
+      const response = await fetch('http://localhost:5000/api/announcements', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify({
+          ...announcementForm,
+          createdBy: userData._id,
+          expiresAt: announcementForm.expiresAt || null
+        })
       });
       
-      if (response.ok) {
-        alert('Announcement created successfully');
+      const data = await response.json();
+      console.log('Response:', data);
+      
+      if (data.success) {
+        alert('Announcement created and notifications sent!');
+        setShowAnnouncementForm(false);
+        setAnnouncementForm({
+          title: '',
+          message: '',
+          type: 'info',
+          targetAudience: 'all',
+          priority: 'medium',
+          expiresAt: ''
+        });
         fetchAdminData();
       } else {
-        alert('Failed to create announcement');
+        alert('Failed to create announcement: ' + (data.message || 'Unknown error'));
       }
     } catch (err) {
-      console.error(err);
-      alert('Error creating announcement');
+      console.error('Error creating announcement:', err);
+      alert('Error creating announcement: ' + err.message);
     }
   };
 
-  const handleToggleAnnouncement = async (id, isActive) => {
+  const handleToggleAnnouncement = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/admin/announcements/${id}`, {
+      const response = await fetch(`http://localhost:5000/api/announcements/${id}/toggle`, {
         method: 'PATCH',
         headers: { 
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ isActive })
+        }
       });
       
-      if (response.ok) {
-        alert(`Announcement ${isActive ? 'activated' : 'deactivated'}`);
+      const data = await response.json();
+      
+      if (data.success) {
         fetchAdminData();
       } else {
         alert('Failed to update announcement');
@@ -575,14 +835,16 @@ function AdminDashboard() {
     if (window.confirm('Delete this announcement?')) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/admin/announcements/${id}`, {
+        const response = await fetch(`http://localhost:5000/api/announcements/${id}`, {
           method: 'DELETE',
           headers: { 
             'Authorization': `Bearer ${token}`
           }
         });
         
-        if (response.ok) {
+        const data = await response.json();
+        
+        if (data.success) {
           alert('Announcement deleted');
           fetchAdminData();
         } else {
@@ -642,6 +904,240 @@ function AdminDashboard() {
       console.error(err);
       alert('Error saving settings');
     }
+  };
+
+  // CSV Download Functions
+  const downloadPendingSellersCSV = () => {
+    if (pendingSellers.length === 0) {
+      alert('No pending sellers to export');
+      return;
+    }
+
+    const headers = ['Name', 'Store Name', 'Email', 'Phone', 'Address', 'Applied Date', 'Documents'];
+    const rows = pendingSellers.map(seller => [
+      seller.name,
+      seller.storeName,
+      seller.email,
+      seller.phone,
+      seller.address,
+      seller.appliedDate,
+      seller.documents
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `pending_sellers_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadApprovedSellersCSV = () => {
+    if (approvedSellers.length === 0) {
+      alert('No approved sellers to export');
+      return;
+    }
+
+    const headers = ['Name', 'Store Name', 'Email', 'Phone', 'Total Sales', 'Products', 'Rating', 'Trust Score'];
+    const rows = approvedSellers.map(seller => [
+      seller.name,
+      seller.storeName,
+      seller.email,
+      seller.phone,
+      seller.totalSales,
+      seller.totalProducts,
+      seller.rating.toFixed(1),
+      seller.trustScore
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `approved_sellers_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadSuspendedSellersCSV = () => {
+    if (suspendedSellers.length === 0) {
+      alert('No suspended sellers to export');
+      return;
+    }
+
+    const headers = ['Name', 'Store Name', 'Email', 'Phone', 'Suspended Date', 'Reason', 'Total Sales', 'Products'];
+    const rows = suspendedSellers.map(seller => [
+      seller.name,
+      seller.storeName,
+      seller.email,
+      seller.phone,
+      seller.suspendedDate,
+      seller.suspensionReason,
+      seller.totalSales,
+      seller.totalProducts
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `suspended_sellers_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadRejectedSellersCSV = () => {
+    if (rejectedSellers.length === 0) {
+      alert('No rejected sellers to export');
+      return;
+    }
+
+    const headers = ['Name', 'Store Name', 'Email', 'Phone', 'Address', 'Rejected Date', 'Reason'];
+    const rows = rejectedSellers.map(seller => [
+      seller.name,
+      seller.storeName,
+      seller.email,
+      seller.phone,
+      seller.address,
+      seller.rejectedDate,
+      seller.rejectionReason
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `rejected_sellers_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadAllSellersCSV = () => {
+    const totalSellers = pendingSellers.length + approvedSellers.length + suspendedSellers.length + rejectedSellers.length;
+    
+    if (totalSellers === 0) {
+      alert('No sellers to export');
+      return;
+    }
+
+    const headers = ['Status', 'Name', 'Store Name', 'Email', 'Phone', 'Address', 'Date', 'Total Sales', 'Products', 'Rating', 'Trust Score', 'Notes'];
+    const rows = [];
+
+    // Add pending sellers
+    pendingSellers.forEach(seller => {
+      rows.push([
+        'Pending',
+        seller.name,
+        seller.storeName,
+        seller.email,
+        seller.phone,
+        seller.address,
+        seller.appliedDate,
+        'N/A',
+        'N/A',
+        'N/A',
+        'N/A',
+        seller.documents
+      ]);
+    });
+
+    // Add approved sellers
+    approvedSellers.forEach(seller => {
+      rows.push([
+        'Approved',
+        seller.name,
+        seller.storeName,
+        seller.email,
+        seller.phone,
+        seller.address,
+        seller.approvedDate,
+        seller.totalSales,
+        seller.totalProducts,
+        seller.rating.toFixed(1),
+        seller.trustScore,
+        ''
+      ]);
+    });
+
+    // Add suspended sellers
+    suspendedSellers.forEach(seller => {
+      rows.push([
+        'Suspended',
+        seller.name,
+        seller.storeName,
+        seller.email,
+        seller.phone,
+        seller.address,
+        seller.suspendedDate,
+        seller.totalSales,
+        seller.totalProducts,
+        'N/A',
+        'N/A',
+        seller.suspensionReason
+      ]);
+    });
+
+    // Add rejected sellers
+    rejectedSellers.forEach(seller => {
+      rows.push([
+        'Rejected',
+        seller.name,
+        seller.storeName,
+        seller.email,
+        seller.phone,
+        seller.address,
+        seller.rejectedDate,
+        'N/A',
+        'N/A',
+        'N/A',
+        'N/A',
+        seller.rejectionReason
+      ]);
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `all_sellers_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleApproveProduct = async (id) => {
@@ -712,6 +1208,34 @@ function AdminDashboard() {
     return filtered;
   };
 
+  // Helper function to format time ago
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Helper function to get audit icon
+  const getAuditIcon = (actionType) => {
+    switch(actionType) {
+      case 'seller': return <FiUserCheck />;
+      case 'product': return <FiPackage />;
+      case 'order': return <FiShoppingBag />;
+      case 'user': return <FiUsers />;
+      case 'system': return <FiSettings />;
+      default: return <FiActivity />;
+    }
+  };
+
   const getFilteredProducts = () => {
     let filtered = products;
     if (searchQuery) {
@@ -740,20 +1264,174 @@ function AdminDashboard() {
     return filtered;
   };
 
+  const getFilteredAuditLogs = () => {
+    if (auditFilter === 'all') return auditLogs;
+    return auditLogs.filter(log => log.actionType === auditFilter);
+  };
+
   // Stats
   const { totalUsers, totalSellers, totalProducts, totalOrders, totalRevenue, pendingProducts } = adminStats;
 
   // Sales Analytics Data
   const salesData = {
-    totalRevenue: adminStats.totalRevenue,
-    totalOrders: adminStats.totalOrders,
-    totalSellers: adminStats.totalSellers,
-    totalCustomers: adminStats.totalUsers,
-    monthlyGrowth: 15.5,
-    topSellingCategory: 'Vintage',
-    averageOrderValue: adminStats.totalOrders > 0 ? (adminStats.totalRevenue / adminStats.totalOrders).toFixed(0) : 0,
-    conversionRate: 3.2
+    totalRevenue: salesStats.totalRevenue || adminStats.totalRevenue,
+    totalOrders: salesStats.totalOrders || adminStats.totalOrders,
+    totalSellers: salesStats.activeSellers || adminStats.totalSellers,
+    totalCustomers: salesStats.totalCustomers || adminStats.totalUsers,
+    monthlyGrowth: salesStats.revenueGrowth || 0,
+    topSellingCategory: salesStats.topCategory || "Men's Collection",
+    averageOrderValue: salesStats.averageOrderValue || (adminStats.totalOrders > 0 ? (adminStats.totalRevenue / adminStats.totalOrders).toFixed(0) : 0),
+    commissionRate: salesStats.commissionRate || 5,
+    platformCommission: salesStats.platformCommission || 0
   };
+
+  // Notification functions
+  const fetchNotifications = async () => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || !user._id) return;
+
+    setLoadingNotifications(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${user._id}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setNotifications(data.notifications);
+        setUnreadCount(data.unreadCount);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || !user._id) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/user/${user._id}/read-all`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  const markAsRead = async (notificationId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        setNotifications(notifications.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const deleteNotification = async (notificationId, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        const notification = notifications.find(n => n._id === notificationId);
+        setNotifications(notifications.filter(n => n._id !== notificationId));
+        if (notification && !notification.isRead) {
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
+
+  const getNotificationIcon = (type, severity) => {
+    if (type === 'order') return <FiShoppingBag />;
+    if (type === 'product') return <FiPackage />;
+    if (type === 'message') return <FiMessageSquare />;
+    if (type === 'stock') return <FiAlertCircle />;
+    if (type === 'system') return <FiActivity />;
+    
+    if (severity === 'error') return <FiXCircle />;
+    if (severity === 'warning') return <FiAlertCircle />;
+    if (severity === 'success') return <FiCheckCircle />;
+    return <FiBell />;
+  };
+
+  const formatNotificationTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const handleNotificationClick = async (notification) => {
+    await markAsRead(notification._id);
+    setShowNotifications(false);
+    
+    switch (notification.type) {
+      case 'order':
+        setActiveTab('orders');
+        break;
+      case 'product':
+        setActiveTab('products');
+        break;
+      case 'message':
+        setActiveTab('overview');
+        break;
+      case 'stock':
+        setActiveTab('products');
+        break;
+      case 'system':
+        setActiveTab('overview');
+        break;
+      default:
+        setActiveTab('overview');
+    }
+  };
+
+  // Close notification dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications) {
+        const notificationWrapper = document.querySelector('.notification-wrapper');
+        if (notificationWrapper && !notificationWrapper.contains(event.target)) {
+          setShowNotifications(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
 
   return (
     <div className="admin-dashboard">
@@ -886,6 +1564,99 @@ function AdminDashboard() {
             </p>
           </div>
           <div className="header-right">
+            <div className="notification-wrapper">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="notification-btn"
+                title="Notifications"
+              >
+                <FiBell />
+                {unreadCount > 0 && (
+                  <span className="notification-count-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                )}
+              </button>
+
+              {/* Notification Dropdown */}
+              {showNotifications && (
+                <div className="notification-dropdown">
+                  {/* Header */}
+                  <div className="notification-header">
+                    <h3 className="notification-header-title">
+                      Notifications {unreadCount > 0 && `(${unreadCount})`}
+                    </h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="notification-mark-read"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Notifications List */}
+                  <div className="notification-list">
+                    {loadingNotifications ? (
+                      <div className="notification-loading">
+                        <div className="notification-loading-spinner"></div>
+                        <p className="notification-loading-text">Loading notifications...</p>
+                      </div>
+                    ) : notifications.length === 0 ? (
+                      <div className="notification-empty">
+                        <div className="notification-empty-icon-wrapper">
+                          <FiBell size={36} />
+                        </div>
+                        <h4 className="notification-empty-title">All caught up!</h4>
+                        <p>You don't have any notifications right now</p>
+                      </div>
+                    ) : (
+                      notifications.map(notif => (
+                        <div
+                          key={notif._id}
+                          onClick={() => handleNotificationClick(notif)}
+                          className={`notification-item ${notif.isRead ? '' : 'unread'}`}
+                        >
+                          <div className="notification-content">
+                            <div className={`notification-icon-wrapper ${notif.severity}`}>
+                              {getNotificationIcon(notif.type, notif.severity)}
+                            </div>
+                            <div className="notification-body">
+                              <h4 className="notification-title">
+                                {notif.title}
+                                <span className={`notification-type-badge ${notif.type}`}>
+                                  {notif.type}
+                                </span>
+                              </h4>
+                              <p className="notification-message">
+                                {notif.message}
+                              </p>
+                              {notif.metadata && notif.metadata.customerNotes && (
+                                <p className="notification-customer-notes">
+                                  <strong>Customer notes:</strong> {notif.metadata.customerNotes}
+                                </p>
+                              )}
+                              <div className="notification-footer">
+                                <span className="notification-time">
+                                  <FiClock size={10} />
+                                  {formatNotificationTime(notif.createdAt)}
+                                </span>
+                                <button
+                                  onClick={(e) => deleteNotification(notif._id, e)}
+                                  className="notification-delete-btn"
+                                >
+                                  <FiTrash2 size={10} />
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="search-box">
               <FiSearch className="search-icon" />
               <input 
@@ -928,7 +1699,11 @@ function AdminDashboard() {
               <>
             {/* Stats Grid */}
             <div className="stats-grid">
-              <div className="stat-card blue">
+              <div 
+                className="stat-card blue clickable-stat" 
+                onClick={() => setActiveTab('users')}
+                title="Click to view user management"
+              >
                 <div className="stat-card-content">
                   <div className="stat-icon-wrapper blue">
                     <MdPeople className="stat-icon" />
@@ -939,9 +1714,16 @@ function AdminDashboard() {
                     <p className="stat-description">+5 new users this month</p>
                   </div>
                 </div>
+                <div className="click-indicator">
+                  <FiChevronRight />
+                </div>
               </div>
 
-              <div className="stat-card green">
+              <div 
+                className="stat-card green clickable-stat" 
+                onClick={() => setActiveTab('seller-approval')}
+                title="Click to view seller approval"
+              >
                 <div className="stat-card-content">
                   <div className="stat-icon-wrapper green">
                     <MdStorefront className="stat-icon" />
@@ -952,9 +1734,16 @@ function AdminDashboard() {
                     <p className="stat-description">+2 new sellers this month</p>
                   </div>
                 </div>
+                <div className="click-indicator">
+                  <FiChevronRight />
+                </div>
               </div>
 
-              <div className="stat-card orange">
+              <div 
+                className="stat-card orange clickable-stat" 
+                onClick={() => setActiveTab('products')}
+                title="Click to view product monitoring"
+              >
                 <div className="stat-card-content">
                   <div className="stat-icon-wrapper orange">
                     <MdInventory className="stat-icon" />
@@ -965,9 +1754,16 @@ function AdminDashboard() {
                     <p className="stat-description">{pendingProducts} pending approval</p>
                   </div>
                 </div>
+                <div className="click-indicator">
+                  <FiChevronRight />
+                </div>
               </div>
 
-              <div className="stat-card purple">
+              <div 
+                className="stat-card purple clickable-stat" 
+                onClick={() => setActiveTab('orders')}
+                title="Click to view orders management"
+              >
                 <div className="stat-card-content">
                   <div className="stat-icon-wrapper purple">
                     <FiShoppingBag className="stat-icon" />
@@ -977,6 +1773,9 @@ function AdminDashboard() {
                     <h3 className="stat-value">{totalOrders}</h3>
                     <p className="stat-description">+8% from last month</p>
                   </div>
+                </div>
+                <div className="click-indicator">
+                  <FiChevronRight />
                 </div>
               </div>
 
@@ -993,7 +1792,11 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="stat-card cyan">
+              <div 
+                className="stat-card cyan clickable-stat" 
+                onClick={() => setActiveTab('sales')}
+                title="Click to view detailed revenue analytics"
+              >
                 <div className="stat-card-content">
                   <div className="stat-icon-wrapper cyan">
                     <MdAttachMoney className="stat-icon" />
@@ -1003,6 +1806,9 @@ function AdminDashboard() {
                     <h3 className="stat-value">Rs. {totalRevenue.toLocaleString()}</h3>
                     <p className="stat-description">+15% from last month</p>
                   </div>
+                </div>
+                <div className="click-indicator">
+                  <FiChevronRight />
                 </div>
               </div>
             </div>
@@ -1053,10 +1859,33 @@ function AdminDashboard() {
                       <FiAlertCircle className="card-icon" />
                       Pending Approvals
                     </h3>
-                    <span className="badge warning">{pendingProducts}</span>
+                    <span className="badge warning">{pendingProducts + pendingSellers.length}</span>
                   </div>
                   <div className="activity-list">
-                    {products.filter(p => p.status === 'Pending').map(product => (
+                    {/* Pending Sellers */}
+                    {pendingSellers.slice(0, 2).map(seller => (
+                      <div key={seller.id} className="activity-item">
+                        <div className="activity-icon warning">
+                          <FiUserCheck />
+                        </div>
+                        <div className="activity-info">
+                          <p className="activity-title">
+                            <strong>{seller.name}</strong> - Seller Application
+                          </p>
+                          <span className="activity-time">{seller.storeName}</span>
+                        </div>
+                        <div className="quick-actions">
+                          <button className="quick-approve" onClick={() => handleApproveSeller(seller.id)}>
+                            <FiCheckCircle />
+                          </button>
+                          <button className="quick-reject" onClick={() => handleRejectSeller(seller.id)}>
+                            <FiXCircle />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Pending Products */}
+                    {products.filter(p => p.status === 'Pending').slice(0, 2).map(product => (
                       <div key={product.id} className="activity-item">
                         <div className="activity-icon warning">
                           <FiPackage />
@@ -1077,12 +1906,18 @@ function AdminDashboard() {
                         </div>
                       </div>
                     ))}
+                    {pendingSellers.length === 0 && products.filter(p => p.status === 'Pending').length === 0 && (
+                      <div className="activity-item" style={{ justifyContent: 'center', padding: '20px' }}>
+                        <p style={{ color: '#8e8e8e' }}>No pending approvals</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Charts Section */}
+            {/* Analytics Overview - Quick Insights */}
             <div className="activity-section">
               <div className="section-title-row">
                 <h2>
@@ -1090,8 +1925,11 @@ function AdminDashboard() {
                   Analytics Overview
                 </h2>
               </div>
+              
+              {/* Revenue Trend (Line) and Category Performance (Pie) */}
               <div className="chart-container">
                 <RevenueTrendChart data={chartData.revenue} />
+                <CategoryPerformanceChart data={chartData.categories} />
               </div>
             </div>
           </>
@@ -1366,66 +2204,291 @@ function AdminDashboard() {
         {/* Seller Approval Tab */}
         {activeTab === 'seller-approval' && (
           <div className="content-section">
-            <div className="sellers-grid">
-              {pendingSellers.map(seller => (
-                <div key={seller.id} className="seller-approval-card">
-                  <div className="seller-card-header">
-                    <div className="seller-avatar">{seller.name.charAt(0)}</div>
-                    <div className="seller-info">
-                      <h3>{seller.name}</h3>
-                      <p className="store-name">{seller.storeName}</p>
-                    </div>
-                    <span className={`doc-badge ${seller.documents.toLowerCase()}`}>
-                      {seller.documents}
-                    </span>
-                  </div>
-
-                  <div className="seller-details-grid">
-                    <div className="detail-item">
-                      <span className="detail-label">Email:</span>
-                      <span className="detail-value">{seller.email}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Phone:</span>
-                      <span className="detail-value">{seller.phone}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Location:</span>
-                      <span className="detail-value">{seller.address}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Experience:</span>
-                      <span className="detail-value">{seller.experience}</span>
-                    </div>
-                    <div className="detail-item">
-                      <span className="detail-label">Applied:</span>
-                      <span className="detail-value">{seller.appliedDate}</span>
-                    </div>
-                  </div>
-
-                  <div className="seller-actions">
-                    <button 
-                      className="approve-btn"
-                      onClick={() => handleApproveSeller(seller.id)}
-                    >
-                      <FiCheckCircle /> Approve
-                    </button>
-                    <button 
-                      className="reject-btn"
-                      onClick={() => handleRejectSeller(seller.id)}
-                    >
-                      <FiXCircle /> Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
+            {/* Export All Button at Top */}
+            <div className="export-all-section">
+              <button 
+                className="export-all-btn" 
+                onClick={downloadAllSellersCSV}
+                disabled={pendingSellers.length + approvedSellers.length + suspendedSellers.length + rejectedSellers.length === 0}
+              >
+                <FiDownload /> Export
+              </button>
             </div>
 
-            {pendingSellers.length === 0 && (
+            {/* Pending Sellers Section */}
+            <div className="section-header">
+              <h2>
+                <FiClock className="section-icon" />
+                Pending Approvals ({pendingSellers.length})
+              </h2>
+            </div>
+            
+            {pendingSellers.length === 0 ? (
               <div className="empty-state-card">
                 <FiUserCheck size={64} />
                 <h3>No Pending Applications</h3>
                 <p>All seller applications have been reviewed</p>
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Seller Name</th>
+                      <th>Store Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Location</th>
+                      <th>Applied Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingSellers.map(seller => (
+                      <tr key={seller.id}>
+                        <td>
+                          <div className="seller-name-cell">
+                            <div className="seller-avatar-small">{seller.name.charAt(0)}</div>
+                            <span>{seller.name}</span>
+                          </div>
+                        </td>
+                        <td className="store-name-cell">{seller.storeName}</td>
+                        <td>{seller.email}</td>
+                        <td>{seller.phone}</td>
+                        <td>{seller.address}</td>
+                        <td>{seller.appliedDate}</td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              className="approve-btn"
+                              onClick={() => handleApproveSeller(seller.id)}
+                              title="Approve Seller"
+                            >
+                              <FiCheckCircle />
+                            </button>
+                            <button 
+                              className="reject-btn"
+                              onClick={() => handleRejectSeller(seller.id)}
+                              title="Reject Seller"
+                            >
+                              <FiXCircle />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Approved Sellers Section */}
+            <div className="section-header" style={{marginTop: '40px'}}>
+              <h2>
+                <FiCheckCircle className="section-icon" />
+                Approved Sellers ({approvedSellers.length})
+              </h2>
+            </div>
+            
+            {approvedSellers.length === 0 ? (
+              <div className="empty-state-card">
+                <FiUserCheck size={64} />
+                <h3>No Approved Sellers</h3>
+                <p>No sellers have been approved yet</p>
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Seller Name</th>
+                      <th>Store Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Total Sales</th>
+                      <th>Products</th>
+                      <th>Rating</th>
+                      <th>Trust Score</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {approvedSellers.map(seller => (
+                      <tr key={seller.id} className="approved-row">
+                        <td>
+                          <div className="seller-name-cell">
+                            <div className="seller-avatar-small approved">{seller.name.charAt(0)}</div>
+                            <span>{seller.name}</span>
+                          </div>
+                        </td>
+                        <td className="store-name-cell">{seller.storeName}</td>
+                        <td>{seller.email}</td>
+                        <td>{seller.phone}</td>
+                        <td className="sales-cell">Rs. {seller.totalSales.toLocaleString()}</td>
+                        <td className="products-cell">{seller.totalProducts}</td>
+                        <td className="rating-cell">
+                          <span className="rating-badge">⭐ {seller.rating.toFixed(1)}</span>
+                        </td>
+                        <td className="trust-cell">
+                          <span className={`trust-badge ${seller.trustScore >= 70 ? 'high' : seller.trustScore >= 40 ? 'medium' : 'low'}`}>
+                            {seller.trustScore}/100
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              className="view-btn"
+                              onClick={() => handleViewSeller(seller.id)}
+                              title="View Profile"
+                            >
+                              <FiEye />
+                            </button>
+                            <button 
+                              className="delete-btn"
+                              onClick={() => handleSuspendSeller(seller.id)}
+                              title="Suspend Seller"
+                            >
+                              <FiXCircle />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Suspended Sellers Section */}
+            <div className="section-header" style={{marginTop: '40px'}}>
+              <h2>
+                <FiAlertCircle className="section-icon" style={{color: '#ff9800'}} />
+                Suspended Sellers ({suspendedSellers.length})
+              </h2>
+            </div>
+            
+            {suspendedSellers.length === 0 ? (
+              <div className="empty-state-card">
+                <FiAlertCircle size={64} />
+                <h3>No Suspended Sellers</h3>
+                <p>No sellers have been suspended</p>
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Seller Name</th>
+                      <th>Store Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Suspended Date</th>
+                      <th>Reason</th>
+                      <th>Total Sales</th>
+                      <th>Products</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suspendedSellers.map(seller => (
+                      <tr key={seller.id} className="suspended-row">
+                        <td>
+                          <div className="seller-name-cell">
+                            <div className="seller-avatar-small suspended">{seller.name.charAt(0)}</div>
+                            <span>{seller.name}</span>
+                          </div>
+                        </td>
+                        <td className="store-name-cell">{seller.storeName}</td>
+                        <td>{seller.email}</td>
+                        <td>{seller.phone}</td>
+                        <td>{seller.suspendedDate}</td>
+                        <td className="reason-cell">{seller.suspensionReason}</td>
+                        <td className="sales-cell">Rs. {seller.totalSales.toLocaleString()}</td>
+                        <td className="products-cell">{seller.totalProducts}</td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              className="view-btn"
+                              onClick={() => handleViewSeller(seller.id)}
+                              title="View Profile"
+                            >
+                              <FiEye />
+                            </button>
+                            <button 
+                              className="approve-btn"
+                              onClick={() => handleReactivateSeller(seller.id)}
+                              title="Reactivate Seller"
+                            >
+                              <FiCheckCircle />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Rejected Sellers Section */}
+            <div className="section-header" style={{marginTop: '40px'}}>
+              <h2>
+                <FiXCircle className="section-icon" style={{color: '#f44336'}} />
+                Rejected Sellers ({rejectedSellers.length})
+              </h2>
+            </div>
+            
+            {rejectedSellers.length === 0 ? (
+              <div className="empty-state-card">
+                <FiXCircle size={64} />
+                <h3>No Rejected Sellers</h3>
+                <p>No seller applications have been rejected</p>
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Seller Name</th>
+                      <th>Store Name</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Location</th>
+                      <th>Rejected Date</th>
+                      <th>Reason</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rejectedSellers.map(seller => (
+                      <tr key={seller.id} className="rejected-row">
+                        <td>
+                          <div className="seller-name-cell">
+                            <div className="seller-avatar-small rejected">{seller.name.charAt(0)}</div>
+                            <span>{seller.name}</span>
+                          </div>
+                        </td>
+                        <td className="store-name-cell">{seller.storeName}</td>
+                        <td>{seller.email}</td>
+                        <td>{seller.phone}</td>
+                        <td>{seller.address}</td>
+                        <td>{seller.rejectedDate}</td>
+                        <td className="reason-cell">{seller.rejectionReason}</td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              className="view-btn"
+                              onClick={() => handleViewSeller(seller.id)}
+                              title="View Profile"
+                            >
+                              <FiEye />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -1434,75 +2497,248 @@ function AdminDashboard() {
         {/* Sales & Reports Tab */}
         {activeTab === 'sales' && (
           <div className="content-section">
-            <button className="export-btn" style={{marginBottom: '20px'}}>
-              <FiDownload /> Export Report
+            <button 
+              className="export-btn" 
+              style={{marginBottom: '20px'}}
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem('token');
+                  const response = await fetch('http://localhost:5000/api/admin/export-sales-report', {
+                    headers: {
+                      'Authorization': `Bearer ${token}`
+                    }
+                  });
+
+                  if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `sales-report-${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                  }
+                } catch (error) {
+                  console.error('Error exporting report:', error);
+                }
+              }}
+            >
+              <FiDownload /> Export Sales Report
             </button>
 
-            {/* Analytics Stats */}
+            {/* Analytics Stats - Clickable */}
             <div className="analytics-grid">
-              <div className="analytics-card revenue">
+              <div 
+                className={`analytics-card revenue clickable-analytics ${selectedMetric === 'revenue' ? 'active' : ''}`}
+                onClick={() => setSelectedMetric(selectedMetric === 'revenue' ? null : 'revenue')}
+                title="Click to view revenue charts"
+              >
                 <p className="analytics-label">Total Revenue</p>
                 <h3>Rs. {salesData.totalRevenue.toLocaleString()}</h3>
                 <span className="analytics-detail">+{salesData.monthlyGrowth}%</span>
+                <FiChevronRight className="card-arrow" />
               </div>
 
-              <div className="analytics-card orders">
+              <div 
+                className={`analytics-card orders clickable-analytics ${selectedMetric === 'orders' ? 'active' : ''}`}
+                onClick={() => setSelectedMetric(selectedMetric === 'orders' ? null : 'orders')}
+                title="Click to view orders charts"
+              >
                 <p className="analytics-label">Total Orders</p>
                 <h3>{salesData.totalOrders}</h3>
                 <span className="analytics-detail">This month</span>
+                <FiChevronRight className="card-arrow" />
               </div>
 
-              <div className="analytics-card sellers">
+              <div 
+                className={`analytics-card sellers clickable-analytics ${selectedMetric === 'sellers' ? 'active' : ''}`}
+                onClick={() => setSelectedMetric(selectedMetric === 'sellers' ? null : 'sellers')}
+                title="Click to view seller charts"
+              >
                 <p className="analytics-label">Active Sellers</p>
                 <h3>{salesData.totalSellers}</h3>
                 <span className="analytics-detail">Verified</span>
+                <FiChevronRight className="card-arrow" />
               </div>
 
-              <div className="analytics-card customers">
+              <div 
+                className={`analytics-card customers clickable-analytics ${selectedMetric === 'customers' ? 'active' : ''}`}
+                onClick={() => setSelectedMetric(selectedMetric === 'customers' ? null : 'customers')}
+                title="Click to view customer charts"
+              >
                 <p className="analytics-label">Total Customers</p>
                 <h3>{salesData.totalCustomers}</h3>
                 <span className="analytics-detail">Registered</span>
+                <FiChevronRight className="card-arrow" />
               </div>
             </div>
 
-            {/* Additional Metrics */}
+            {/* Additional Metrics - Clickable */}
             <div className="metrics-row">
-              <div className="metric-card">
+              <div 
+                className={`metric-card clickable-metric ${selectedMetric === 'avgOrder' ? 'active' : ''}`}
+                onClick={() => setSelectedMetric(selectedMetric === 'avgOrder' ? null : 'avgOrder')}
+              >
                 <h4>Average Order Value</h4>
                 <p className="metric-value">Rs. {salesData.averageOrderValue.toLocaleString()}</p>
               </div>
-              <div className="metric-card">
-                <h4>Conversion Rate</h4>
-                <p className="metric-value">{salesData.conversionRate}%</p>
+              <div 
+                className={`metric-card clickable-metric ${selectedMetric === 'commission' ? 'active' : ''}`}
+                onClick={() => setSelectedMetric(selectedMetric === 'commission' ? null : 'commission')}
+              >
+                <h4>Commission Rate</h4>
+                <p className="metric-value">{salesData.commissionRate}%</p>
               </div>
-              <div className="metric-card">
+              <div 
+                className={`metric-card clickable-metric ${selectedMetric === 'topCategory' ? 'active' : ''}`}
+                onClick={() => setSelectedMetric(selectedMetric === 'topCategory' ? null : 'topCategory')}
+              >
                 <h4>Top Category</h4>
                 <p className="metric-value">{salesData.topSellingCategory}</p>
               </div>
             </div>
 
-            {/* Charts */}
-            <div className="chart-container">
-              <h4>Revenue Trend</h4>
-              <RevenueTrendChart data={chartData.revenue} />
-            </div>
+            {/* Dynamic Charts Based on Selected Metric */}
+            {selectedMetric === 'revenue' && (
+              <div className="dynamic-charts" style={{marginTop: '30px'}}>
+                <div className="chart-container">
+                  <RevenueTrendChart data={chartData.revenue} />
+                </div>
+                <div className="chart-container" style={{marginTop: '20px'}}>
+                  <RevenueBreakdownChart data={chartData.revenueBreakdown} title="Revenue Breakdown by Category" />
+                </div>
+              </div>
+            )}
 
-            <div className="metrics-row">
-              <div className="chart-container">
-                <h4>Top Products</h4>
-                <TopProductsChart data={chartData.topProducts} />
+            {selectedMetric === 'orders' && (
+              <div className="dynamic-charts" style={{marginTop: '30px'}}>
+                <div className="chart-container">
+                  <OrdersTrendChart data={chartData.ordersTrend} />
+                </div>
               </div>
-              <div className="chart-container">
-                <h4>Category Performance</h4>
-                <CategoryPerformanceChart data={chartData.categories} />
+            )}
+
+            {selectedMetric === 'sellers' && (
+              <div className="dynamic-charts" style={{marginTop: '30px'}}>
+                <div className="chart-container">
+                  <SellerStatsChart data={chartData.sellerStats} title="Seller Growth" />
+                </div>
               </div>
-            </div>
+            )}
+
+            {selectedMetric === 'customers' && (
+              <div className="dynamic-charts" style={{marginTop: '30px'}}>
+                <div className="chart-container">
+                  <UserGrowthChart data={chartData.userGrowth} />
+                </div>
+              </div>
+            )}
+
+            {selectedMetric === 'avgOrder' && (
+              <div className="dynamic-charts" style={{marginTop: '30px'}}>
+                <div className="chart-container">
+                  <div className="commission-summary" style={{padding: '40px', textAlign: 'center'}}>
+                    <h3 style={{fontSize: '16px', marginBottom: '20px', color: '#333', fontWeight: '600'}}>Average Order Value</h3>
+                    <div style={{fontSize: '48px', fontWeight: 'bold', color: '#00bcd4', marginBottom: '20px'}}>
+                      Rs. {salesData.averageOrderValue?.toLocaleString() || 0}
+                    </div>
+                    <div style={{fontSize: '18px', color: '#666', marginBottom: '10px'}}>
+                      Per Order
+                    </div>
+                    <div style={{fontSize: '14px', color: '#999'}}>
+                      Based on {salesData.totalOrders} total orders with Rs. {salesData.totalRevenue?.toLocaleString()} revenue
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedMetric === 'commission' && (
+              <div className="dynamic-charts" style={{marginTop: '30px'}}>
+                <div className="chart-container">
+                  <div className="commission-summary" style={{padding: '40px', textAlign: 'center'}}>
+                    <h3 style={{fontSize: '16px', marginBottom: '20px', color: '#333', fontWeight: '600'}}>Platform Commission Earnings</h3>
+                    <div style={{fontSize: '48px', fontWeight: 'bold', color: '#00bcd4', marginBottom: '20px'}}>
+                      Rs. {salesData.platformCommission?.toLocaleString() || 0}
+                    </div>
+                    <div style={{fontSize: '18px', color: '#666', marginBottom: '10px'}}>
+                      Total Commission Earned
+                    </div>
+                    <div style={{fontSize: '14px', color: '#999'}}>
+                      Based on {salesData.commissionRate}% commission rate across {salesData.totalOrders} orders
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedMetric === 'topCategory' && (
+              <div className="dynamic-charts" style={{marginTop: '30px'}}>
+                <div className="chart-container">
+                  <TopProductsChart data={chartData.topProducts} title="Top Selling Products by Category" />
+                </div>
+                <div className="chart-container" style={{marginTop: '20px'}}>
+                  <CategoryPerformanceChart data={chartData.categories} />
+                </div>
+              </div>
+            )}
+
+            {/* Default Charts when nothing is selected */}
+            {!selectedMetric && (
+              <>
+                <div className="chart-container" style={{marginTop: '30px'}}>
+                  <RevenueTrendChart data={chartData.revenue} />
+                </div>
+
+                <div className="metrics-row" style={{marginTop: '20px'}}>
+                  <div className="chart-container">
+                    <TopProductsChart data={chartData.topProducts} />
+                  </div>
+                  <div className="chart-container">
+                    <CategoryPerformanceChart data={chartData.categories} />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {/* Fraud Detection Tab */}
         {activeTab === 'fraud' && (
           <div className="content-section">
+            <div className="section-header" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2>Fraud Detection</h2>
+                <p>Automated monitoring of suspicious activities</p>
+              </div>
+              <button 
+                className="primary-btn"
+                onClick={async () => {
+                  if (window.confirm('Run fraud detection scan on all data?')) {
+                    try {
+                      const token = localStorage.getItem('token');
+                      const response = await fetch('http://localhost:5000/api/admin/fraud-detection/run', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      const data = await response.json();
+                      if (data.success) {
+                        alert(data.message);
+                        fetchAdminData();
+                      }
+                    } catch (err) {
+                      console.error(err);
+                      alert('Error running fraud detection');
+                    }
+                  }
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <FiSearch /> Run Scan
+              </button>
+            </div>
             <div className="fraud-alerts">
               {fraudAlerts.map(alert => (
                 <div key={alert._id} className={`fraud-card risk-${alert.riskLevel}`}>
@@ -1568,136 +2804,74 @@ function AdminDashboard() {
         {activeTab === 'audit' && (
           <div className="content-section">
             <div className="filter-buttons">
-              <button className="filter-btn active">
+              <button 
+                className={`filter-btn ${auditFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setAuditFilter('all')}
+              >
                 <FiActivity /> All Activities
               </button>
-              <button className="filter-btn">
+              <button 
+                className={`filter-btn ${auditFilter === 'user' ? 'active' : ''}`}
+                onClick={() => setAuditFilter('user')}
+              >
                 <FiUsers /> User Actions
               </button>
-              <button className="filter-btn">
+              <button 
+                className={`filter-btn ${auditFilter === 'seller' ? 'active' : ''}`}
+                onClick={() => setAuditFilter('seller')}
+              >
+                <FiUserCheck /> Seller Actions
+              </button>
+              <button 
+                className={`filter-btn ${auditFilter === 'product' ? 'active' : ''}`}
+                onClick={() => setAuditFilter('product')}
+              >
                 <FiPackage /> Product Changes
               </button>
-              <button className="filter-btn">
+              <button 
+                className={`filter-btn ${auditFilter === 'system' ? 'active' : ''}`}
+                onClick={() => setAuditFilter('system')}
+              >
                 <FiSettings /> System Events
               </button>
             </div>
 
-            <div className="audit-timeline">
-              <div className="audit-entry">
-                <div className="audit-icon user">
-                  <FiUserCheck />
-                </div>
-                <div className="audit-content">
-                  <div className="audit-header">
-                    <h4>Seller Approved</h4>
-                    <span className="audit-time">2 hours ago</span>
-                  </div>
-                  <p className="audit-description">
-                    Admin approved seller application for <strong>John's Vintage Store</strong>
-                  </p>
-                  <div className="audit-meta">
-                    <span className="audit-user">
-                      <FiUser /> Administrator
-                    </span>
-                    <span className="audit-ip">
-                      IP: 192.168.1.1
-                    </span>
-                  </div>
-                </div>
+            {getFilteredAuditLogs().length === 0 ? (
+              <div className="empty-state-card">
+                <FiActivity size={64} />
+                <h3>No Audit Logs</h3>
+                <p>No activities have been logged yet</p>
               </div>
-
-              <div className="audit-entry">
-                <div className="audit-icon product">
-                  <FiPackage />
-                </div>
-                <div className="audit-content">
-                  <div className="audit-header">
-                    <h4>Product Deleted</h4>
-                    <span className="audit-time">5 hours ago</span>
+            ) : (
+              <div className="audit-timeline">
+                {getFilteredAuditLogs().map(log => (
+                  <div key={log._id} className="audit-entry">
+                    <div className={`audit-icon ${log.actionType}`}>
+                      {getAuditIcon(log.actionType)}
+                    </div>
+                    <div className="audit-content">
+                      <div className="audit-header">
+                        <h4>{log.action}</h4>
+                        <span className="audit-time">{formatTimeAgo(log.createdAt)}</span>
+                      </div>
+                      <p className="audit-description">
+                        {log.description}
+                      </p>
+                      <div className="audit-meta">
+                        <span className="audit-user">
+                          <FiUser /> {log.performedBy?.fullName || log.performedBy?.email || 'System'}
+                        </span>
+                        {log.ipAddress && (
+                          <span className="audit-ip">
+                            IP: {log.ipAddress}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <p className="audit-description">
-                    Admin deleted product <strong>"Vintage Jacket"</strong> due to policy violation
-                  </p>
-                  <div className="audit-meta">
-                    <span className="audit-user">
-                      <FiUser /> Administrator
-                    </span>
-                    <span className="audit-ip">
-                      IP: 192.168.1.1
-                    </span>
-                  </div>
-                </div>
+                ))}
               </div>
-
-              <div className="audit-entry">
-                <div className="audit-icon system">
-                  <FiSettings />
-                </div>
-                <div className="audit-content">
-                  <div className="audit-header">
-                    <h4>System Settings Updated</h4>
-                    <span className="audit-time">1 day ago</span>
-                  </div>
-                  <p className="audit-description">
-                    Payment gateway configuration updated
-                  </p>
-                  <div className="audit-meta">
-                    <span className="audit-user">
-                      <FiUser /> Administrator
-                    </span>
-                    <span className="audit-ip">
-                      IP: 192.168.1.1
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="audit-entry">
-                <div className="audit-icon warning">
-                  <FiAlertCircle />
-                </div>
-                <div className="audit-content">
-                  <div className="audit-header">
-                    <h4>User Suspended</h4>
-                    <span className="audit-time">2 days ago</span>
-                  </div>
-                  <p className="audit-description">
-                    Admin suspended user <strong>suspicious_user@email.com</strong> for fraudulent activity
-                  </p>
-                  <div className="audit-meta">
-                    <span className="audit-user">
-                      <FiUser /> Administrator
-                    </span>
-                    <span className="audit-ip">
-                      IP: 192.168.1.1
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="audit-entry">
-                <div className="audit-icon success">
-                  <FiCheckCircle />
-                </div>
-                <div className="audit-content">
-                  <div className="audit-header">
-                    <h4>Bulk Product Approval</h4>
-                    <span className="audit-time">3 days ago</span>
-                  </div>
-                  <p className="audit-description">
-                    Admin approved 15 pending products in bulk operation
-                  </p>
-                  <div className="audit-meta">
-                    <span className="audit-user">
-                      <FiUser /> Administrator
-                    </span>
-                    <span className="audit-ip">
-                      IP: 192.168.1.1
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1707,51 +2881,125 @@ function AdminDashboard() {
             <button 
               className="export-btn" 
               style={{marginBottom: '20px'}}
-              onClick={() => {
-                const title = prompt('Announcement Title:');
-                const message = prompt('Announcement Message:');
-                const type = prompt('Type (info/warning/success/error):', 'info');
-                const targetAudience = prompt('Target (all/sellers/customers):', 'all');
-                if (title && message) {
-                  handleCreateAnnouncement({ title, message, type, targetAudience });
-                }
-              }}
+              onClick={() => setShowAnnouncementForm(!showAnnouncementForm)}
             >
-              <FiBell /> Create Announcement
+              <FiBell /> {showAnnouncementForm ? 'Cancel' : 'Create Announcement'}
             </button>
+
+            {showAnnouncementForm && (
+              <div className="form-card" style={{marginBottom: '30px'}}>
+                <h3>Create New Announcement</h3>
+                <form onSubmit={handleCreateAnnouncementForm}>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Title</label>
+                      <input
+                        type="text"
+                        name="title"
+                        value={announcementForm.title}
+                        onChange={handleAnnouncementFormChange}
+                        required
+                        placeholder="Enter announcement title"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Message</label>
+                    <textarea
+                      name="message"
+                      value={announcementForm.message}
+                      onChange={handleAnnouncementFormChange}
+                      required
+                      rows="4"
+                      placeholder="Enter announcement message"
+                    />
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Type</label>
+                      <select name="type" value={announcementForm.type} onChange={handleAnnouncementFormChange}>
+                        <option value="info">Info</option>
+                        <option value="success">Success</option>
+                        <option value="warning">Warning</option>
+                        <option value="error">Error</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Target Audience</label>
+                      <select name="targetAudience" value={announcementForm.targetAudience} onChange={handleAnnouncementFormChange}>
+                        <option value="all">All Users</option>
+                        <option value="sellers">Sellers Only</option>
+                        <option value="customers">Customers Only</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Priority</label>
+                      <select name="priority" value={announcementForm.priority} onChange={handleAnnouncementFormChange}>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Expires At (Optional)</label>
+                    <input
+                      type="datetime-local"
+                      name="expiresAt"
+                      value={announcementForm.expiresAt}
+                      onChange={handleAnnouncementFormChange}
+                    />
+                  </div>
+
+                  <button type="submit" className="submit-btn">Create & Send Notifications</button>
+                </form>
+              </div>
+            )}
 
             <div className="announcements-list">
               {announcements.map(announcement => (
                 <div key={announcement._id} className={`announcement-card ${announcement.type}`}>
                   <div className="announcement-header">
-                    <h3>{announcement.title}</h3>
-                    <span className={`type-badge ${announcement.type}`}>{announcement.type}</span>
+                    <div className="announcement-title-section">
+                      <h3>{announcement.title}</h3>
+                      <div className="announcement-badges">
+                        <span className={`type-badge ${announcement.type}`}>{announcement.type}</span>
+                        <span className={`priority-badge ${announcement.priority}`}>{announcement.priority}</span>
+                        <span className="audience-badge">{announcement.targetAudience}</span>
+                      </div>
+                    </div>
+                    <div className="announcement-actions">
+                      <button 
+                        className={`toggle-btn ${announcement.isActive ? 'active' : 'inactive'}`}
+                        onClick={() => handleToggleAnnouncement(announcement._id)}
+                      >
+                        {announcement.isActive ? 'Active' : 'Inactive'}
+                      </button>
+                      <button 
+                        className="delete-btn"
+                        onClick={() => handleDeleteAnnouncement(announcement._id)}
+                      >
+                        <FiTrash2 />
+                      </button>
+                    </div>
                   </div>
                   <p className="announcement-message">{announcement.message}</p>
-                  <div className="announcement-meta">
-                    <span>Target: {announcement.targetAudience}</span>
-                    <span>Priority: {announcement.priority}</span>
-                    <span>{new Date(announcement.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <div className="announcement-actions">
-                    <button 
-                      className={announcement.isActive ? 'deactivate-btn' : 'activate-btn'}
-                      onClick={() => handleToggleAnnouncement(announcement._id, !announcement.isActive)}
-                    >
-                      {announcement.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button 
-                      className="delete-btn"
-                      onClick={() => handleDeleteAnnouncement(announcement._id)}
-                    >
-                      <FiTrash2 /> Delete
-                    </button>
+                  <div className="announcement-footer">
+                    <span>Created: {new Date(announcement.createdAt).toLocaleDateString()}</span>
+                    {announcement.expiresAt && (
+                      <span>Expires: {new Date(announcement.expiresAt).toLocaleDateString()}</span>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
 
-            {announcements.length === 0 && (
+            {announcements.length === 0 && !showAnnouncementForm && (
               <div className="empty-state-card">
                 <FiBell size={64} />
                 <h3>No Announcements</h3>
@@ -1789,15 +3037,28 @@ function AdminDashboard() {
                       <td>
                         <div className="action-buttons">
                           <button 
-                            className="edit-btn"
+                            className="action-btn add-btn"
+                            title="Add Points"
                             onClick={() => {
-                              const points = prompt('Add/Subtract points:', '0');
-                              if (points) {
+                              const points = prompt('Enter points to add:', '100');
+                              if (points && !isNaN(points)) {
                                 handleUpdateLoyaltyPoints(record.userId._id, parseInt(points));
                               }
                             }}
                           >
-                            <FiEdit2 />
+                            + Add
+                          </button>
+                          <button 
+                            className="action-btn subtract-btn"
+                            title="Subtract Points"
+                            onClick={() => {
+                              const points = prompt('Enter points to subtract:', '50');
+                              if (points && !isNaN(points)) {
+                                handleUpdateLoyaltyPoints(record.userId._id, -parseInt(points));
+                              }
+                            }}
+                          >
+                            - Subtract
                           </button>
                         </div>
                       </td>
@@ -2348,6 +3609,118 @@ function AdminDashboard() {
                       <div className="info-item">
                         <label>City:</label>
                         <span>{selectedUser.city}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Seller Details Modal */}
+      {showSellerModal && selectedSeller && (
+        <div className="modal-overlay" onClick={() => setShowSellerModal(false)}>
+          <div className="order-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Seller Details</h2>
+              <button className="close-btn" onClick={() => setShowSellerModal(false)}>
+                <FiXCircle />
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="order-info-section">
+                <h3>Seller Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Seller ID:</label>
+                    <span>#{selectedSeller._id}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Name:</label>
+                    <span>{selectedSeller.fullName || selectedSeller.name}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Email:</label>
+                    <span>{selectedSeller.email}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Phone:</label>
+                    <span>{selectedSeller.phone}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Status:</label>
+                    <span className={`status-badge ${selectedSeller.status}`}>
+                      {selectedSeller.status}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <label>Joined Date:</label>
+                    <span>{new Date(selectedSeller.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Store Information</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Store Name:</label>
+                    <span>{selectedSeller.storeName}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Store Description:</label>
+                    <span>{selectedSeller.storeDescription || 'N/A'}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Address:</label>
+                    <span>{selectedSeller.address}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>City:</label>
+                    <span>{selectedSeller.city}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="order-info-section">
+                <h3>Performance Metrics</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <label>Total Sales:</label>
+                    <span className="sales-cell">Rs. {selectedSeller.totalSales?.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Total Products:</label>
+                    <span>{selectedSeller.totalProducts || 0}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Rating:</label>
+                    <span>⭐ {selectedSeller.rating?.toFixed(1) || '0.0'}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Trust Score:</label>
+                    <span className={`trust-badge ${selectedSeller.trustScore?.score >= 70 ? 'high' : selectedSeller.trustScore?.score >= 40 ? 'medium' : 'low'}`}>
+                      {selectedSeller.trustScore?.score || 50}/100
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {selectedSeller.status === 'suspended' && selectedSeller.approvalData?.suspensionReason && (
+                <div className="order-info-section">
+                  <h3>Suspension Details</h3>
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>Reason:</label>
+                      <span>{selectedSeller.approvalData.suspensionReason}</span>
+                    </div>
+                    {selectedSeller.deactivatedAt && (
+                      <div className="info-item">
+                        <label>Suspended Date:</label>
+                        <span>{new Date(selectedSeller.deactivatedAt).toLocaleDateString()}</span>
                       </div>
                     )}
                   </div>

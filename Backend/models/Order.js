@@ -1,6 +1,23 @@
 const mongoose = require('mongoose');
 
+// Generate a short human-readable order ID like "RB7K2A" (6 chars)
+const generateShortOrderId = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // excludes 0/O/1/I to avoid confusion
+  let id = 'RB'; // "RB" prefix = Rebuy
+  for (let i = 0; i < 4; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id; // e.g. "RB7K2A"
+};
+
 const orderSchema = new mongoose.Schema({
+  // Short human-readable order ID shown to customers (e.g. RB7K2A)
+  orderId: {
+    type: String,
+    unique: true,
+    index: true
+  },
+
   // Customer Information
   customer: {
     type: mongoose.Schema.Types.ObjectId,
@@ -56,7 +73,12 @@ const orderSchema = new mongoose.Schema({
     phone: String,
     address: String,
     city: String,
-    postalCode: String
+    postalCode: String,
+    state: String,
+    district: String,
+    municipality: String,
+    landmark: String,
+    label: String
   },
 
   // Payment Information
@@ -71,6 +93,13 @@ const orderSchema = new mongoose.Schema({
     default: 'Pending'
   },
   transactionId: String,
+  paymentDetails: {
+    type: mongoose.Schema.Types.Mixed
+  },
+  paymentReference: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Payment'
+  },
 
   // Order Totals
   subtotal: {
@@ -78,6 +107,26 @@ const orderSchema = new mongoose.Schema({
     required: true
   },
   shippingCost: {
+    type: Number,
+    default: 0
+  },
+  pointsRedeemed: {
+    type: Number,
+    default: 0
+  },
+  pointsDiscount: {
+    type: Number,
+    default: 0
+  },
+  platformCommissionRate: {
+    type: Number,
+    default: 5 // 5% commission
+  },
+  platformCommission: {
+    type: Number,
+    default: 0
+  },
+  sellerPayout: {
     type: Number,
     default: 0
   },
@@ -114,8 +163,6 @@ const orderSchema = new mongoose.Schema({
     },
     customerFeedback: String,
     verificationImages: [String],
-    
-    // Dispute handling
     disputeRaised: {
       type: Boolean,
       default: false
@@ -149,7 +196,25 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster queries
+// Auto-generate short orderId before saving new documents
+orderSchema.pre('save', async function (next) {
+  if (!this.orderId) {
+    let unique = false;
+    let attempts = 0;
+    while (!unique && attempts < 10) {
+      const candidate = generateShortOrderId();
+      const existing = await mongoose.model('Order').findOne({ orderId: candidate });
+      if (!existing) {
+        this.orderId = candidate;
+        unique = true;
+      }
+      attempts++;
+    }
+  }
+  next();
+});
+
+// Indexes for faster queries
 orderSchema.index({ customer: 1, orderDate: -1 });
 orderSchema.index({ status: 1 });
 

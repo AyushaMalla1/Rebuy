@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Seller = require('../models/Seller');
 const { sendEmail } = require('../utils/emailService');
+const { logAudit } = require('../utils/auditLogger');
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -93,6 +94,17 @@ router.post('/signup', async (req, res) => {
       // Generate token
       const token = generateToken(seller._id);
 
+      // Log audit
+      await logAudit({
+        action: 'Seller Registered',
+        actionType: 'auth',
+        performedBy: seller._id,
+        targetId: seller._id,
+        targetModel: 'Seller',
+        description: 'New seller account registered',
+        ipAddress: req.ip
+      }).catch(console.error);
+
       return res.status(201).json({
         success: true,
         message: 'Seller account created successfully',
@@ -150,6 +162,17 @@ router.post('/signup', async (req, res) => {
 
     // Generate token
     const token = generateToken(user._id);
+
+    // Log audit
+    await logAudit({
+      action: 'User Registered',
+      actionType: 'auth',
+      performedBy: user._id,
+      targetId: user._id,
+      targetModel: 'User',
+      description: 'New user account registered',
+      ipAddress: req.ip
+    }).catch(console.error);
 
     const userResponse = {
       _id: user._id,
@@ -218,6 +241,17 @@ router.post('/login', async (req, res) => {
       // Generate token
       const token = generateToken(seller._id);
 
+      // Log audit
+      await logAudit({
+        action: 'Seller Login',
+        actionType: 'auth',
+        performedBy: seller._id,
+        targetId: seller._id,
+        targetModel: 'Seller',
+        description: 'Seller logged in successfully',
+        ipAddress: req.ip
+      }).catch(console.error);
+
       console.log('Seller login successful:', email);
       return res.status(200).json({
         success: true,
@@ -261,6 +295,17 @@ router.post('/login', async (req, res) => {
 
     // Generate token
     const token = generateToken(user._id);
+
+    // Log audit
+    await logAudit({
+      action: 'User Login',
+      actionType: 'auth',
+      performedBy: user._id,
+      targetId: user._id,
+      targetModel: 'User',
+      description: 'Customer logged in successfully',
+      ipAddress: req.ip
+    }).catch(console.error);
 
     console.log('Customer login successful:', email);
 
@@ -488,6 +533,17 @@ router.post('/reset-password', async (req, res) => {
     
     await user.save();
 
+    // Log audit
+    await logAudit({
+      action: 'Password Reset',
+      actionType: 'auth',
+      performedBy: user._id,
+      targetId: user._id,
+      targetModel: user.storeName ? 'Seller' : 'User',
+      description: 'Password reset via OTP',
+      ipAddress: req.ip
+    }).catch(console.error);
+
     // Send password changed confirmation email
     try {
       await sendEmail(user.email, 'passwordChanged', user.fullName);
@@ -544,6 +600,17 @@ router.put('/change-password/:userId', async (req, res) => {
     user.password = newPassword;
     await user.save();
     
+    // Log audit
+    await logAudit({
+      action: 'Password Changed',
+      actionType: 'auth',
+      performedBy: user._id,
+      targetId: user._id,
+      targetModel: 'User',
+      description: 'User changed password manually',
+      ipAddress: req.ip
+    }).catch(console.error);
+
     // Send confirmation email
     try {
       await sendEmail(user.email, 'passwordChanged', user.fullName);

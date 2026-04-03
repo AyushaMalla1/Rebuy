@@ -9,6 +9,8 @@ const {
   verifyEsewaPayment,
   verifyKhaltiPayment
 } = require('../utils/paymentService');
+const { logAudit } = require('../utils/auditLogger');
+const { sendPaymentConfirmation } = require('../utils/emailService');
 
 // Initiate payment
 router.post('/initiate', async (req, res) => {
@@ -114,6 +116,17 @@ router.post('/verify', async (req, res) => {
       order.transactionId = result.transactionId;
       order.status = 'Processing';
       await order.save();
+      
+      // Log audit
+      await logAudit({
+        action: 'Payment Verified',
+        actionType: 'payment',
+        performedBy: order.customer,
+        targetId: order._id,
+        targetModel: 'Order',
+        description: `Payment verified via ${settings.paymentGateway.provider} for Order ${order.trackingNumber || order._id}`,
+        ipAddress: req.ip
+      }).catch(console.error);
     }
     
     res.json(result);
@@ -200,9 +213,26 @@ router.get('/esewa/success', async (req, res) => {
           ipAddress: req.ip,
           userAgent: req.headers['user-agent']
         });
+        payment.userAgent = req.headers['user-agent'];
       }
       
       await payment.save();
+      
+      // Log audit
+      await logAudit({
+        action: 'Payment Completed',
+        actionType: 'payment',
+        performedBy: order.customer,
+        targetId: payment._id,
+        targetModel: 'Payment',
+        description: `Payment completed via eSewa for Order ${order.trackingNumber || order._id}`,
+        ipAddress: req.ip
+      }).catch(console.error);
+      
+      // Send payment confirmation email
+      sendPaymentConfirmation(order).catch(err =>
+        console.error('Failed to send payment confirmation email:', err)
+      );
     }
 
     // Redirect to success page
@@ -313,6 +343,22 @@ router.post('/esewa/verify-frontend', async (req, res) => {
         });
       }
       await payment.save();
+      
+      // Log audit
+      await logAudit({
+        action: 'Payment Completed',
+        actionType: 'payment',
+        performedBy: order.customer,
+        targetId: payment._id,
+        targetModel: 'Payment',
+        description: `Payment verified from frontend via eSewa for Order ${order.trackingNumber || order._id}`,
+        ipAddress: req.ip
+      }).catch(console.error);
+      
+      // Send payment confirmation email
+      sendPaymentConfirmation(order).catch(err =>
+        console.error('Failed to send payment confirmation email:', err)
+      );
     }
 
     return res.json({ success: true, transactionId: result.transactionId, message: 'Payment verified successfully' });
@@ -444,6 +490,18 @@ router.post('/:paymentId/refund', async (req, res) => {
       paymentStatus: 'Refunded',
       status: 'Cancelled'
     });
+    
+    // Log audit
+    await logAudit({
+      action: 'Payment Refunded',
+      actionType: 'payment',
+      performedBy: req.user?.id || payment.customer,
+      targetId: payment._id,
+      targetModel: 'Payment',
+      description: `Payment refunded: Rs. ${refundAmount || payment.amount}`,
+      ipAddress: req.ip,
+      metadata: { refundReason }
+    }).catch(console.error);
     
     res.json({ success: true, message: 'Payment refunded successfully', payment });
   } catch (error) {

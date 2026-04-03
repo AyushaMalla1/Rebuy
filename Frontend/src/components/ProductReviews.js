@@ -4,61 +4,23 @@ import './ProductReviews.css';
 import { reviewAPI } from '../services/api';
 
 function ProductReviews({ productId }) {
-  const [reviews, setReviews] = useState([]);
+  const [verifications, setVerifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [newReview, setNewReview] = useState({
-    rating: 5,
-    title: '',
-    comment: ''
-  });
 
   useEffect(() => {
-    fetchReviews();
+    fetchVerifications();
   }, [productId]);
 
-  const fetchReviews = async () => {
+  const fetchVerifications = async () => {
     try {
-      const data = await reviewAPI.getByProduct(productId);
-      setReviews(data.reviews || []);
+      // Fetch orders with condition verifications for this product
+      const response = await fetch(`http://localhost:5000/api/orders/product/${productId}/verifications`);
+      const data = await response.json();
+      setVerifications(data.verifications || []);
     } catch (error) {
-      console.error('Error fetching reviews:', error);
+      console.error('Error fetching verifications:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSubmitReview = async (e) => {
-    e.preventDefault();
-    
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user) {
-      alert('Please login to submit a review');
-      return;
-    }
-
-    try {
-      await reviewAPI.submit({
-        productId,
-        customerId: user._id,
-        ...newReview
-      });
-
-      alert('Review submitted successfully!');
-      setShowReviewForm(false);
-      setNewReview({ rating: 5, title: '', comment: '' });
-      fetchReviews();
-    } catch (error) {
-      alert(error.message || 'Failed to submit review');
-    }
-  };
-
-  const handleMarkHelpful = async (reviewId) => {
-    try {
-      await reviewAPI.markHelpful(reviewId);
-      fetchReviews();
-    } catch (error) {
-      console.error('Error marking review helpful:', error);
     }
   };
 
@@ -72,102 +34,64 @@ function ProductReviews({ productId }) {
   };
 
   if (loading) {
-    return <div className="reviews-loading">Loading reviews...</div>;
+    return <div className="reviews-loading">Loading verifications...</div>;
   }
 
   return (
     <div className="product-reviews">
       <div className="reviews-header">
-        <h2>Customer Reviews</h2>
-        <button 
-          className="write-review-btn"
-          onClick={() => setShowReviewForm(!showReviewForm)}
-        >
-          Write a Review
-        </button>
+        <h2>Condition Verifications</h2>
+        <span className="verification-count">{verifications.length} Verified Purchase{verifications.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {showReviewForm && (
-        <form className="review-form" onSubmit={handleSubmitReview}>
-          <h3>Write Your Review</h3>
-          
-          <div className="form-group">
-            <label>Rating</label>
-            <div className="star-rating-input">
-              {[1, 2, 3, 4, 5].map(star => (
-                <FiStar
-                  key={star}
-                  className={star <= newReview.rating ? 'star-filled' : 'star-empty'}
-                  onClick={() => setNewReview({ ...newReview, rating: star })}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Title</label>
-            <input
-              type="text"
-              value={newReview.title}
-              onChange={(e) => setNewReview({ ...newReview, title: e.target.value })}
-              placeholder="Sum up your experience"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Review</label>
-            <textarea
-              value={newReview.comment}
-              onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-              placeholder="Share your thoughts about this product"
-              rows="4"
-              required
-            />
-          </div>
-
-          <div className="form-actions">
-            <button type="button" onClick={() => setShowReviewForm(false)}>
-              Cancel
-            </button>
-            <button type="submit" className="submit-btn">
-              Submit Review
-            </button>
-          </div>
-        </form>
-      )}
-
       <div className="reviews-list">
-        {reviews.length === 0 ? (
-          <p className="no-reviews">No reviews yet. Be the first to review!</p>
+        {verifications.length === 0 ? (
+          <p className="no-reviews">No condition verifications yet.</p>
         ) : (
-          reviews.map(review => (
-            <div key={review._id} className="review-card">
+          verifications.map(verification => (
+            <div key={verification._id} className="review-card">
               <div className="review-header">
                 <div className="reviewer-info">
-                  <strong>{review.customer?.fullName || 'Anonymous'}</strong>
-                  {review.verifiedPurchase && (
-                    <span className="verified-badge">✓ Verified Purchase</span>
-                  )}
+                  <strong>{verification.customerName || 'Anonymous'}</strong>
+                  <span className="verified-badge">✓ Verified Purchase</span>
+                  <span className="condition-verified-badge">
+                    ✓ Condition Verified
+                  </span>
                 </div>
-                <div className="review-rating">
-                  {renderStars(review.rating)}
+                <div className="verification-date">
+                  {new Date(verification.verifiedAt).toLocaleDateString()}
                 </div>
               </div>
 
-              <h4 className="review-title">{review.title}</h4>
-              <p className="review-comment">{review.comment}</p>
+              {/* Condition Verification Details */}
+              <div className="verification-details">
+                <div className="verification-header">
+                  <strong>Condition Status:</strong>
+                  <span className={`verification-status ${verification.matchesDescription === 'yes' ? 'matches' : 'no-match'}`}>
+                    {verification.matchesDescription === 'yes' ? '✓ Matches Description' : '✕ Does Not Match Description'}
+                  </span>
+                </div>
+                {verification.customerFeedback && (
+                  <p className="verification-notes">
+                    "{verification.customerFeedback}"
+                  </p>
+                )}
+                {verification.verificationImages && verification.verificationImages.length > 0 && (
+                  <div className="verification-images">
+                    {verification.verificationImages.map((img, idx) => (
+                      <img 
+                        key={idx} 
+                        src={img} 
+                        alt={`Verification ${idx + 1}`}
+                        className="verification-image"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="review-footer">
-                <span className="review-date">
-                  {new Date(review.createdAt).toLocaleDateString()}
-                </span>
-                <button 
-                  className="helpful-btn"
-                  onClick={() => handleMarkHelpful(review._id)}
-                >
-                  <FiThumbsUp /> Helpful ({review.helpful})
-                </button>
+                <span className="order-id">Order: {verification.orderId}</span>
               </div>
             </div>
           ))

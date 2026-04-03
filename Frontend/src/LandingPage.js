@@ -64,9 +64,9 @@ function LandingPage() {
       // Sync cart with backend when user is logged in
       syncCartWithBackend(parsedUser._id);
     } else {
-      // Load cart from localStorage for guest users
-      const savedCart = localStorage.getItem('cart');
-      if (savedCart) setCart(JSON.parse(savedCart));
+      // Clear cart for non-logged-in users
+      setCart([]);
+      localStorage.removeItem('cart');
     }
 
     // Load favorites from localStorage
@@ -95,13 +95,10 @@ function LandingPage() {
 
   const syncCartWithBackend = async (customerId) => {
     try {
-      // Get localStorage cart
-      const localCart = JSON.parse(localStorage.getItem('cart') || '[]');
-      
-      // Get backend cart
+      // Get backend cart first
       const backendCart = await cartAPI.get(customerId);
       
-      // If backend has cart items, use them
+      // If backend has cart items, use them and update localStorage
       if (backendCart.items && backendCart.items.length > 0) {
         const formattedCart = backendCart.items.map(item => ({
           id: item.product._id || item.product,
@@ -118,25 +115,15 @@ function LandingPage() {
         
         setCart(formattedCart);
         localStorage.setItem('cart', JSON.stringify(formattedCart));
-        return;
-      }
-      
-      // If local cart exists but backend is empty, sync to backend
-      if (localCart.length > 0) {
-        for (const item of localCart) {
-          try {
-            await cartAPI.add(customerId, item.id, item.quantity);
-          } catch (error) {
-            console.error('Error syncing item to backend:', error);
-          }
-        }
-        setCart(localCart);
+      } else {
+        // Backend cart is empty - clear localStorage and set empty cart
+        setCart([]);
+        localStorage.removeItem('cart');
       }
     } catch (error) {
       console.error('Error syncing cart:', error);
-      // Fallback to localStorage cart on error
-      const savedCart = localStorage.getItem('cart');
-      if (savedCart) setCart(JSON.parse(savedCart));
+      // On error, just set empty cart
+      setCart([]);
     }
   };
 
@@ -408,9 +395,8 @@ function LandingPage() {
 
   // Fetch search suggestions
   const fetchSuggestions = async (query) => {
-    if (!query || query.trim().length < 2) {
+    if (!query || query.trim().length < 1) {
       setSearchSuggestions({});
-      setShowSuggestions(false);
       return;
     }
     
@@ -440,9 +426,12 @@ function LandingPage() {
         
         setSearchSuggestions(formattedSuggestions);
         setShowSuggestions(true);
+      } else {
+        setSearchSuggestions({});
       }
     } catch (error) {
       console.error('Error fetching suggestions:', error);
+      setSearchSuggestions({});
     }
   };
 
@@ -450,19 +439,75 @@ function LandingPage() {
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchQuery(value);
-    fetchSuggestions(value);
+    
+    if (value.trim()) {
+      fetchSuggestions(value);
+      setShowSuggestions(true);
+    } else {
+      // Show recent searches when input is empty
+      setShowSuggestions(true);
+    }
+  };
+
+  // Handle search input focus
+  const handleSearchFocus = () => {
+    setShowSuggestions(true);
+  };
+
+  // Handle search input blur
+  const handleSearchBlur = () => {
+    setTimeout(() => setShowSuggestions(false), 200);
+  };
+
+  // Save search to recent searches
+  const saveRecentSearch = (searchTerm, type, id = null) => {
+    const recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+    const newSearch = {
+      term: searchTerm,
+      type: type, // 'product', 'seller', 'page'
+      id: id,
+      timestamp: Date.now()
+    };
+    
+    // Remove duplicate if exists
+    const filtered = recentSearches.filter(s => 
+      !(s.term === searchTerm && s.type === type)
+    );
+    
+    // Add to beginning and limit to 10
+    const updated = [newSearch, ...filtered].slice(0, 10);
+    localStorage.setItem('recentSearches', JSON.stringify(updated));
+  };
+
+  // Get recent searches
+  const getRecentSearches = () => {
+    return JSON.parse(localStorage.getItem('recentSearches') || '[]');
+  };
+
+  // Clear recent searches
+  const clearRecentSearches = () => {
+    localStorage.setItem('recentSearches', '[]');
+    setShowSuggestions(false);
   };
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion) => {
-    setSearchQuery(suggestion.name);
-    setShowSuggestions(false);
-    
-    if (suggestion.type === 'category') {
+    if (suggestion.type === 'product') {
+      saveRecentSearch(suggestion.name, 'product', suggestion._id);
+      navigate(`/product/${suggestion._id}`);
+    } else if (suggestion.type === 'seller') {
+      saveRecentSearch(suggestion.storeName || suggestion.name, 'seller', suggestion.id);
+      navigate(`/seller/${suggestion.id}`);
+    } else if (suggestion.type === 'category') {
+      saveRecentSearch(suggestion.name, 'category');
       handleCategoryClick(suggestion.name.toUpperCase());
-    } else {
-      performSearch(suggestion.name);
+    } else if (suggestion.type === 'page') {
+      saveRecentSearch(suggestion.name, 'page');
+      navigate(suggestion.path);
     }
+    
+    setSearchQuery('');
+    setShowSuggestions(false);
   };
 
   const performSearch = (query) => {
@@ -693,8 +738,8 @@ function LandingPage() {
               placeholder="Search products, sellers, pages..." 
               value={searchQuery} 
               onChange={handleSearchChange}
-              onFocus={() => searchSuggestions.products?.length > 0 && setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
             />
             {searchQuery && (
               <button 
@@ -732,10 +777,68 @@ function LandingPage() {
           </form>
           
           {/* Search Suggestions Dropdown */}
-          {showSuggestions && (searchSuggestions.products?.length > 0 || searchSuggestions.collections?.length > 0 || searchSuggestions.sellers?.length > 0) && (
+          {showSuggestions && (
             <div className="landing-search-suggestions">
+              {/* Recent Searches - Show when no query */}
+              {!searchQuery && (
+                <>
+                  {getRecentSearches().length > 0 ? (
+                    <div className="suggestions-section">
+                      <div className="suggestions-header">
+                        <span className="suggestions-title">RECENT SEARCHES</span>
+                        <button 
+                          onClick={clearRecentSearches}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#00bcd4',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            fontWeight: '600'
+                          }}
+                        >
+                          CLEAR ALL
+                        </button>
+                      </div>
+                      {getRecentSearches().map((recent, index) => (
+                        <div
+                          key={`recent-${index}`}
+                          className="suggestion-item"
+                          onClick={() => {
+                            if (recent.type === 'product' && recent.id) {
+                              navigate(`/product/${recent.id}`);
+                            } else if (recent.type === 'seller' && recent.id) {
+                              navigate(`/seller/${recent.id}`);
+                            } else if (recent.type === 'page') {
+                              const page = [
+                                { name: 'About Us', path: '/about' },
+                                { name: 'Contact', path: '/contact' },
+                                { name: 'FAQ', path: '/faq' },
+                                { name: 'Shop', path: '/shop' }
+                              ].find(p => p.name === recent.term);
+                              if (page) navigate(page.path);
+                            }
+                            setShowSuggestions(false);
+                          }}
+                        >
+                          <FiSearch className="suggestion-icon" />
+                          <span className="suggestion-text">{recent.term}</span>
+                          <span className="suggestion-type">{recent.type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="suggestions-section">
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>
+                        No recent searches
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* Products Section */}
-              {searchSuggestions.products && searchSuggestions.products.length > 0 && (
+              {searchQuery && searchSuggestions.products && searchSuggestions.products.length > 0 && (
                 <div className="suggestions-section">
                   <div className="suggestions-header">
                     <span className="suggestions-title">PRODUCTS</span>
@@ -806,7 +909,7 @@ function LandingPage() {
               )}
 
               {/* Sellers Section */}
-              {searchSuggestions.sellers && searchSuggestions.sellers.length > 0 && (
+              {searchQuery && searchSuggestions.sellers && searchSuggestions.sellers.length > 0 && (
                 <div className="suggestions-section">
                   <div className="suggestions-header">
                     <span className="suggestions-title">SELLERS</span>
@@ -817,15 +920,20 @@ function LandingPage() {
                       key={`seller-${index}`}
                       className="suggestion-item seller-suggestion"
                       onClick={() => {
-                        setSearchQuery(seller.name);
+                        saveRecentSearch(seller.storeName || seller.name, 'seller', seller._id || seller.id);
+                        navigate(`/seller/${seller._id || seller.id}`);
                         setShowSuggestions(false);
-                        performSearch(seller.name);
                       }}
                     >
                       <div className="suggestion-icon-wrapper">
                         <FiUser />
                       </div>
-                      <span className="suggestion-text">{seller.name}</span>
+                      <div className="suggestion-seller-info">
+                        <span className="suggestion-text">{seller.storeName || seller.name}</span>
+                        {seller.storeName && seller.name && (
+                          <span className="suggestion-subtext">{seller.name}</span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -836,7 +944,7 @@ function LandingPage() {
 
         <div className={`header-right ${mobileMenuOpen ? 'mobile-open' : ''}`}>
           <div className="header-links">
-            <Link to="/seller" onClick={() => setMobileMenuOpen(false)}>Become a Seller</Link>
+            {!user && <Link to="/seller" onClick={() => setMobileMenuOpen(false)}>Become a Seller</Link>}
             {user ? (
               <>
                 <span>Hi, {user.fullName}</span>
@@ -1082,8 +1190,6 @@ function LandingPage() {
         <div className="filter-tabs">
           <button className={activeTab === 'ALL' ? 'active' : ''} onClick={() => setActiveTab('ALL')}>ALL</button>
           <button className={activeTab === 'NEW' ? 'active' : ''} onClick={() => setActiveTab('NEW')}>NEW ARRIVALS</button>
-          <button className={activeTab === 'BEST' ? 'active' : ''} onClick={() => setActiveTab('BEST')}>BEST SELLER</button>
-          <button className={activeTab === 'TOP' ? 'active' : ''} onClick={() => setActiveTab('TOP')}>TOP RATED</button>
         </div>
         {loading ? (
           <div className="loading-message">
@@ -1108,7 +1214,7 @@ function LandingPage() {
               <div className="product-details">
                 <h3 className="product-title">{product.name}</h3>
                 <p className="product-size">Size: {product.size || 'M'}</p>
-                <p className="product-price">Rs{product.price.toLocaleString()}</p>
+                <p className="product-price">Rs. {product.price.toLocaleString()}</p>
               </div>
             </div>
             ))}
@@ -1129,7 +1235,7 @@ function LandingPage() {
 
       {/* Collections */}
       <section className="category-sections">
-        <div className="category-card" onClick={() => handleCategoryClick('MEN')} style={{cursor: 'pointer'}}>
+        <div className="category-card" onClick={() => navigate('/mens-outlet')} style={{cursor: 'pointer'}}>
           <div className="category-image-placeholder">
             <img 
               src="https://i.pinimg.com/474x/bc/83/08/bc8308ad115003adae43e7743ef2254f.jpg" 
@@ -1144,12 +1250,12 @@ function LandingPage() {
           </div>
           <h3>MEN'S APPAREL</h3>
           <ul>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); }}>Men's Jacket</li>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); }}>Men's Shirt</li>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); }}>Men's Pants</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/mens-jacket'); }}>Men's Jacket</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/mens-shirt'); }}>Men's Shirt</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/mens-pants'); }}>Men's Pants</li>
           </ul>
         </div>
-        <div className="category-card" onClick={() => handleCategoryClick('WOMEN')} style={{cursor: 'pointer'}}>
+        <div className="category-card" onClick={() => navigate('/womens-outlet')} style={{cursor: 'pointer'}}>
           <div className="category-image-placeholder">
             <img 
               src="https://i.pinimg.com/1200x/0c/84/90/0c8490ba8312437f20816c196febce73.jpg" 
@@ -1164,9 +1270,9 @@ function LandingPage() {
           </div>
           <h3>WOMEN'S APPAREL</h3>
           <ul>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); }}>Women's Jacket</li>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); }}>Women's Shirt</li>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); }}>Women's Pants</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-jacket'); }}>Women's Jacket</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-shirt'); }}>Women's Shirt</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-pants'); }}>Women's Pants</li>
           </ul>
         </div>
         <div className="category-card" onClick={handleExploreMore} style={{cursor: 'pointer'}}>
@@ -1184,8 +1290,8 @@ function LandingPage() {
           </div>
           <h3>SHOP OUTLET</h3>
           <ul>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('MEN'); }}>Men's Outlet</li>
-            <li onClick={(e) => { e.stopPropagation(); handleCategoryClick('WOMEN'); }}>Women's Outlet</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/mens-outlet'); }}>Men's Outlet</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-outlet'); }}>Women's Outlet</li>
           </ul>
         </div>
       </section>

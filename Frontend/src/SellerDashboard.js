@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   FaBox,
   FaShoppingCart,
+  FaDollarSign,
   FaChartBar,
   FaUser,
   FaCog,
@@ -14,7 +15,6 @@ import {
   FaBell,
   FaHome,
   FaShoppingBag,
-  FaDollarSign,
   FaQuestionCircle,
   FaCheckCircle,
   FaExclamationTriangle,
@@ -33,7 +33,9 @@ import {
 } from "react-icons/fa";
 import { HiTrendingUp } from "react-icons/hi";
 import { MdDashboard } from "react-icons/md";
+import { FiSend } from "react-icons/fi";
 import { RevenueTrendChart, TopProductsChart, CategoryPerformanceChart, StockLevelsChart } from "./components/Charts";
+import SellerFinance from "./SellerFinance";
 import HelpCenter from "./components/HelpCenter";
 import Chatbot from "./components/Chatbot";
 import "./SellerDashboard.css";
@@ -60,13 +62,20 @@ function SellerDashboard() {
     description: '',
     price: '',
     category: '',
+    subcategory: '',
     condition: 'New',
     size: '',
     brand: '',
     stock: '',
     images: [''],
     story: '',
-    paymentOptions: ['cod', 'online']
+    paymentOptions: ['cod', 'online'],
+    bundleDeal: {
+      enabled: false,
+      buyQuantity: 2,
+      discountPercentage: 10,
+      description: ''
+    }
   });
   const [imageFiles, setImageFiles] = useState([]);
   const [chartData, setChartData] = useState({
@@ -97,6 +106,9 @@ function SellerDashboard() {
   const [messages, setMessages] = useState([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [conversationMessages, setConversationMessages] = useState([]);
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [twoFAPassword, setTwoFAPassword] = useState('');
   const [show2FASuccess, setShow2FASuccess] = useState(false);
@@ -131,6 +143,16 @@ function SellerDashboard() {
   const [showRestockModal, setShowRestockModal] = useState(false);
   const [restockProduct, setRestockProduct] = useState(null);
   const [restockQuantity, setRestockQuantity] = useState('');
+  const [returns, setReturns] = useState([]);
+  const [returnStats, setReturnStats] = useState({
+    totalReturns: 0,
+    pendingReturns: 0,
+    approvedReturns: 0,
+    completedReturns: 0,
+    totalRefundAmount: 0
+  });
+  const [loadingReturns, setLoadingReturns] = useState(false);
+  const [returnStatusFilter, setReturnStatusFilter] = useState('All');
 
   const handleProfileImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -156,6 +178,8 @@ function SellerDashboard() {
     fetchStats(user._id);
     fetchOrders(user._id);
     fetchMessages(user._id);
+    fetchReturns(user._id);
+    fetchReturnStats(user._id);
     fetchNotifications();
   }, [navigate]);
 
@@ -251,16 +275,71 @@ function SellerDashboard() {
   const fetchMessages = async (sellerId) => {
     setLoadingMessages(true);
     try {
-      const response = await fetch(`${API_URL}/messages/seller/${sellerId}`);
+      // Fetch conversations for seller
+      const response = await fetch(`${API_URL}/messages/conversations/${sellerId}`);
       const data = await response.json();
-      if (data.success) {
-        setMessages(data.messages || []);
-        setUnreadMessages(data.unreadCount || 0);
+      
+      console.log('Seller conversations data:', data);
+      
+      if (data.success && data.conversations) {
+        // Transform conversations to message format for display
+        const conversationMessages = data.conversations.map(conv => {
+          console.log('Processing conversation:', conv);
+          return {
+            _id: conv.conversationId,
+            conversationId: conv.conversationId,
+            senderId: conv.otherUser._id,
+            senderModel: conv.otherUser.model,
+            senderInfo: {
+              fullName: conv.otherUser.name || 'Customer',
+              email: conv.otherUser.email || '',
+              profileImage: conv.otherUser.profileImage
+            },
+            message: conv.lastMessage.message,
+            createdAt: conv.lastMessage.createdAt,
+            read: conv.lastMessage.read,
+            productId: conv.productId
+          };
+        });
+        
+        console.log('Transformed seller messages:', conversationMessages);
+        setMessages(conversationMessages);
+        setUnreadMessages(data.conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0));
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error('Error fetching seller messages:', error);
     } finally {
       setLoadingMessages(false);
+    }
+  };
+
+  const fetchReturns = async (sellerId) => {
+    setLoadingReturns(true);
+    try {
+      const statusParam = returnStatusFilter !== 'All' ? `?status=${returnStatusFilter}` : '';
+      const response = await fetch(`${API_URL}/returns/seller/${sellerId}${statusParam}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setReturns(data.returns || []);
+      }
+    } catch (error) {
+      console.error('Error fetching returns:', error);
+    } finally {
+      setLoadingReturns(false);
+    }
+  };
+
+  const fetchReturnStats = async (sellerId) => {
+    try {
+      const response = await fetch(`${API_URL}/returns/seller/${sellerId}/stats`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setReturnStats(data.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching return stats:', error);
     }
   };
 
@@ -292,10 +371,67 @@ function SellerDashboard() {
         alert('Message deleted successfully');
         const user = JSON.parse(localStorage.getItem('user'));
         fetchMessages(user._id);
+        setSelectedMessage(null);
       }
     } catch (error) {
       console.error('Error deleting message:', error);
       alert('Failed to delete message');
+    }
+  };
+
+  const fetchConversationMessages = async (conversationId) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const response = await fetch(`${API_URL}/messages/conversation/${conversationId}?userId=${user._id}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setConversationMessages(data.messages);
+      }
+    } catch (error) {
+      console.error('Error fetching conversation messages:', error);
+    }
+  };
+
+  const handleSelectMessage = async (msg) => {
+    setSelectedMessage(msg);
+    // Fetch full conversation
+    await fetchConversationMessages(msg.conversationId);
+  };
+
+  const handleDirectReply = async () => {
+    if (!replyText.trim() || !selectedMessage) return;
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const response = await fetch(`${API_URL}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          senderId: user._id,
+          senderModel: 'Seller',
+          receiverId: selectedMessage.senderId,
+          receiverModel: selectedMessage.senderModel,
+          message: replyText
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setReplyText('');
+        // Refresh conversation messages
+        await fetchConversationMessages(selectedMessage.conversationId);
+        // Refresh message list
+        fetchMessages(user._id);
+      } else {
+        alert('Failed to send reply');
+      }
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      alert('Failed to send reply');
     }
   };
 
@@ -637,6 +773,14 @@ function SellerDashboard() {
     setFilteredOrders(filtered);
   }, [orderSearchQuery, orderStatusFilter, orders]);
 
+  // Refetch returns when filter changes
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user && user._id) {
+      fetchReturns(user._id);
+    }
+  }, [returnStatusFilter]);
+
   const handleAddProduct = async (e) => {
     e.preventDefault();
     const user = JSON.parse(localStorage.getItem('user'));
@@ -671,7 +815,13 @@ function SellerDashboard() {
           stock: '',
           images: [''],
           story: '',
-          paymentOptions: ['cod', 'online']
+          paymentOptions: ['cod', 'online'],
+          bundleDeal: {
+            enabled: false,
+            buyQuantity: 2,
+            discountPercentage: 10,
+            description: ''
+          }
         });
         fetchProducts(user._id);
         fetchStats(user._id);
@@ -721,17 +871,25 @@ function SellerDashboard() {
     const user = JSON.parse(localStorage.getItem('user'));
     
     try {
+      // Prepare update data
+      const updateData = {
+        ...editingProduct,
+        sellerId: user._id,
+        price: parseFloat(editingProduct.price),
+        stock: parseInt(editingProduct.stock)
+      };
+      
+      // Remove discount field if it's empty or invalid
+      if (!updateData.discount || !updateData.discount.percentage || !updateData.discount.startDate || !updateData.discount.endDate) {
+        delete updateData.discount;
+      }
+      
       const response = await fetch(`${API_URL}/products/${editingProduct._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...editingProduct,
-          sellerId: user._id,
-          price: parseFloat(editingProduct.price),
-          stock: parseInt(editingProduct.stock)
-        }),
+        body: JSON.stringify(updateData),
       });
 
       const data = await response.json();
@@ -785,8 +943,12 @@ function SellerDashboard() {
         sellerId: user._id
       };
 
-      // Include discount if it exists
-      if (restockProduct.discount) {
+      // Include discount if it exists and is valid
+      if (restockProduct.discount && 
+          restockProduct.discount.percentage !== undefined &&
+          restockProduct.discount.startDate &&
+          restockProduct.discount.endDate &&
+          restockProduct.discount.active !== undefined) {
         updatePayload.discount = restockProduct.discount;
       }
 
@@ -798,7 +960,14 @@ function SellerDashboard() {
         body: JSON.stringify(updatePayload),
       });
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { message: text };
+      }
       
       if (response.ok) {
         alert(`Product restocked successfully! New stock: ${newStock} units`);
@@ -809,7 +978,7 @@ function SellerDashboard() {
         fetchStats(user._id);
       } else {
         console.error('Restock error:', data);
-        alert(data.message || 'Failed to restock product');
+        alert(data.message || data.errors?.join(', ') || 'Failed to restock product');
       }
     } catch (error) {
       console.error('Error restocking product:', error);
@@ -821,6 +990,66 @@ function SellerDashboard() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/');
+  };
+
+  const handleReturnResponse = async (returnId, status) => {
+    const sellerResponse = prompt(`Please provide a response to the customer (optional):`);
+    
+    try {
+      const response = await fetch(`${API_URL}/returns/${returnId}/respond`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status,
+          sellerResponse: sellerResponse || ''
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`Return request ${status.toLowerCase()} successfully`);
+        const user = JSON.parse(localStorage.getItem('user'));
+        fetchReturns(user._id);
+        fetchReturnStats(user._id);
+      } else {
+        alert(data.message || 'Failed to update return request');
+      }
+    } catch (error) {
+      console.error('Error updating return request:', error);
+      alert('Error updating return request');
+    }
+  };
+
+  const handleCompleteReturn = async (returnId) => {
+    if (!window.confirm('Mark this return as completed and process refund?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/returns/${returnId}/complete`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('Return completed and refund processed successfully');
+        const user = JSON.parse(localStorage.getItem('user'));
+        fetchReturns(user._id);
+        fetchReturnStats(user._id);
+      } else {
+        alert(data.message || 'Failed to complete return');
+      }
+    } catch (error) {
+      console.error('Error completing return:', error);
+      alert('Error completing return');
+    }
   };
 
   // Settings handlers
@@ -1303,50 +1532,67 @@ function SellerDashboard() {
       <div className="sidebar">
         <img src="/logo.png" alt="Rebuy" className="sidebar-logo-img" />
         
-        <div 
-          className={`menu-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
-          <MdDashboard /> Dashboard
-        </div>
-        <div 
-          className={`menu-item ${activeTab === 'products' ? 'active' : ''}`}
-          onClick={() => setActiveTab('products')}
-        >
-          <FaBox /> Products
-        </div>
-        <div 
-          className={`menu-item ${activeTab === 'orders' ? 'active' : ''}`}
-          onClick={() => setActiveTab('orders')}
-        >
-          <FaShoppingCart /> Orders
-        </div>
+        <div className="menu-items-scrollable">
+          <div 
+            className={`menu-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
+          >
+            <MdDashboard /> Dashboard
+          </div>
+          <div 
+            className={`menu-item ${activeTab === 'products' ? 'active' : ''}`}
+            onClick={() => setActiveTab('products')}
+          >
+            <FaBox /> Products
+          </div>
+          
+          <div 
+            className={`menu-item ${activeTab === 'orders' ? 'active' : ''}`}
+            onClick={() => setActiveTab('orders')}
+          >
+            <FaShoppingCart /> Orders
+          </div>
+          
+          <div 
+            className={`menu-item ${activeTab === 'customer-returns' ? 'active' : ''}`}
+            onClick={() => setActiveTab('customer-returns')}
+          >
+            <FaArchive /> Customer Returns
+          </div>
 
-        <div 
-          className={`menu-item ${activeTab === 'inbox' ? 'active' : ''}`}
-          onClick={() => setActiveTab('inbox')}
-        >
-          <FaBell /> Inbox
-        </div>
+          <div 
+            className={`menu-item ${activeTab === 'finance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('finance')}
+          >
+            <FaDollarSign /> Finance
+          </div>
 
-        <div 
-          className={`menu-item ${activeTab === 'revenue' ? 'active' : ''}`}
-          onClick={() => setActiveTab('revenue')}
-        >
-          <FaChartLine /> Revenue
-        </div>
-        <div 
-          className={`menu-item ${activeTab === 'performance' ? 'active' : ''}`}
-          onClick={() => setActiveTab('performance')}
-        >
-          <FaChartBar /> Performance
-        </div>
+          <div 
+            className={`menu-item ${activeTab === 'inbox' ? 'active' : ''}`}
+            onClick={() => setActiveTab('inbox')}
+          >
+            <FaBell /> Inbox
+          </div>
 
-        <div 
-          className="menu-item"
-          onClick={() => setActiveTab('profile')}
-        >
-          <FaUser /> Profile
+          <div 
+            className={`menu-item ${activeTab === 'revenue' ? 'active' : ''}`}
+            onClick={() => setActiveTab('revenue')}
+          >
+            <FaChartLine /> Revenue
+          </div>
+          <div 
+            className={`menu-item ${activeTab === 'performance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('performance')}
+          >
+            <FaChartBar /> Performance
+          </div>
+
+          <div 
+            className="menu-item"
+            onClick={() => setActiveTab('profile')}
+          >
+            <FaUser /> Profile
+          </div>
         </div>
 
         <div className="bottom-menu">
@@ -1377,6 +1623,8 @@ function SellerDashboard() {
               {activeTab === 'dashboard' && 'Dashboard Overview'}
               {activeTab === 'products' && 'Product Management'}
               {activeTab === 'orders' && 'Order Management'}
+              {activeTab === 'customer-returns' && 'Customer Returns'}
+              {activeTab === 'finance' && 'Finance & Payouts'}
               {activeTab === 'inbox' && 'Inbox'}
               {activeTab === 'revenue' && 'Revenue Analytics'}
               {activeTab === 'performance' && 'Performance Analytics'}
@@ -1388,6 +1636,8 @@ function SellerDashboard() {
               {activeTab === 'dashboard' && 'Manage your store efficiently with real-time insights.'}
               {activeTab === 'products' && 'Manage your product inventory and listings.'}
               {activeTab === 'orders' && 'Track and manage customer orders.'}
+              {activeTab === 'customer-returns' && 'Handle customer return requests.'}
+              {activeTab === 'finance' && 'View your earnings and manage payout details.'}
               {activeTab === 'inbox' && 'View and respond to customer messages.'}
               {activeTab === 'revenue' && 'View your revenue trends and analytics.'}
               {activeTab === 'performance' && 'Analyze your store performance metrics.'}
@@ -1463,6 +1713,11 @@ function SellerDashboard() {
                               <p className="notification-message">
                                 {notif.message}
                               </p>
+                              {notif.metadata && notif.metadata.customerNotes && (
+                                <p className="notification-customer-notes">
+                                  <strong>Customer notes:</strong> {notif.metadata.customerNotes}
+                                </p>
+                              )}
                               <div className="notification-footer">
                                 <span className="notification-time">
                                   <FaClock size={10} />
@@ -1695,7 +1950,7 @@ function SellerDashboard() {
         {activeTab === 'products' && (
           <div className="products-section">
             <div className="products-header">
-              <h3 className="products-title">My Products</h3>
+              <h3 className="products-title"></h3>
               
               <div className="search-container">
                 <input
@@ -1784,17 +2039,103 @@ function SellerDashboard() {
                       <label className="form-label">Category *</label>
                       <select
                         value={newProduct.category}
-                        onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                        onChange={(e) => {
+                          setNewProduct({...newProduct, category: e.target.value, subcategory: ''});
+                        }}
                         required
                         className="form-select"
                       >
                         <option value="">Select Category</option>
                         <option value="Men's Collection">Men's Collection</option>
                         <option value="Women's Collection">Women's Collection</option>
-                        <option value="Kid's Collection">Kid's Collection</option>
                         <option value="Sportswear">Sportswear</option>
                         <option value="Vintage">Vintage</option>
-                        <option value="Accessories">Accessories</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Subcategory</label>
+                      <select
+                        value={newProduct.subcategory || ''}
+                        onChange={(e) => setNewProduct({...newProduct, subcategory: e.target.value})}
+                        className="form-select"
+                        disabled={!newProduct.category}
+                      >
+                        <option value="">Select Subcategory</option>
+                        {newProduct.category === "Men's Collection" && (
+                          <>
+                            <optgroup label="Tops">
+                              <option value="T-Shirts">T-Shirts</option>
+                              <option value="Shirts">Shirts</option>
+                              <option value="Polos">Polos</option>
+                              <option value="Hoodies">Hoodies</option>
+                              <option value="Sweaters">Sweaters</option>
+                            </optgroup>
+                            <optgroup label="Bottoms">
+                              <option value="Jeans">Jeans</option>
+                              <option value="Pants">Pants</option>
+                              <option value="Shorts">Shorts</option>
+                              <option value="Joggers">Joggers</option>
+                            </optgroup>
+                            <optgroup label="Outerwear">
+                              <option value="Jackets">Jackets</option>
+                              <option value="Coats">Coats</option>
+                              <option value="Blazers">Blazers</option>
+                              <option value="Vests">Vests</option>
+                            </optgroup>
+                          </>
+                        )}
+                        {newProduct.category === "Women's Collection" && (
+                          <>
+                            <optgroup label="Tops">
+                              <option value="T-Shirts">T-Shirts</option>
+                              <option value="Blouses">Blouses</option>
+                              <option value="Sweaters">Sweaters</option>
+                              <option value="Hoodies">Hoodies</option>
+                              <option value="Tank Tops">Tank Tops</option>
+                            </optgroup>
+                            <optgroup label="Bottoms">
+                              <option value="Jeans">Jeans</option>
+                              <option value="Pants">Pants</option>
+                              <option value="Skirts">Skirts</option>
+                              <option value="Leggings">Leggings</option>
+                            </optgroup>
+                            <optgroup label="Dresses">
+                              <option value="Casual Dresses">Casual Dresses</option>
+                              <option value="Formal Dresses">Formal Dresses</option>
+                              <option value="Maxi Dresses">Maxi Dresses</option>
+                              <option value="Mini Dresses">Mini Dresses</option>
+                            </optgroup>
+                          </>
+                        )}
+                        {newProduct.category === "Sportswear" && (
+                          <>
+                            <optgroup label="Athletic Wear">
+                              <option value="Sports T-Shirts">Sports T-Shirts</option>
+                              <option value="Tank Tops">Tank Tops</option>
+                              <option value="Jerseys">Jerseys</option>
+                              <option value="Tracksuits">Tracksuits</option>
+                            </optgroup>
+                            <optgroup label="Bottoms">
+                              <option value="Joggers">Joggers</option>
+                              <option value="Track Pants">Track Pants</option>
+                              <option value="Sports Shorts">Sports Shorts</option>
+                              <option value="Leggings">Leggings</option>
+                            </optgroup>
+                            <optgroup label="Outerwear">
+                              <option value="Windbreakers">Windbreakers</option>
+                              <option value="Sports Hoodies">Sports Hoodies</option>
+                              <option value="Sports Jackets">Sports Jackets</option>
+                            </optgroup>
+                          </>
+                        )}
+                        {newProduct.category === "Vintage" && (
+                          <>
+                            <option value="Vintage Tops">Vintage Tops</option>
+                            <option value="Vintage Bottoms">Vintage Bottoms</option>
+                            <option value="Vintage Dresses">Vintage Dresses</option>
+                            <option value="Vintage Outerwear">Vintage Outerwear</option>
+                          </>
+                        )}
                       </select>
                     </div>
                     <div>
@@ -1811,6 +2152,9 @@ function SellerDashboard() {
                         <option value="Vintage">Vintage</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div className="form-grid-2">
                     <div>
                       <label className="form-label">Size</label>
                       <input
@@ -1821,17 +2165,16 @@ function SellerDashboard() {
                         className="form-input"
                       />
                     </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Brand</label>
-                    <input
-                      type="text"
-                      value={newProduct.brand}
-                      onChange={(e) => setNewProduct({...newProduct, brand: e.target.value})}
-                      placeholder="e.g., Nike, Adidas, Zara"
-                      className="form-input"
-                    />
+                    <div>
+                      <label className="form-label">Brand</label>
+                      <input
+                        type="text"
+                        value={newProduct.brand}
+                        onChange={(e) => setNewProduct({...newProduct, brand: e.target.value})}
+                        placeholder="e.g., Nike, Adidas, Zara"
+                        className="form-input"
+                      />
+                    </div>
                   </div>
 
                   <div className="form-group">
@@ -1845,15 +2188,108 @@ function SellerDashboard() {
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Product Story</label>
+                  <div className="form-group story-field-enhanced">
+                    <label className="form-label">
+                      <span className="label-icon">📖</span>
+                      Product Story
+                      <span className="label-badge-important">Recommended</span>
+                    </label>
+                    <p className="field-hint">
+                      Share the unique story behind this item. Add personality and emotional value to help buyers connect with your product.
+                    </p>
                     <textarea
                       value={newProduct.story}
                       onChange={(e) => setNewProduct({...newProduct, story: e.target.value})}
-                      rows="3"
-                      placeholder="Share the story behind this item..."
-                      className="form-textarea"
+                      rows="4"
+                      placeholder='Example: "This vintage denim jacket is from the 90s collection. It was worn only twice and has been carefully preserved. The distressed look is authentic, not artificially created. Perfect for anyone who loves authentic vintage fashion!"'
+                      className="form-textarea story-textarea"
                     />
+                    <div className="character-count">
+                      {newProduct.story?.length || 0} characters
+                    </div>
+                  </div>
+
+                  {/* Bundle Deal Section */}
+                  <div className="form-group bundle-deal-section">
+                    <div style={{display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px'}}>
+                      <input
+                        type="checkbox"
+                        id="bundleDealEnabled"
+                        checked={newProduct.bundleDeal?.enabled || false}
+                        onChange={(e) => setNewProduct({
+                          ...newProduct,
+                          bundleDeal: {
+                            ...newProduct.bundleDeal,
+                            enabled: e.target.checked
+                          }
+                        })}
+                        style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                      />
+                      <label htmlFor="bundleDealEnabled" className="form-label" style={{margin: 0, cursor: 'pointer'}}>
+                        Enable Bundle Deal
+                      </label>
+                    </div>
+
+                    {newProduct.bundleDeal?.enabled && (
+                      <div style={{marginLeft: '28px', padding: '12px', background: '#f8f9fa', borderRadius: '8px'}}>
+                        <div className="form-grid-2" style={{marginBottom: '12px'}}>
+                          <div>
+                            <label className="form-label">Buy Quantity *</label>
+                            <input
+                              type="number"
+                              min="2"
+                              value={newProduct.bundleDeal?.buyQuantity || 2}
+                              onChange={(e) => setNewProduct({
+                                ...newProduct,
+                                bundleDeal: {
+                                  ...newProduct.bundleDeal,
+                                  buyQuantity: parseInt(e.target.value) || 2
+                                }
+                              })}
+                              className="form-input"
+                              placeholder="e.g., 2"
+                            />
+                          </div>
+                          <div>
+                            <label className="form-label">Discount % *</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={newProduct.bundleDeal?.discountPercentage || 10}
+                              onChange={(e) => setNewProduct({
+                                ...newProduct,
+                                bundleDeal: {
+                                  ...newProduct.bundleDeal,
+                                  discountPercentage: parseInt(e.target.value) || 10
+                                }
+                              })}
+                              className="form-input"
+                              placeholder="e.g., 10"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="form-label">Bundle Description (Optional)</label>
+                          <input
+                            type="text"
+                            value={newProduct.bundleDeal?.description || ''}
+                            onChange={(e) => setNewProduct({
+                              ...newProduct,
+                              bundleDeal: {
+                                ...newProduct.bundleDeal,
+                                description: e.target.value
+                              }
+                            })}
+                            className="form-input"
+                            placeholder="e.g., Buy 2 or more and save!"
+                          />
+                        </div>
+                        <p style={{fontSize: '12px', color: '#666', marginTop: '8px', marginBottom: 0}}>
+                          Preview: Buy {newProduct.bundleDeal?.buyQuantity || 2}+ Get {newProduct.bundleDeal?.discountPercentage || 10}% OFF
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="image-upload-section">
@@ -2166,7 +2602,7 @@ function SellerDashboard() {
         {activeTab === 'orders' && (
           <div className="products-section">
             <div className="orders-header">
-              <h3 className="orders-title">Order Management</h3>
+              <h3 className="orders-title"></h3>
               
               <div className="orders-controls">
                 <div className="order-search-container">
@@ -2386,100 +2822,111 @@ function SellerDashboard() {
           </div>
         )}
 
-        {/* INBOX TAB */}
-        {activeTab === 'inbox' && (
-          <div className="products-section">
-            <h3 className="inbox-title">
-              Customer Messages {unreadMessages > 0 && `(${unreadMessages} unread)`}
-            </h3>
-            
-            {loadingMessages ? (
-              <div className="messages-loading">
-                <h3>Loading messages...</h3>
+        {/* CUSTOMER RETURNS TAB */}
+        {activeTab === 'customer-returns' && (
+          <div className="returns-section">
+            <div className="returns-stats">
+              <div className="stat-card">
+                <h4>Total Returns</h4>
+                <p className="stat-number">{returnStats.totalReturns || 0}</p>
               </div>
-            ) : messages.length === 0 ? (
-              <div className="inbox-empty">
-                <FaBell size={64} className="inbox-empty-icon" />
-                <h3 className="inbox-empty-title">No Messages Yet</h3>
-                <p className="inbox-empty-text">Customer inquiries will appear here</p>
+              <div className="stat-card pending">
+                <h4>Pending</h4>
+                <p className="stat-number">{returnStats.pendingReturns || 0}</p>
+              </div>
+              <div className="stat-card approved">
+                <h4>Approved</h4>
+                <p className="stat-number">{returnStats.approvedReturns || 0}</p>
+              </div>
+              <div className="stat-card completed">
+                <h4>Completed</h4>
+                <p className="stat-number">{returnStats.completedReturns || 0}</p>
+              </div>
+            </div>
+
+            <div className="returns-filters">
+              <select 
+                value={returnStatusFilter}
+                onChange={(e) => setReturnStatusFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="All">All Returns</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Completed">Completed</option>
+                <option value="Refunded">Refunded</option>
+              </select>
+            </div>
+
+            {loadingReturns ? (
+              <div className="loading-state">Loading returns...</div>
+            ) : returns.length === 0 ? (
+              <div className="empty-state">
+                <FaArchive style={{ fontSize: '64px', color: '#00bcd4', marginBottom: '20px' }} />
+                <h3>No Return Requests</h3>
+                <p>You don't have any return requests yet.</p>
               </div>
             ) : (
-              <div className="messages-grid">
-                {messages.map((msg) => (
-                  <div
-                    key={msg._id}
-                    className={`message-card ${msg.read ? '' : 'unread'}`}
-                  >
-                    {!msg.read && (
-                      <div className="message-unread-badge"></div>
-                    )}
-                    
-                    <div className="message-header">
-                      <div className="message-header-content">
-                        <h4 className="message-subject">
-                          {msg.subject}
-                        </h4>
-                        <div className="message-meta">
-                          <span className="message-from">
-                            From: <strong>{msg.senderInfo?.fullName || 'Customer'}</strong>
-                          </span>
-                          <span className="message-email">
-                            {msg.senderInfo?.email}
-                          </span>
-                          <span className="message-time">
-                            {new Date(msg.createdAt).toLocaleString()}
-                          </span>
-                        </div>
+              <div className="returns-list">
+                {returns.map((returnItem) => (
+                  <div key={returnItem._id} className="return-card">
+                    <div className="return-header">
+                      <div className="return-info">
+                        <h4>Order #{returnItem.orderId?.orderId}</h4>
+                        <span className={`return-status ${returnItem.status.toLowerCase()}`}>
+                          {returnItem.status}
+                        </span>
+                      </div>
+                      <div className="return-date">
+                        {new Date(returnItem.requestedAt).toLocaleDateString()}
                       </div>
                     </div>
-
-                    {msg.productId && (
-                      <div className="message-product">
-                        {msg.productId.images && msg.productId.images[0] && (
-                          <img
-                            src={msg.productId.images[0]}
-                            alt={msg.productId.name}
-                            className="message-product-image"
-                          />
+                    
+                    <div className="return-body">
+                      <div className="return-product">
+                        {returnItem.product?.images?.[0] && (
+                          <img src={returnItem.product.images[0]} alt={returnItem.product.name} />
                         )}
                         <div>
-                          <div className="message-product-label">
-                            Regarding product:
-                          </div>
-                          <div className="message-product-name">
-                            {msg.productId.name}
-                          </div>
+                          <h5>{returnItem.product?.name}</h5>
+                          <p className="return-customer">Customer: {returnItem.customer?.fullName}</p>
                         </div>
                       </div>
-                    )}
+                      
+                      <div className="return-details">
+                        <p><strong>Reason:</strong> {returnItem.reason}</p>
+                        <p><strong>Description:</strong> {returnItem.description}</p>
+                        <p><strong>Refund Amount:</strong> Rs. {returnItem.refundAmount.toLocaleString()}</p>
+                      </div>
 
-                    <div className="message-body">
-                      <p className="message-text">
-                        {msg.message}
-                      </p>
-                    </div>
-
-                    <div className="message-actions">
-                      {!msg.read && (
-                        <button
-                          onClick={() => handleMarkAsRead(msg._id)}
-                          className="message-btn read"
-                        >
-                          Mark as Read
-                        </button>
+                      {returnItem.status === 'Pending' && (
+                        <div className="return-actions">
+                          <button 
+                            className="approve-btn"
+                            onClick={() => handleReturnResponse(returnItem._id, 'Approved')}
+                          >
+                            <FaCheckCircle /> Approve
+                          </button>
+                          <button 
+                            className="reject-btn"
+                            onClick={() => handleReturnResponse(returnItem._id, 'Rejected')}
+                          >
+                            <FaTimesCircle /> Reject
+                          </button>
+                        </div>
                       )}
-                      <button
-                        onClick={() => window.location.href = `mailto:${msg.senderInfo?.email}?subject=Re: ${msg.subject}`}
-                        className="message-btn reply"
-                      >
-                        Reply via Email
-                      </button>
-                      <button
-                        onClick={() => handleDeleteMessage(msg._id)}
-                        className="message-btn delete"
-                      >
-                        Delete
-                      </button>
+
+                      {returnItem.status === 'Approved' && (
+                        <div className="return-actions">
+                          <button 
+                            className="complete-btn"
+                            onClick={() => handleCompleteReturn(returnItem._id)}
+                          >
+                            <FaCheckCircle /> Mark as Completed
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -2488,12 +2935,174 @@ function SellerDashboard() {
           </div>
         )}
 
+        {/* FINANCE TAB */}
+        {activeTab === 'finance' && (
+          <SellerFinance />
+        )}
+
+        {/* INBOX TAB */}
+        {activeTab === 'inbox' && (
+          <div className="messages-section">
+            <div className="messages-container">
+              {/* Conversations List */}
+              <div className="chat-list">
+                <div className="chat-list-header">
+                  <h3>Customer Messages</h3>
+                </div>
+                
+                {loadingMessages ? (
+                  <div className="loading-chats">
+                    <p>Loading messages...</p>
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="no-chats">
+                    <FaBell size={48} />
+                    <p>No Messages Yet</p>
+                    <small>Customer inquiries will appear here</small>
+                  </div>
+                ) : (
+                  messages.map((msg) => (
+                    <div
+                      key={msg._id}
+                      className="chat-item"
+                      onClick={() => handleSelectMessage(msg)}
+                    >
+                      <div className="chat-info">
+                        <div className="chat-header-row">
+                          <h4>{msg.senderInfo?.fullName || 'Customer'}</h4>
+                          <span className="chat-time">
+                            {new Date(msg.createdAt).toLocaleTimeString('en-US', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                        <p className="chat-last-message">{msg.message}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Message View */}
+              <div className="chat-window">
+                {selectedMessage ? (
+                  <>
+                    <div className="chat-window-header">
+                      <div className="seller-info">
+                        <div>
+                          <h3 
+                            onClick={() => {
+                              // Navigate to customer profile if available
+                              // For now, just show an alert with customer info
+                              alert(`Customer: ${selectedMessage.senderInfo?.fullName || 'Customer'}\nEmail: ${selectedMessage.senderInfo?.email || 'N/A'}`);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {selectedMessage.senderInfo?.fullName || 'Customer'}
+                          </h3>
+                          <span className="customer-email">{selectedMessage.senderInfo?.email}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="chat-messages">
+                      {conversationMessages.length > 0 ? (
+                        conversationMessages.map((msg) => {
+                          const user = JSON.parse(localStorage.getItem('user'));
+                          const isSeller = msg.senderId === user._id;
+                          
+                          return (
+                            <div key={msg._id} className={`message ${isSeller ? 'buyer' : 'seller'}`}>
+                              <div className="message-bubble">
+                                <div className="message-sender-name">
+                                  {isSeller ? 'You' : (msg.senderInfo?.fullName || 'Customer')}
+                                </div>
+                                <p>{msg.message}</p>
+                                <span className="message-time">
+                                  {new Date(msg.createdAt).toLocaleString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="message seller">
+                          <div className="message-bubble">
+                            <div className="message-sender-name">
+                              {selectedMessage.senderInfo?.fullName || 'Customer'}
+                            </div>
+                            <p>{selectedMessage.message}</p>
+                            <span className="message-time">
+                              {new Date(selectedMessage.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {selectedMessage.productId && (
+                        <div className="message-product-info">
+                          <small>Regarding product:</small>
+                          <div className="product-mini">
+                            {selectedMessage.productId.images?.[0] && (
+                              <img src={selectedMessage.productId.images[0]} alt={selectedMessage.productId.name} />
+                            )}
+                            <span>{selectedMessage.productId.name}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="chat-input-container">
+                      <input
+                        type="text"
+                        placeholder="Type your reply..."
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && replyText.trim()) {
+                            handleDirectReply();
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={handleDirectReply}
+                        disabled={!replyText.trim()}
+                        className="send-btn"
+                      >
+                        <FiSend />
+                      </button>
+                      <button
+                        onClick={() => window.location.href = `mailto:${selectedMessage.senderInfo?.email}?subject=Re: Your inquiry`}
+                        className="reply-email-btn"
+                      >
+                        Reply via Email
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="no-chat-selected">
+                    <FaBell size={64} />
+                    <h3>Select a message</h3>
+                    <p>Choose a customer message from the list to view details</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* REVENUE TAB */}
         {activeTab === 'revenue' && (
           <div className="products-section">
             <div className="revenue-container">
               <div className="revenue-header">
-                <h3 className="revenue-title">Revenue Analytics</h3>
+                <h3 className="revenue-title"></h3>
                 <div className="revenue-controls">
                   <div className="date-range-selector">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="calendar-icon">
@@ -2634,7 +3243,7 @@ function SellerDashboard() {
         {activeTab === 'performance' && (
           <div className="products-section">
             <div className="performance-container">
-              <h3 className="performance-title">Performance Analytics</h3>
+              <h3 className="performance-title"></h3>
               <TopProductsChart data={chartData.topProducts} />
               <CategoryPerformanceChart data={chartData.categories} />
             </div>
@@ -2645,7 +3254,7 @@ function SellerDashboard() {
         {activeTab === 'profile' && (
           <div className="products-section">
             <div className="profile-header-row">
-              <h3 className="profile-main-title">Seller Profile</h3>
+              <h3 className="profile-main-title"></h3>
               <button
                 onClick={() => setIsEditingProfile(!isEditingProfile)}
                 className="profile-edit-btn"
@@ -2883,7 +3492,7 @@ function SellerDashboard() {
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
           <div className="products-section">
-            <h3 className="inbox-title">Account Settings</h3>
+            <h3 className="inbox-title"></h3>
 
             {/* Security Settings */}
             <div className="settings-card">
@@ -3093,10 +3702,8 @@ function SellerDashboard() {
                     <option value="">Select Category</option>
                     <option value="Men's Collection">Men's Collection</option>
                     <option value="Women's Collection">Women's Collection</option>
-                    <option value="Kid's Collection">Kid's Collection</option>
                     <option value="Sportswear">Sportswear</option>
                     <option value="Vintage">Vintage</option>
-                    <option value="Accessories">Accessories</option>
                   </select>
                 </div>
               </div>
@@ -3110,6 +3717,90 @@ function SellerDashboard() {
                   rows="4"
                   className="modal-form-textarea"
                 />
+              </div>
+
+              {/* Bundle Deal Section */}
+              <div className="modal-form-full-width" style={{marginTop: '16px'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px'}}>
+                  <input
+                    type="checkbox"
+                    id="editBundleDealEnabled"
+                    checked={editingProduct.bundleDeal?.enabled || false}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct,
+                      bundleDeal: {
+                        ...editingProduct.bundleDeal,
+                        enabled: e.target.checked,
+                        buyQuantity: editingProduct.bundleDeal?.buyQuantity || 2,
+                        discountPercentage: editingProduct.bundleDeal?.discountPercentage || 10,
+                        description: editingProduct.bundleDeal?.description || ''
+                      }
+                    })}
+                    style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                  />
+                  <label htmlFor="editBundleDealEnabled" className="modal-form-label" style={{margin: 0, cursor: 'pointer'}}>
+                    Enable Bundle Deal
+                  </label>
+                </div>
+
+                {editingProduct.bundleDeal?.enabled && (
+                  <div style={{marginLeft: '28px', padding: '12px', background: '#f8f9fa', borderRadius: '8px'}}>
+                    <div className="modal-form-grid">
+                      <div className="modal-form-group">
+                        <label className="modal-form-label">Buy Quantity *</label>
+                        <input
+                          type="number"
+                          min="2"
+                          value={editingProduct.bundleDeal?.buyQuantity || 2}
+                          onChange={(e) => setEditingProduct({
+                            ...editingProduct,
+                            bundleDeal: {
+                              ...editingProduct.bundleDeal,
+                              buyQuantity: parseInt(e.target.value) || 2
+                            }
+                          })}
+                          className="modal-form-input"
+                        />
+                      </div>
+                      <div className="modal-form-group">
+                        <label className="modal-form-label">Discount % *</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={editingProduct.bundleDeal?.discountPercentage || 10}
+                          onChange={(e) => setEditingProduct({
+                            ...editingProduct,
+                            bundleDeal: {
+                              ...editingProduct.bundleDeal,
+                              discountPercentage: parseInt(e.target.value) || 10
+                            }
+                          })}
+                          className="modal-form-input"
+                        />
+                      </div>
+                    </div>
+                    <div className="modal-form-group" style={{marginTop: '12px'}}>
+                      <label className="modal-form-label">Bundle Description (Optional)</label>
+                      <input
+                        type="text"
+                        value={editingProduct.bundleDeal?.description || ''}
+                        onChange={(e) => setEditingProduct({
+                          ...editingProduct,
+                          bundleDeal: {
+                            ...editingProduct.bundleDeal,
+                            description: e.target.value
+                          }
+                        })}
+                        className="modal-form-input"
+                        placeholder="e.g., Buy 2 or more and save!"
+                      />
+                    </div>
+                    <p style={{fontSize: '12px', color: '#666', marginTop: '8px', marginBottom: 0}}>
+                      Preview: Buy {editingProduct.bundleDeal?.buyQuantity || 2}+ Get {editingProduct.bundleDeal?.discountPercentage || 10}% OFF
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="modal-actions">

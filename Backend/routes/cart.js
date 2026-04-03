@@ -13,13 +13,24 @@ const calculateDiscountedPrice = (price, discount) => {
   return Math.round(price * (1 - percentage / 100));
 };
 
+// Helper function to calculate bundle discount
+const calculateBundleDiscount = (product, quantity) => {
+  if (!product.bundleDeal || !product.bundleDeal.enabled) return 0;
+  if (quantity < product.bundleDeal.buyQuantity) return 0;
+  
+  const basePrice = product.price;
+  const discountPercentage = product.bundleDeal.discountPercentage || 0;
+  
+  return Math.round(basePrice * quantity * (discountPercentage / 100));
+};
+
 // Get customer cart
 router.get('/:customerId', async (req, res) => {
   try {
     const cart = await Cart.findOne({ customer: req.params.customerId })
       .populate({
         path: 'items.product',
-        select: 'name price images stock seller sellerName storeName discount condition category'
+        select: 'name price images stock seller sellerName storeName discount condition category bundleDeal'
       });
     
     if (!cart) {
@@ -34,15 +45,22 @@ router.get('/:customerId', async (req, res) => {
       items: validItems.map(item => {
         const product = item.product;
         let discountedPrice = product.price;
+        let bundleDiscount = 0;
         
         if (product.discount) {
           discountedPrice = calculateDiscountedPrice(product.price, product.discount);
+        }
+        
+        // Calculate bundle discount if applicable
+        if (product.bundleDeal && product.bundleDeal.enabled && item.quantity >= product.bundleDeal.buyQuantity) {
+          bundleDiscount = calculateBundleDiscount(product, item.quantity);
         }
         
         return {
           _id: item._id,
           quantity: item.quantity,
           addedAt: item.addedAt,
+          bundleDiscount: bundleDiscount,
           product: {
             _id: product._id,
             name: product.name,
@@ -55,7 +73,8 @@ router.get('/:customerId', async (req, res) => {
             storeName: product.storeName,
             discount: product.discount,
             condition: product.condition,
-            category: product.category
+            category: product.category,
+            bundleDeal: product.bundleDeal
           }
         };
       })

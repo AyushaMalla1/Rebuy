@@ -25,6 +25,9 @@ const productSchema = new mongoose.Schema({
     required: true,
     enum: ["Men's Collection", "Women's Collection", "Kid's Collection", "Sportswear", "Vintage", "Accessories"]
   },
+  subcategory: {
+    type: String
+  },
   condition: {
     type: String,
     required: true,
@@ -90,6 +93,93 @@ const productSchema = new mongoose.Schema({
   },
   tags: [String],
   
+  // Product Status (Draft/Published)
+  publishStatus: {
+    type: String,
+    enum: ['draft', 'published', 'out_of_stock', 'archived'],
+    default: 'published'
+  },
+  
+  // Sale/Discount Price
+  salePrice: {
+    type: Number,
+    min: 0
+  },
+  onSale: {
+    type: Boolean,
+    default: false
+  },
+  
+  // Shipping Information
+  shipping: {
+    weight: {
+      type: Number, // in kg
+      default: 0.5
+    },
+    dimensions: {
+      length: Number, // in cm
+      width: Number,
+      height: Number
+    },
+    shippingCost: {
+      type: Number,
+      default: 0
+    },
+    freeShipping: {
+      type: Boolean,
+      default: false
+    }
+  },
+  
+  // SEO Fields
+  seo: {
+    metaTitle: String,
+    metaDescription: String,
+    keywords: [String]
+  },
+  
+  // Product Variants (colors, sizes with separate stock)
+  variants: [{
+    color: String,
+    size: String,
+    stock: {
+      type: Number,
+      default: 0
+    },
+    sku: String,
+    images: [String]
+  }],
+  
+  // Inventory Alerts
+  lowStockThreshold: {
+    type: Number,
+    default: 5
+  },
+  lowStockAlert: {
+    type: Boolean,
+    default: false
+  },
+  
+  // Analytics
+  analytics: {
+    views: {
+      type: Number,
+      default: 0
+    },
+    clicks: {
+      type: Number,
+      default: 0
+    },
+    addedToCart: {
+      type: Number,
+      default: 0
+    },
+    conversions: {
+      type: Number,
+      default: 0
+    }
+  },
+  
   // Payment Options
   paymentOptions: [{
     type: String,
@@ -114,6 +204,29 @@ const productSchema = new mongoose.Schema({
     active: {
       type: Boolean,
       default: false
+    }
+  },
+  
+  // Bundle Deal Configuration
+  bundleDeal: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    buyQuantity: {
+      type: Number,
+      min: 2,
+      default: 2
+    },
+    discountPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 10
+    },
+    description: {
+      type: String,
+      default: ''
     }
   },
   
@@ -152,6 +265,30 @@ productSchema.path('discount.startDate').validate(function(value) {
   }
   return true;
 }, 'Discount start date must be before end date');
+
+// Validation: Sale price must be less than regular price
+productSchema.path('salePrice').validate(function(value) {
+  if (this.onSale && value) {
+    return value < this.price;
+  }
+  return true;
+}, 'Sale price must be less than regular price');
+
+// Check low stock and set alert
+productSchema.pre('save', function(next) {
+  if (this.stock <= this.lowStockThreshold) {
+    this.lowStockAlert = true;
+  } else {
+    this.lowStockAlert = false;
+  }
+  
+  // Auto set out of stock status
+  if (this.stock === 0) {
+    this.publishStatus = 'out_of_stock';
+  }
+  
+  next();
+});
 
 // Auto-generate SKU before saving if not provided
 productSchema.pre('save', function(next) {

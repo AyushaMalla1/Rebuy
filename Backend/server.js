@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { startStockAlertScheduler } = require('./utils/stockAlertScheduler');
+const { initializeWeeklyPayoutScheduler } = require('./utils/weeklyPayoutScheduler');
 require('dotenv').config();
 
 const app = express();
@@ -50,6 +52,9 @@ const customerRoutes = require('./routes/customers');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const adminRoutes = require('./routes/admin');
 const paymentRoutes = require('./routes/payment');
+const payoutRoutes = require('./routes/payouts');
+const returnRoutes = require('./routes/returns');
+const announcementRoutes = require('./routes/announcements');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -65,6 +70,9 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/chat', chatbotRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/payouts', payoutRoutes);
+app.use('/api/returns', returnRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Basic route
 app.get('/', (req, res) => {
@@ -103,4 +111,10 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Start stock alert scheduler
+  startStockAlertScheduler();
+  
+  // Start weekly payout scheduler (Every Friday at 9:00 AM)
+  initializeWeeklyPayoutScheduler();
 });

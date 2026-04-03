@@ -22,6 +22,6 @@ const wishlistSchema = new mongoose.Schema({
   timestamps: true
 });
 
-wishlistSchema.index({ customer: 1 });
+// Index removed because unique: true already creates one
 
 module.exports = mongoose.model('Wishlist', wishlistSchema);

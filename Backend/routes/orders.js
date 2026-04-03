@@ -3,6 +3,9 @@ const router = express.Router();
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const LoyaltyPoints = require('../models/LoyaltyPoints');
+const Seller = require('../models/Seller');
+const { logAudit } = require('../utils/auditLogger');
+const { sendOrderConfirmation, sendOrderStatusUpdate, sendPaymentConfirmation, sendLowStockAlert, sendOutOfStockAlert } = require('../utils/emailService');
 
 // Create new order
 router.post('/', async (req, res) => {
@@ -17,6 +20,8 @@ router.post('/', async (req, res) => {
       paymentMethod,
       subtotal,
       shippingCost,
+      pointsRedeemed,
+      pointsDiscount,
       total,
       customerNotes
     } = req.body;
@@ -62,11 +67,14 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Determine payment status based on method
+    // Payment status: only COD stays Pending at order time; online methods
+    // remain Pending until the gateway callback confirms payment.
     let paymentStatus = 'Pending';
-    if (paymentMethod === 'esewa' || paymentMethod === 'khalti' || paymentMethod === 'card') {
-      paymentStatus = 'Paid';
-    }
+
+    // Calculate platform commission (5%) and seller payout
+    const platformCommissionRate = 5; // 5%
+    const platformCommission = Math.round((subtotal * platformCommissionRate) / 100);
+    const sellerPayout = subtotal - platformCommission;
 
     // Create order
     const order = new Order({
@@ -80,6 +88,11 @@ router.post('/', async (req, res) => {
       paymentStatus,
       subtotal,
       shippingCost,
+      pointsRedeemed: pointsRedeemed || 0,
+      pointsDiscount: pointsDiscount || 0,
+      platformCommissionRate,
+      platformCommission,
+      sellerPayout,
       total,
       customerNotes: customerNotes || '',
       trackingNumber: `TRK${Date.now()}`,
@@ -90,38 +103,88 @@ router.post('/', async (req, res) => {
 
     // Update product stock
     for (let item of items) {
-      await Product.findByIdAndUpdate(item.product, {
-        $inc: { stock: -item.quantity, sold: item.quantity }
-      });
+      const updatedProduct = await Product.findByIdAndUpdate(
+        item.product,
+        {
+          $inc: { stock: -item.quantity, sold: item.quantity }
+        },
+        { new: true }
+      );
+      
+      // Check if product needs stock alert
+      if (updatedProduct) {
+        const seller = await Seller.findById(updatedProduct.seller).select('email fullName storeName');
+        
+        if (seller) {
+          // Out of stock alert
+          if (updatedProduct.stock === 0) {
+            sendOutOfStockAlert(seller, [updatedProduct.toObject()]).catch(err =>
+              console.error('Failed to send out of stock alert:', err)
+            );
+          }
+          // Low stock alert (less than 5)
+          else if (updatedProduct.stock > 0 && updatedProduct.stock < 5) {
+            sendLowStockAlert(seller, [updatedProduct.toObject()]).catch(err =>
+              console.error('Failed to send low stock alert:', err)
+            );
+          }
+        }
+      }
     }
 
-    // Award loyalty points (1 point per Rs. 100 spent)
-    const pointsEarned = Math.floor(total / 100);
+    // Handle loyalty points
     let loyaltyAccount = await LoyaltyPoints.findOne({ customer: customerId });
     
     if (!loyaltyAccount) {
       loyaltyAccount = new LoyaltyPoints({
         customer: customerId,
-        totalPoints: pointsEarned,
-        pointsHistory: [{
-          points: pointsEarned,
-          type: 'earned',
-          reason: `Purchase - Order ${order._id}`,
-          order: order._id
-        }]
+        totalPoints: 0,
+        pointsHistory: []
       });
-    } else {
+    }
+
+    // Redeem points if any
+    if (pointsRedeemed && pointsRedeemed > 0) {
+      loyaltyAccount.totalPoints -= pointsRedeemed;
+      loyaltyAccount.pointsHistory.push({
+        points: pointsRedeemed,
+        type: 'redeemed',
+        reason: `Redeemed for Order ${order.orderId || order._id}`,
+        order: order._id
+      });
+    }
+
+    // Award loyalty points (1 point per Rs. 100 spent on final total)
+    const pointsEarned = Math.floor(total / 100);
+    if (pointsEarned > 0) {
       loyaltyAccount.totalPoints += pointsEarned;
       loyaltyAccount.pointsHistory.push({
         points: pointsEarned,
         type: 'earned',
-        reason: `Purchase - Order ${order._id}`,
+        reason: `Purchase - Order ${order.orderId || order._id}`,
         order: order._id
       });
     }
     
     loyaltyAccount.updateTier();
     await loyaltyAccount.save();
+
+    // Log audit
+    await logAudit({
+      action: 'Order Placed',
+      actionType: 'order',
+      performedBy: customerId,
+      targetId: order._id,
+      targetModel: 'Order',
+      description: `New order ${order.trackingNumber || order._id} placed`,
+      ipAddress: req.ip,
+      metadata: { total, paymentMethod }
+    }).catch(console.error);
+
+    // Send order confirmation email
+    sendOrderConfirmation(order).catch(err => 
+      console.error('Failed to send order confirmation email:', err)
+    );
 
     res.status(201).json({ 
       message: 'Order placed successfully', 
@@ -184,6 +247,22 @@ router.patch('/:orderId/status', async (req, res) => {
     
     await order.save();
     
+    // Log audit
+    await logAudit({
+      action: 'Order Status Updated',
+      actionType: 'order',
+      performedBy: req.query.sellerId || req.body.sellerId || req.user?.id || order.customer,
+      targetId: order._id,
+      targetModel: 'Order',
+      description: `Order status changed to ${status}`,
+      ipAddress: req.ip
+    }).catch(console.error);
+
+    // Send status update email
+    sendOrderStatusUpdate(order, status).catch(err =>
+      console.error('Failed to send status update email:', err)
+    );
+
     res.json({ message: 'Order status updated', order });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -194,7 +273,10 @@ router.patch('/:orderId/status', async (req, res) => {
 router.post('/:orderId/verify-condition', async (req, res) => {
   try {
     const { matchesDescription, customerNotes, images } = req.body;
-    const order = await Order.findById(req.params.orderId);
+    const order = await Order.findById(req.params.orderId)
+      .populate('customer', 'fullName email')
+      .populate('items.product', 'name images')
+      .populate('items.seller', 'fullName email');
     
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
@@ -204,12 +286,18 @@ router.post('/:orderId/verify-condition', async (req, res) => {
       return res.status(400).json({ message: 'Can only verify delivered orders' });
     }
     
+    // Check if already verified
+    if (order.conditionVerification && order.conditionVerification.verified) {
+      return res.status(400).json({ message: 'Order already verified' });
+    }
+    
     // Convert boolean to string if needed for backward compatibility
     let matchesDescriptionValue = matchesDescription;
     if (typeof matchesDescription === 'boolean') {
       matchesDescriptionValue = matchesDescription ? 'yes' : 'no';
     }
     
+    // Update order with verification status
     order.conditionVerification = {
       verified: true,
       verifiedAt: Date.now(),
@@ -220,13 +308,46 @@ router.post('/:orderId/verify-condition', async (req, res) => {
     
     await order.save();
     
+    // Create ConditionVerification documents for each product in the order
+    const ConditionVerification = require('../models/ConditionVerification');
+    
+    for (const item of order.items) {
+      // Skip if product or seller data is missing
+      if (!item.product || !item.seller) {
+        console.log('Skipping item - missing product or seller data');
+        continue;
+      }
+
+      const sellerId = item.seller._id || item.seller;
+      const sellerName = item.sellerName || (item.seller.fullName ? item.seller.fullName : 'Unknown Seller');
+      
+      await ConditionVerification.create({
+        order: order._id,
+        orderId: order.orderId,
+        product: item.product._id || item.product,
+        productName: item.productName || (item.product.name ? item.product.name : 'Unknown Product'),
+        productImage: item.productImage || (item.product.images && item.product.images[0]) || '',
+        customer: order.customer._id || order.customer,
+        customerName: (order.customer && order.customer.fullName) || order.customerName || 'Unknown Customer',
+        customerEmail: (order.customer && order.customer.email) || order.customerEmail || '',
+        seller: sellerId,
+        sellerName: sellerName,
+        matchesDescription: matchesDescriptionValue,
+        customerNotes: customerNotes || '',
+        verificationImages: images || [],
+        disputeRaised: matchesDescriptionValue === 'no'
+      });
+    }
+    
     // Award bonus points for positive verification
+    let bonusPoints = 0;
     if (matchesDescriptionValue === 'yes') {
-      const loyaltyAccount = await LoyaltyPoints.findOne({ customer: order.customer });
+      const loyaltyAccount = await LoyaltyPoints.findOne({ customer: order.customer._id || order.customer });
       if (loyaltyAccount) {
-        loyaltyAccount.totalPoints += 50; // Bonus points for positive verification
+        bonusPoints = 50;
+        loyaltyAccount.totalPoints += bonusPoints;
         loyaltyAccount.pointsHistory.push({
-          points: 50,
+          points: bonusPoints,
           type: 'earned',
           reason: 'Condition verification bonus',
           date: Date.now(),
@@ -237,12 +358,76 @@ router.post('/:orderId/verify-condition', async (req, res) => {
       }
     }
     
+    // Send notifications to seller and admin
+    const Notification = require('../models/Notification');
+    
+    // Get unique sellers from order items
+    const sellers = [...new Set(order.items
+      .filter(item => item.seller)
+      .map(item => (item.seller._id || item.seller).toString())
+      .filter(Boolean))];
+    
+    // Notification message
+    const verificationStatus = matchesDescriptionValue === 'yes' ? 'matches the description' : 'does not match the description';
+    const notificationTitle = matchesDescriptionValue === 'yes' 
+      ? 'Positive Condition Verification' 
+      : 'Condition Verification Issue';
+    
+    // Notify each seller (use sellerId field for sellers)
+    for (const sellerId of sellers) {
+      try {
+        await Notification.create({
+          sellerId: sellerId,  // Use sellerId for seller notifications
+          type: 'order',
+          title: notificationTitle,
+          message: `Customer verified condition for Order ${order.orderId}: Product ${verificationStatus}`,
+          severity: matchesDescriptionValue === 'yes' ? 'info' : 'warning',
+          relatedOrder: order._id,
+          metadata: {
+            orderId: order.orderId,
+            matchesDescription: matchesDescriptionValue,
+            customerNotes: customerNotes
+          }
+        });
+      } catch (notifError) {
+        console.error('Error creating seller notification:', notifError);
+      }
+    }
+    
+    // Notify admin (find admin user)
+    try {
+      const User = require('../models/User');
+      const admin = await User.findOne({ userType: 'admin' });
+      if (admin) {
+        await Notification.create({
+          recipient: admin._id,
+          recipientModel: 'User',
+          type: 'order',
+          title: notificationTitle,
+          message: `Condition verification received for Order ${order.orderId}: ${verificationStatus}`,
+          severity: matchesDescriptionValue === 'yes' ? 'info' : 'warning',
+          relatedOrder: order._id,
+          metadata: {
+            orderId: order.orderId,
+            customerId: order.customer._id || order.customer,
+            customerName: (order.customer && order.customer.fullName) || order.customerName,
+            matchesDescription: matchesDescriptionValue,
+            customerNotes: customerNotes,
+            hasImages: images && images.length > 0
+          }
+        });
+      }
+    } catch (adminNotifError) {
+      console.error('Error creating admin notification:', adminNotifError);
+    }
+    
     res.json({ 
-      message: 'Condition verification submitted', 
+      message: 'Condition verification submitted successfully', 
       order,
-      bonusPoints: matchesDescriptionValue === 'yes' ? 50 : 0
+      bonusPoints
     });
   } catch (error) {
+    console.error('Condition verification error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -271,6 +456,17 @@ router.post('/:orderId/cancel', async (req, res) => {
       });
     }
     
+    // Log audit
+    await logAudit({
+      action: 'Order Cancelled',
+      actionType: 'order',
+      performedBy: req.user?.id || order.customer,
+      targetId: order._id,
+      targetModel: 'Order',
+      description: `Order cancelled`,
+      ipAddress: req.ip
+    }).catch(console.error);
+
     res.json({ message: 'Order cancelled successfully', order });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -296,6 +492,41 @@ router.get('/seller/:sellerId', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching seller orders:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+});
+
+// Get condition verifications for a specific product
+router.get('/product/:productId/verifications', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const ConditionVerification = require('../models/ConditionVerification');
+    
+    // Find all verifications for this product
+    const verifications = await ConditionVerification.find({
+      product: productId
+    })
+    .populate('customer', 'fullName')
+    .sort({ verifiedAt: -1 });
+    
+    res.json({ 
+      success: true, 
+      verifications: verifications.map(v => ({
+        _id: v._id,
+        orderId: v.orderId,
+        customerName: v.customerName,
+        verifiedAt: v.verifiedAt,
+        matchesDescription: v.matchesDescription,
+        customerFeedback: v.customerNotes,
+        verificationImages: v.verificationImages || []
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching product verifications:', error);
     res.status(500).json({ 
       success: false,
       message: 'Server error', 

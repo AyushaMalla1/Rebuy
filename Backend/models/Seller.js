@@ -64,6 +64,49 @@ const sellerSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Payout Information
+  payoutDetails: {
+    khaltiMobile: {
+      type: String,
+      default: ''
+    },
+    esewaId: {
+      type: String,
+      default: ''
+    },
+    bankAccount: {
+      accountNumber: String,
+      accountName: String,
+      bankName: String,
+      branchName: String
+    },
+    preferredMethod: {
+      type: String,
+      enum: ['khalti', 'esewa', 'bank'],
+      default: 'bank'
+    },
+    verifiedAt: Date,
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  },
+  // Earnings tracking
+  earnings: {
+    totalEarned: {
+      type: Number,
+      default: 0
+    },
+    pendingPayout: {
+      type: Number,
+      default: 0
+    },
+    completedPayouts: {
+      type: Number,
+      default: 0
+    },
+    lastPayoutDate: Date
+  },
   // Trust Score System
   trustScore: {
     score: {

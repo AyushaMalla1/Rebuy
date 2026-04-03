@@ -70,10 +70,52 @@
   color: #64748b;
 }
 
+/* Error State */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 20px;
+  text-align: center;
+  padding: 40px;
+}
+
+.error-container h2 {
+  font-size: 28px;
+  color: #1e293b;
+  margin: 0;
+}
+
+.error-container p {
+  font-size: 16px;
+  color: #64748b;
+  margin: 0;
+}
+
+.error-container .back-button {
+  margin-top: 20px;
+  background: #00bcd4;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.error-container .back-button:hover {
+  background: #0097a7;
+  transform: translateY(-2px);
+}
+
 /* Hero Section */
 .seller-hero {
   background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-  padding: 60px 24px;
+  padding: 24px 20px;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -84,9 +126,9 @@
 
 .seller-main-info {
   display: flex;
-  gap: 40px;
+  gap: 20px;
   align-items: flex-start;
-  margin-bottom: 48px;
+  margin-bottom: 24px;
 }
 
 .seller-avatar-wrapper {
@@ -95,28 +137,39 @@
 }
 
 .seller-avatar-large {
-  width: 160px;
-  height: 160px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   object-fit: cover;
-  border: 4px solid white;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: 3px solid white;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.seller-avatar-placeholder {
+  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 32px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .verified-badge {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
+  bottom: 4px;
+  right: 4px;
   background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
   color: white;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 9px;
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 4px;
-  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+  gap: 3px;
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
 }
 
 .seller-identity {
@@ -124,114 +177,114 @@
 }
 
 .seller-name {
-  font-size: 36px;
-  font-weight: 800;
+  font-size: 24px;
+  font-weight: 700;
   color: #1a1a1a;
-  margin: 0 0 8px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.3px;
 }
 
 .seller-store {
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 600;
   color: #64748b;
-  margin: 0 0 20px 0;
+  margin: 0 0 12px 0;
 }
 
 .seller-rating-large {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .rating-stars {
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 
 .rating-stars .star-filled {
   color: #ffc107;
   fill: #ffc107;
-  font-size: 22px;
+  font-size: 16px;
 }
 
 .rating-stars .star-empty {
   color: #e2e8f0;
-  font-size: 22px;
+  font-size: 16px;
 }
 
 .rating-value {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: #1a1a1a;
 }
 
 .rating-count {
-  font-size: 16px;
+  font-size: 13px;
   color: #64748b;
   font-weight: 500;
 }
 
 .seller-bio {
-  font-size: 16px;
+  font-size: 14px;
   color: #475569;
-  line-height: 1.7;
-  margin: 0 0 20px 0;
+  line-height: 1.5;
+  margin: 0 0 12px 0;
   max-width: 700px;
 }
 
 .seller-location-info {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
+  gap: 6px;
+  padding: 6px 12px;
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 24px;
-  font-size: 14px;
+  border-radius: 16px;
+  font-size: 12px;
   color: #475569;
   font-weight: 500;
 }
 
 .seller-location-info svg {
   color: #00bcd4;
-  font-size: 18px;
+  font-size: 14px;
 }
 
 /* Stats Cards */
 .seller-stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 40px;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .stat-card-modern {
   background: white;
-  padding: 28px;
-  border-radius: 16px;
+  padding: 16px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
   transition: all 0.3s;
 }
 
 .stat-card-modern:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
   border-color: #00bcd4;
 }
 
 .stat-icon-wrapper {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 18px;
   flex-shrink: 0;
 }
 
@@ -260,15 +313,15 @@
 }
 
 .stat-number {
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
   color: #1a1a1a;
-  margin-bottom: 4px;
-  letter-spacing: -0.5px;
+  margin-bottom: 2px;
+  letter-spacing: -0.3px;
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 11px;
   color: #64748b;
   font-weight: 500;
 }
@@ -276,96 +329,96 @@
 /* Achievements */
 .achievements-section {
   background: white;
-  padding: 28px;
-  border-radius: 16px;
+  padding: 16px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .achievements-title {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
   color: #1a1a1a;
-  margin: 0 0 20px 0;
+  margin: 0 0 12px 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .achievements-title svg {
   color: #00bcd4;
-  font-size: 22px;
+  font-size: 16px;
 }
 
 .badges-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
 .badge-item {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
+  gap: 6px;
+  padding: 8px 14px;
   background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
   color: #2e7d32;
-  border-radius: 24px;
-  font-size: 14px;
+  border-radius: 16px;
+  font-size: 12px;
   font-weight: 600;
   border: 2px solid #81c784;
 }
 
 .badge-icon {
-  font-size: 18px;
+  font-size: 14px;
 }
 
 /* Contact Button */
 .contact-seller-btn {
   width: 100%;
-  padding: 18px;
+  padding: 12px;
   background: linear-gradient(135deg, #00bcd4 0%, #00acc1 100%);
   color: white;
   border: none;
-  border-radius: 12px;
-  font-size: 16px;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   transition: all 0.3s;
-  box-shadow: 0 4px 16px rgba(0, 188, 212, 0.3);
+  box-shadow: 0 3px 12px rgba(0, 188, 212, 0.3);
 }
 
 .contact-seller-btn:hover {
   background: linear-gradient(135deg, #00acc1 0%, #0097a7 100%);
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0, 188, 212, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 188, 212, 0.4);
 }
 
 /* Products Section */
 .seller-products-wrapper {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 60px 24px;
+  padding: 32px 20px;
 }
 
 .products-section-header {
-  margin-bottom: 40px;
+  margin-bottom: 24px;
 }
 
 .products-section-header h2 {
-  font-size: 32px;
-  font-weight: 800;
+  font-size: 22px;
+  font-weight: 700;
   color: #1a1a1a;
-  margin: 0 0 8px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.3px;
 }
 
 .products-count {
-  font-size: 16px;
+  font-size: 13px;
   color: #64748b;
   margin: 0;
 }
@@ -397,12 +450,12 @@
 .products-grid-modern {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 24px;
+  gap: 16px;
 }
 
 .product-card-modern {
   background: white;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
   transition: all 0.3s;
@@ -410,15 +463,15 @@
 }
 
 .product-card-modern:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   border-color: #00bcd4;
 }
 
 .product-image-wrapper {
   position: relative;
   width: 100%;
-  height: 260px;
+  height: 180px;
   overflow: hidden;
   background: #f8fafc;
 }
@@ -431,67 +484,67 @@
 }
 
 .product-card-modern:hover .product-image-wrapper img {
-  transform: scale(1.08);
+  transform: scale(1.05);
 }
 
 .condition-tag {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  padding: 8px 14px;
+  top: 8px;
+  left: 8px;
+  padding: 4px 8px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-radius: 8px;
-  font-size: 11px;
+  border-radius: 6px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .condition-tag.excellent,
 .condition-tag.new {
   color: #2e7d32;
-  border: 2px solid #81c784;
+  border: 1px solid #81c784;
 }
 
 .condition-tag.very-good,
 .condition-tag.like-new {
   color: #1565c0;
-  border: 2px solid #64b5f6;
+  border: 1px solid #64b5f6;
 }
 
 .condition-tag.good,
 .condition-tag.slightly-used {
   color: #f57c00;
-  border: 2px solid #ffb74d;
+  border: 1px solid #ffb74d;
 }
 
 .condition-tag.fair {
   color: #d32f2f;
-  border: 2px solid #e57373;
+  border: 1px solid #e57373;
 }
 
 .product-info-modern {
-  padding: 20px;
+  padding: 12px;
 }
 
 .product-name-modern {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #1a1a1a;
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .product-category-modern {
-  font-size: 13px;
+  font-size: 11px;
   color: #64748b;
-  margin: 0 0 16px 0;
+  margin: 0 0 10px 0;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   font-weight: 500;
 }
 
@@ -502,17 +555,17 @@
 }
 
 .product-price-modern {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
   color: #00bcd4;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.3px;
 }
 
 .product-rating-modern {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 14px;
+  gap: 3px;
+  font-size: 12px;
   color: #475569;
   font-weight: 600;
 }
@@ -520,7 +573,7 @@
 .product-rating-modern .star-icon {
   color: #ffc107;
   fill: #ffc107;
-  font-size: 16px;
+  font-size: 13px;
 }
 
 /* Responsive */

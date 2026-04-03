@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight, FiStar, FiShield, FiTruck, FiRefreshCw, FiMessageSquare, FiAward, FiZap, FiPackage } from 'react-icons/fi';
+import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight, FiStar, FiShield, FiTruck, FiRefreshCw, FiMessageSquare, FiAward, FiZap, FiPackage, FiCheck } from 'react-icons/fi';
 import './ProductDetail.css';
 import Chatbot from './components/Chatbot';
 import ProductReviews from './components/ProductReviews';
-import { productAPI } from './services/api';
+import { productAPI, cartAPI } from './services/api';
 
 function ProductDetail() {
   const { id } = useParams();
@@ -13,9 +13,12 @@ function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState('online');
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAddToCartModal, setShowAddToCartModal] = useState(false);
+  const [addedToCartProduct, setAddedToCartProduct] = useState(null);
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const [showContactModal, setShowContactModal] = useState(false);
   const [contactForm, setContactForm] = useState({
@@ -124,37 +127,79 @@ function ProductDetail() {
     setIsFavorite(!isFavorite);
   };
 
-  const handleAddToCart = () => {
-    // Check if user is logged in
+  const handleAddToCart = async () => {
     const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const userData = localStorage.getItem('user');
     
-    if (!token || !user) {
+    if (!token || !userData) {
       setShowAuthModal(true);
       return;
     }
     
-    const savedCart = localStorage.getItem('cart');
-    let cart = savedCart ? JSON.parse(savedCart) : [];
-    
-    const effectivePrice = product.discountedPrice || product.price;
-    const existingItem = cart.find(item => item.id === product.id);
-    
-    if (existingItem) {
-      cart = cart.map(item =>
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      );
-    } else {
-      cart.push({ 
-        ...product, 
-        quantity: 1,
-        price: effectivePrice,
-        originalPrice: product.price
+    try {
+      const user = JSON.parse(userData);
+      const productId = product._id || product.id;
+      
+      await cartAPI.add(user._id, productId, selectedQuantity);
+      
+      // Set product data for modal
+      setAddedToCartProduct({
+        name: product.name,
+        price: product.discountedPrice || product.price,
+        originalPrice: product.price,
+        image: product.images?.[0] || '',
+        quantity: selectedQuantity,
+        discount: typeof product.discount === 'object' ? product.discount.percentage : product.discount
       });
+      
+      setShowAddToCartModal(true);
+    } catch (error) {
+      console.error('Add to cart error:', error);
+      showToast(error.message || 'Failed to add item to cart', 'error');
+    }
+  };
+
+  // Add to cart silently (for Buy It Now - no modal)
+  const addToCartSilently = async () => {
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    
+    if (!token || !userData) {
+      setShowAuthModal(true);
+      return false;
     }
     
-    localStorage.setItem('cart', JSON.stringify(cart));
-    showToast(`${product.name} added to cart!`, 'success');
+    try {
+      const user = JSON.parse(userData);
+      const productId = product._id || product.id;
+      
+      // Add to backend cart
+      await cartAPI.add(user._id, productId, selectedQuantity);
+      
+      // Fetch updated cart from backend
+      const cartResponse = await cartAPI.get(user._id);
+      
+      // Format cart items for localStorage
+      const formattedCart = cartResponse.items.map(item => ({
+        id: item.product._id || item.product,
+        name: item.product.name || item.productName,
+        price: item.product.price || item.price,
+        image: (item.product.images && item.product.images[0]) || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+        quantity: item.quantity,
+        seller: item.product.seller || item.seller,
+        sellerName: item.product.sellerName || item.sellerName,
+        storeName: item.product.storeName || item.storeName
+      }));
+      
+      // Save to localStorage
+      localStorage.setItem('cart', JSON.stringify(formattedCart));
+      
+      return true;
+    } catch (error) {
+      console.error('Add to cart error:', error);
+      showToast(error.message || 'Failed to add item to cart', 'error');
+      return false;
+    }
   };
 
   const handleAddToWishlist = async () => {
@@ -238,7 +283,7 @@ function ProductDetail() {
     }
   };
 
-  const handlePurchase = () => {
+  const handlePurchase = async () => {
     // Check if user is logged in
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
@@ -252,8 +297,14 @@ function ProductDetail() {
       showToast('Please select a size', 'error');
       return;
     }
-    handleAddToCart();
-    navigate('/checkout');
+    
+    // Add to cart silently (without showing modal)
+    const success = await addToCartSilently();
+    
+    if (success) {
+      // Navigate directly to checkout
+      navigate('/checkout');
+    }
   };
 
   // Similar products (empty for now - can be populated from API)
@@ -261,13 +312,6 @@ function ProductDetail() {
 
   return (
     <div className="product-detail-page">
-      {/* Header */}
-      <header className="detail-header">
-        <Link to="/" className="back-link">
-          <FiChevronLeft /> Back to Shop
-        </Link>
-      </header>
-
       <div className="detail-container">
         {/* Image Gallery */}
         <div className="image-gallery">
@@ -295,24 +339,33 @@ function ProductDetail() {
 
         {/* Product Info */}
         <div className="product-info">
-          {/* Product Title */}
-          <h1 className="product-title">{product.name}</h1>
+          {/* Product Title with Bundle Deal and Rating */}
+          <div className="title-row">
+            <h1 className="product-title">{product.name}</h1>
+            
+            {/* Rating */}
+            <div className="product-rating">
+              <div className="stars">
+                {[...Array(5)].map((_, i) => (
+                  <FiStar key={i} className={i < Math.floor(product.rating || 4.5) ? 'star-filled' : 'star-empty'} />
+                ))}
+              </div>
+              <span className="rating-text">{product.rating || '4.5'} ({product.reviews || 128} reviews)</span>
+            </div>
+            
+            {product.bundleDeal && product.bundleDeal.enabled && (
+              <div className="bundle-deal-badge">
+                <FiPackage className="bundle-icon" />
+                <span>Buy {product.bundleDeal.buyQuantity}+ Get {product.bundleDeal.discountPercentage}% OFF</span>
+              </div>
+            )}
+          </div>
 
           {/* Condition Badge */}
           <div className="product-badges">
             <span className={`condition-badge ${product.condition.toLowerCase().replace(' ', '-')}`}>
               {product.condition.toUpperCase()}
             </span>
-          </div>
-
-          {/* Rating */}
-          <div className="product-rating">
-            <div className="stars">
-              {[...Array(5)].map((_, i) => (
-                <FiStar key={i} className={i < Math.floor(product.rating || 4.5) ? 'star-filled' : 'star-empty'} />
-              ))}
-            </div>
-            <span className="rating-text">{product.rating || '4.5'} ({product.reviews || 128} reviews)</span>
           </div>
 
           {/* Price */}
@@ -330,12 +383,9 @@ function ProductDetail() {
             )}
           </div>
 
-          {/* Size Guide Link */}
-          <a href="#" className="size-guide-link" onClick={(e) => e.preventDefault()}>Size Guide</a>
-
           {/* Size Selection */}
           <div className="size-selection">
-            {['M', 'L', 'XL', 'XXL'].map(size => (
+            {['S', 'M', 'L', 'XL', 'XXL'].map(size => (
               <button
                 key={size}
                 className={`size-option ${selectedSize === size ? 'selected' : ''}`}
@@ -346,36 +396,55 @@ function ProductDetail() {
             ))}
           </div>
 
-          {/* Payment Methods */}
-          <div className="payment-methods">
-            <label className={`payment-method ${selectedPayment === 'online' ? 'selected' : ''}`}>
-              <input
-                type="radio"
-                name="payment"
-                value="online"
-                checked={selectedPayment === 'online'}
-                onChange={(e) => setSelectedPayment(e.target.value)}
+          {/* Size Guide Link */}
+          <a href="#" className="size-guide-link" onClick={(e) => e.preventDefault()}>Size Guide</a>
+
+          {/* Quantity Selection */}
+          <div className="quantity-selection">
+            <label>Quantity:</label>
+            <div className="quantity-controls">
+              <button 
+                className="qty-btn" 
+                onClick={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
+                disabled={selectedQuantity <= 1}
+              >
+                -
+              </button>
+              <input 
+                type="number" 
+                value={selectedQuantity} 
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 1;
+                  setSelectedQuantity(Math.max(1, Math.min(val, product.stock)));
+                }}
+                min="1"
+                max={product.stock}
+                className="qty-input"
               />
-              <span className="payment-icon">💳</span>
-              <div className="payment-info">
-                <strong>Online Payment</strong>
-                <p>Pay securely with card or digital wallet</p>
+              <button 
+                className="qty-btn" 
+                onClick={() => setSelectedQuantity(Math.min(product.stock, selectedQuantity + 1))}
+                disabled={selectedQuantity >= product.stock}
+              >
+                +
+              </button>
+            </div>
+            <span className="stock-info">{product.stock} available</span>
+          </div>
+
+          {/* Payment Methods - Information Only */}
+          <div className="payment-methods-info">
+            <h4 style={{fontSize: '13px', marginBottom: '8px', color: '#64748b', fontWeight: '600'}}>Available Payment Methods:</h4>
+            <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap'}}>
+              <div className="payment-method-badge">
+                <span className="payment-icon-small">💳</span>
+                <span>Online Payment</span>
               </div>
-            </label>
-            <label className={`payment-method ${selectedPayment === 'cod' ? 'selected' : ''}`}>
-              <input
-                type="radio"
-                name="payment"
-                value="cod"
-                checked={selectedPayment === 'cod'}
-                onChange={(e) => setSelectedPayment(e.target.value)}
-              />
-              <span className="payment-icon">🚚</span>
-              <div className="payment-info">
-                <strong>Cash on Delivery</strong>
-                <p>Pay when your order arrives</p>
+              <div className="payment-method-badge">
+                <span className="payment-icon-small">🚚</span>
+                <span>Cash on Delivery</span>
               </div>
-            </label>
+            </div>
           </div>
 
           {/* Action Buttons */}
@@ -428,60 +497,24 @@ function ProductDetail() {
             </div>
           </div>
 
-          {/* Condition Details & Verification - Inside Product Card */}
-          <div className="condition-details-card">
-            <h3>Condition Details & Verification</h3>
-            
-            {/* Condition Explanation */}
-            <div className="condition-explanation-box">
-              <div className="condition-header">
-                <span className={`condition-label ${product.condition.toLowerCase().replace(' ', '-')}`}>
-                  {product.condition.toUpperCase()}
-                </span>
-                {product.condition === 'Excellent' && <span className="condition-stars-inline">★★★★★</span>}
-                {product.condition === 'Very Good' && <span className="condition-stars-inline">★★★★</span>}
-                {product.condition === 'Good' && <span className="condition-stars-inline">★★★</span>}
-                {product.condition === 'Fair' && <span className="condition-stars-inline">★★</span>}
-              </div>
-              
-              <p className="condition-description">
-                {product.condition === 'Excellent' && 'This item is practically new! It shows no obvious signs of being worn or washed and is in excellent condition.'}
-                {product.condition === 'Very Good' && 'This item shows no major flaws. Due to being worn or washed, there may be light fading or pilling.'}
-                {product.condition === 'Good' && 'Item has clearly been worn but is still in good condition. There may be minor signs of wear such as fading.'}
-                {product.condition === 'Fair' && 'Item shows visible signs of wear. May have minor defects but is still functional and wearable.'}
-              </p>
-            </div>
-
-            {/* Item Story */}
-            {product.story && (
-              <div className="item-story-box">
-                <h4>Item Story</h4>
-                <p>{product.story}</p>
-              </div>
-            )}
-
-            {/* Verification Promise */}
-            <div className="verification-box">
-              <div className="verification-icon">
-                <FiShield />
-              </div>
-              <div className="verification-text">
-                <h4>Condition Verification Promise</h4>
-                <p>After receiving your order, you can verify if the product matches the listed description. We encourage honest feedback to build trust in our community. If the item doesn't match the description, contact us within 48 hours for a resolution.</p>
-              </div>
-            </div>
-
-            {/* Transparency Note */}
-            <div className="transparency-note">
-              <p>This feature enhances both transparency and emotional connection in the buying process. Sellers label each product with clear condition badges, helping customers understand exactly what they are purchasing. By combining accurate condition labeling with personal storytelling, the platform promotes authenticity, transparency, and stronger buyer-seller relationships.</p>
-            </div>
-          </div>
-
           {/* Seller Profile Section */}
           <div className="seller-profile-card">
             <h3>About the Seller</h3>
             
-            <div className="seller-info-header">
+            <div 
+              className="seller-info-header clickable-seller-info"
+              onClick={() => {
+                const sellerId = product.seller?._id || product.seller;
+                console.log('Product seller data:', product.seller);
+                console.log('Extracted seller ID:', sellerId);
+                if (sellerId) {
+                  navigate(`/seller/${sellerId}`);
+                } else {
+                  console.error('No seller ID found in product');
+                }
+              }}
+              style={{ cursor: 'pointer' }}
+            >
               <img src={sellerInfo.avatar} alt={sellerInfo.name} className="seller-avatar" />
               <div className="seller-basic-info">
                 <h4>{sellerInfo.name}</h4>
@@ -534,13 +567,6 @@ function ProductDetail() {
                 </div>
               </div>
             </div>
-
-            <button 
-              className="btn-view-seller-profile"
-              onClick={() => navigate(`/seller/${sellerInfo.id || product.seller._id || product.seller}`)}
-            >
-              View Seller Profile & Products
-            </button>
           </div>
 
           {/* Contact Seller */}
@@ -550,7 +576,17 @@ function ProductDetail() {
         </div>
       </div>
 
-      {/* Product Reviews */}
+      {/* Product Story - Simple Purple Box */}
+      {product.story && (
+        <div className="product-story-section-standalone">
+          <div className="item-story-box-simple">
+            <h3 className="story-title-simple">Item Story</h3>
+            <p className="story-content-simple">{product.story}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Product Reviews - Condition Verifications */}
       <ProductReviews productId={id} />
 
       {/* Similar Products */}
@@ -616,6 +652,44 @@ function ProductDetail() {
               <p className="auth-note">
                 Already have an account? <span onClick={() => navigate('/login')} style={{color: '#00bcd4', cursor: 'pointer', fontWeight: '500'}}>Sign in here</span>
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add to Cart Success Modal */}
+      {showAddToCartModal && addedToCartProduct && (
+        <div className="cart-modal-overlay" onClick={() => setShowAddToCartModal(false)}>
+          <div className="cart-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="cart-modal-close" onClick={() => setShowAddToCartModal(false)}>×</button>
+            
+            <div className="cart-modal-header">
+              <FiCheck className="success-check" />
+              <span>Product successfully added to your cart.</span>
+            </div>
+
+            <div className="cart-modal-body">
+              <img src={addedToCartProduct.image} alt={addedToCartProduct.name} />
+              <div className="cart-modal-info">
+                <h3>{addedToCartProduct.name}</h3>
+                <div className="cart-modal-pricing">
+                  <span className="price">Rs. {addedToCartProduct.price.toLocaleString()}</span>
+                  {addedToCartProduct.discount > 0 && (
+                    <>
+                      <span className="original">Rs. {addedToCartProduct.originalPrice.toLocaleString()}</span>
+                      <span className="discount">({addedToCartProduct.discount}% OFF)</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <button className="view-cart-button" onClick={() => navigate('/cart')}>
+                View Cart
+              </button>
+            </div>
+
+            <div className="cart-modal-footer">
+              <span>Total :</span>
+              <span className="total">Rs. {(addedToCartProduct.price * addedToCartProduct.quantity).toLocaleString()}</span>
             </div>
           </div>
         </div>

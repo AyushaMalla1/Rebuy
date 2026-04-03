@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
+  conversationId: {
+    type: String,
+    required: true,
+    index: true
+  },
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
@@ -9,20 +14,21 @@ const messageSchema = new mongoose.Schema({
   senderModel: {
     type: String,
     required: true,
-    enum: ['User', 'Seller']
+    enum: ['User', 'Seller', 'Customer']
   },
   receiverId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    ref: 'Seller'
+    refPath: 'receiverModel'
+  },
+  receiverModel: {
+    type: String,
+    required: true,
+    enum: ['User', 'Seller', 'Customer']
   },
   productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product'
-  },
-  subject: {
-    type: String,
-    required: true
   },
   message: {
     type: String,
@@ -32,12 +38,15 @@ const messageSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  replied: {
-    type: Boolean,
-    default: false
+  readAt: {
+    type: Date
   }
 }, {
   timestamps: true
 });
+
+// Index for faster queries
+messageSchema.index({ conversationId: 1, createdAt: -1 });
+messageSchema.index({ senderId: 1, receiverId: 1 });
 
 module.exports = mongoose.model('Message', messageSchema);

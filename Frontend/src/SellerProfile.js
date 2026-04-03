@@ -4,40 +4,139 @@ import { FiStar, FiPackage, FiShoppingBag, FiMapPin, FiClock, FiTruck, FiAward, 
 import './SellerProfile.css';
 
 function SellerProfile() {
-  const { id } = useParams();
+  const { sellerId } = useParams();
   const navigate = useNavigate();
   const [seller, setSeller] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     fetchSellerProfile();
-  }, [id]);
+    // Get logged in user
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, [sellerId]);
 
   const fetchSellerProfile = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:5000/api/sellers/${id}`);
-      const data = await response.json();
+      console.log('Fetching seller with ID:', sellerId);
       
-      if (data.success) {
-        setSeller(data.seller);
-        setProducts(data.products);
+      // Fetch seller info
+      const sellerResponse = await fetch(`http://localhost:5000/api/sellers/${sellerId}`);
+      const sellerData = await sellerResponse.json();
+      
+      console.log('Seller response:', sellerData);
+      
+      if (!sellerData.success || !sellerData.seller) {
+        console.error('Seller not found or invalid response');
+        setLoading(false);
+        // Don't show alert, just show error state
+        return;
+      }
+      
+      setSeller(sellerData.seller);
+      
+      // Fetch seller's products
+      const productsResponse = await fetch(`http://localhost:5000/api/sellers/${sellerId}/products`);
+      const productsData = await productsResponse.json();
+      
+      console.log('Products response:', productsData);
+      
+      if (productsData.success && productsData.products) {
+        setProducts(productsData.products);
       } else {
-        alert('Seller not found');
-        navigate('/');
+        setProducts([]);
       }
     } catch (error) {
       console.error('Error fetching seller:', error);
-      alert('Error loading seller profile');
-      navigate('/');
+      setLoading(false);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const handleContactSeller = async () => {
+    if (!user) {
+      alert('Please login to contact the seller');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const senderId = user._id || user.id;
+      const conversationId = [senderId, seller._id].sort().join('_');
+      
+      // Check if conversation already exists
+      const existingConvResponse = await fetch(`http://localhost:5000/api/messages/conversations/${senderId}`);
+      const existingConvData = await existingConvResponse.json();
+      
+      let conversationExists = false;
+      if (existingConvData.success && existingConvData.conversations) {
+        conversationExists = existingConvData.conversations.some(
+          conv => conv.conversationId === conversationId
+        );
+      }
+      
+      // Only send initial message if conversation doesn't exist
+      if (!conversationExists) {
+        const token = localStorage.getItem('token');
+        // Determine sender model - check userType field
+        const senderModel = user.userType === 'seller' || user.role === 'seller' ? 'Seller' : 'Customer';
+        
+        console.log('Creating new conversation with:', {
+          senderId,
+          senderModel,
+          receiverId: seller._id,
+          receiverModel: 'Seller',
+          userType: user.userType,
+          role: user.role
+        });
+        
+        const response = await fetch('http://localhost:5000/api/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            senderId: senderId,
+            senderModel: senderModel,
+            receiverId: seller._id,
+            receiverModel: 'Seller',
+            message: `Hi, I'm interested in your products from ${seller.storeName}.`
+          })
+        });
+
+        const data = await response.json();
+        console.log('Message response:', data);
+        
+        if (!data.success) {
+          console.error('Failed to send message:', data);
+          alert(data.message || 'Failed to send message. Please try again.');
+          return;
+        }
+      }
+      
+      // Navigate to buyer profile messages tab with seller info
+      navigate('/buyer-profile', { 
+        state: { 
+          activeTab: 'messages',
+          openConversation: {
+            conversationId: conversationId,
+            sellerId: seller._id,
+            sellerName: seller.storeName || seller.fullName,
+            sellerAvatar: seller.profileImage
+          }
+        } 
+      });
+    } catch (error) {
+      console.error('Error contacting seller:', error);
+      alert('Failed to contact seller. Please try again.');
+    }
   };
 
   if (loading) {
@@ -51,8 +150,26 @@ function SellerProfile() {
     );
   }
 
-  if (!seller) {
-    return null;
+  if (!seller && !loading) {
+    return (
+      <div className="seller-profile-page">
+        <div className="seller-nav">
+          <div className="seller-nav-content">
+            <button className="back-button" onClick={() => navigate(-1)}>
+              <FiChevronLeft /> Back
+            </button>
+          </div>
+        </div>
+        <div className="error-container">
+          <FiPackage size={64} color="#ccc" />
+          <h2>Seller Not Found</h2>
+          <p>The seller you're looking for doesn't exist or has been removed.</p>
+          <button className="back-button" onClick={() => navigate('/')}>
+            Go to Home
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -71,27 +188,33 @@ function SellerProfile() {
         <div className="seller-hero-content">
           <div className="seller-main-info">
             <div className="seller-avatar-wrapper">
-              <img src={seller.avatar} alt={seller.name} className="seller-avatar-large" />
+              {seller.profileImage ? (
+                <img src={seller.profileImage} alt={seller.storeName} className="seller-avatar-large" />
+              ) : (
+                <div className="seller-avatar-large seller-avatar-placeholder">
+                  {(seller.storeName || seller.fullName || 'S').substring(0, 2).toUpperCase()}
+                </div>
+              )}
               <div className="verified-badge">
                 <FiShield /> Verified
               </div>
             </div>
             
             <div className="seller-identity">
-              <h1 className="seller-name">{seller.name}</h1>
-              <h2 className="seller-store">{seller.storeName}</h2>
+              <h1 className="seller-name">{seller.storeName || seller.fullName}</h1>
+              <h2 className="seller-store">{seller.fullName}</h2>
               
               <div className="seller-rating-large">
                 <div className="rating-stars">
                   {[...Array(5)].map((_, i) => (
                     <FiStar 
                       key={i} 
-                      className={i < Math.floor(seller.rating) ? 'star-filled' : 'star-empty'} 
+                      className={i < Math.floor(seller.rating || 0) ? 'star-filled' : 'star-empty'} 
                     />
                   ))}
                 </div>
-                <span className="rating-value">{seller.rating.toFixed(1)}</span>
-                <span className="rating-count">({seller.totalReviews} reviews)</span>
+                <span className="rating-value">{(seller.rating || 0).toFixed(1)}</span>
+                <span className="rating-count">({seller.totalReviews || 0} reviews)</span>
               </div>
 
               {seller.storeDescription && (
@@ -100,7 +223,7 @@ function SellerProfile() {
 
               <div className="seller-location-info">
                 <FiMapPin />
-                <span>{seller.city}, Nepal</span>
+                <span>{seller.city || seller.address || 'Nepal'}</span>
               </div>
             </div>
           </div>
@@ -166,7 +289,7 @@ function SellerProfile() {
           )}
 
           {/* Contact Button */}
-          <button className="contact-seller-btn">
+          <button className="contact-seller-btn" onClick={handleContactSeller}>
             <FiMessageCircle /> Contact Seller
           </button>
         </div>

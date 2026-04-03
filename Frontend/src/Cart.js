@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiTrash2, FiShoppingBag, FiX, FiTruck, FiAlertCircle, FiCheck, FiHeart } from 'react-icons/fi';
+import { FiArrowLeft, FiTrash2, FiShoppingBag, FiX, FiTruck, FiAlertCircle, FiCheck, FiHeart, FiPackage } from 'react-icons/fi';
 import './Cart.css';
 import { cartAPI } from './services/api';
 
@@ -31,6 +31,7 @@ function Cart() {
       if (!userData) {
         console.log('No user data found in localStorage');
         setCart([]);
+        localStorage.removeItem('cart'); // Clear any old cart data
         setLoading(false);
         return;
       }
@@ -64,7 +65,9 @@ function Cart() {
             sellerName: product.sellerName,
             storeName: product.storeName,
             discount: typeof product.discount === 'object' ? product.discount.percentage : product.discount,
-            stock: product.stock
+            stock: product.stock,
+            bundleDeal: product.bundleDeal,
+            bundleDiscount: item.bundleDiscount || 0
           };
         });
       
@@ -189,10 +192,19 @@ function Cart() {
     return cart
       .filter(item => selectedItems.includes(item.id))
       .reduce((total, item) => {
+        let savings = 0;
+        
+        // Regular discount savings
         if (item.discount && item.originalPrice > item.price) {
-          return total + ((item.originalPrice - item.price) * item.quantity);
+          savings += (item.originalPrice - item.price) * item.quantity;
         }
-        return total;
+        
+        // Bundle discount savings
+        if (item.bundleDiscount) {
+          savings += item.bundleDiscount;
+        }
+        
+        return total + savings;
       }, 0);
   };
 
@@ -225,7 +237,8 @@ function Cart() {
       .reduce((total, item) => {
         const price = Number(item.price) || 0;
         const quantity = Number(item.quantity) || 0;
-        return total + (price * quantity);
+        const bundleDiscount = Number(item.bundleDiscount) || 0;
+        return total + (price * quantity) - bundleDiscount;
       }, 0);
   };
 
@@ -348,6 +361,44 @@ function Cart() {
                             <div className="item-info">
                               <h3 onClick={() => navigate(`/product/${item.id}`)}>{item.name}</h3>
                               <div className="item-price">Rs. {(item.price || 0).toLocaleString()}</div>
+                              
+                              {/* Bundle Deal Badge */}
+                              {item.bundleDeal && item.bundleDeal.enabled && item.quantity >= item.bundleDeal.buyQuantity && (
+                                <div style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '4px 10px',
+                                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                  color: 'white',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  fontWeight: '600',
+                                  marginTop: '6px'
+                                }}>
+                                  <FiPackage size={14} />
+                                  Bundle Deal Applied: {item.bundleDeal.discountPercentage}% OFF
+                                </div>
+                              )}
+                              
+                              {item.bundleDeal && item.bundleDeal.enabled && item.quantity < item.bundleDeal.buyQuantity && (
+                                <div style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '4px 10px',
+                                  background: '#fef3c7',
+                                  color: '#92400e',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  fontWeight: '600',
+                                  marginTop: '6px'
+                                }}>
+                                  <FiPackage size={14} />
+                                  Buy {item.bundleDeal.buyQuantity - item.quantity} more for {item.bundleDeal.discountPercentage}% OFF
+                                </div>
+                              )}
+                              
                               <div className="item-stock">
                                 {item.stock === 0 ? (
                                   <span className="out-of-stock"><FiAlertCircle /> Out of Stock</span>
@@ -439,13 +490,20 @@ function Cart() {
                 <div className="summary-details">
                   <div className="summary-row">
                     <span>Subtotal ({selectedItems.length} {selectedItems.length === 1 ? 'item' : 'items'} selected)</span>
-                    <span>Rs. {getSubtotal().toLocaleString()}</span>
+                    <span>Rs. {(getSubtotal() + cart.filter(item => selectedItems.includes(item.id)).reduce((sum, item) => sum + (item.bundleDiscount || 0), 0)).toLocaleString()}</span>
                   </div>
                   
                   {getTotalSavings() > 0 && (
                     <div className="summary-row savings">
                       <span>Total Savings</span>
                       <span className="savings-amount">- Rs. {getTotalSavings().toLocaleString()}</span>
+                    </div>
+                  )}
+                  
+                  {cart.filter(item => selectedItems.includes(item.id) && item.bundleDiscount > 0).length > 0 && (
+                    <div className="summary-row" style={{color: '#10b981', fontSize: '13px'}}>
+                      <span>Bundle Discount</span>
+                      <span>- Rs. {cart.filter(item => selectedItems.includes(item.id)).reduce((sum, item) => sum + (item.bundleDiscount || 0), 0).toLocaleString()}</span>
                     </div>
                   )}
                   

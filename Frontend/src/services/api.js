@@ -55,6 +55,46 @@ export const productAPI = {
   search: (query) => apiCall(`/products?search=${encodeURIComponent(query)}`),
   
   getByCategory: (category) => apiCall(`/products?category=${category}`),
+  
+  getSuggestions: async (query) => {
+    try {
+      // Use the dedicated suggestions endpoint
+      const response = await apiCall(`/products/suggestions?q=${encodeURIComponent(query)}`);
+      
+      if (response.success) {
+        return {
+          success: true,
+          suggestions: {
+            products: response.suggestions.products || [],
+            categories: response.suggestions.categories || [],
+            brands: response.suggestions.brands || [],
+            sellers: response.suggestions.sellers || []
+          }
+        };
+      }
+      
+      return {
+        success: false,
+        suggestions: {
+          products: [],
+          categories: [],
+          brands: [],
+          sellers: []
+        }
+      };
+    } catch (error) {
+      console.error('Error in getSuggestions:', error);
+      return {
+        success: false,
+        suggestions: {
+          products: [],
+          categories: [],
+          brands: [],
+          sellers: []
+        }
+      };
+    }
+  },
 };
 
 // Cart APIs
@@ -244,6 +284,26 @@ export const customerAPI = {
   }),
 };
 
+// Message APIs
+export const messageAPI = {
+  getConversations: (userId) => apiCall(`/messages/conversations/${userId}`),
+  
+  getConversation: (conversationId, userId) => apiCall(`/messages/conversation/${conversationId}?userId=${userId}`),
+  
+  send: (messageData) => apiCall('/messages', {
+    method: 'POST',
+    body: JSON.stringify(messageData),
+  }),
+  
+  markAsRead: (messageId) => apiCall(`/messages/${messageId}/read`, {
+    method: 'PATCH',
+  }),
+  
+  deleteConversation: (conversationId, userId) => apiCall(`/messages/conversation/${conversationId}/${userId}`, {
+    method: 'DELETE',
+  }),
+};
+
 export default {
   auth: authAPI,
   products: productAPI,
@@ -254,4 +314,5 @@ export default {
   wishlist: wishlistAPI,
   seller: sellerAPI,
   customer: customerAPI,
+  messages: messageAPI,
 };

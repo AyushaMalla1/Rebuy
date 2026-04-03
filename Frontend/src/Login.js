@@ -40,7 +40,9 @@ function Login() {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Redirect based on user type
-        if (activeTab === 'seller') {
+        if (activeTab === 'admin') {
+          navigate('/admin/dashboard');
+        } else if (activeTab === 'seller') {
           navigate('/seller/dashboard');
         } else {
           navigate('/');
@@ -76,6 +78,12 @@ function Login() {
             onClick={() => setActiveTab('seller')}
           >
             Seller Login
+          </button>
+          <button 
+            className={activeTab === 'admin' ? 'active' : ''} 
+            onClick={() => setActiveTab('admin')}
+          >
+            Admin Login
           </button>
         </div>
 

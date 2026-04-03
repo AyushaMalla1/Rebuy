@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, FiHeart, FiSettings, FiLogOut, FiEdit2, FiSave, FiX, FiHome, FiPackage, FiRefreshCw, FiTruck, FiStar, FiAward, FiGift, FiMessageSquare, FiSend, FiChevronRight } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, FiHeart, FiSettings, FiLogOut, FiEdit2, FiSave, FiX, FiHome, FiPackage, FiRefreshCw, FiTruck, FiStar, FiAward, FiGift, FiMessageSquare, FiSend, FiChevronRight, FiBell, FiCheckCircle } from 'react-icons/fi';
 import './BuyerProfile.css';
-import { orderAPI, loyaltyAPI, customerAPI, authAPI } from './services/api';
+import { orderAPI, loyaltyAPI, customerAPI, authAPI, messageAPI } from './services/api';
 import { getProvinces, getDistrictsByProvince, getMunicipalitiesByDistrict, getAreasByMunicipality } from './data/nepalLocations';
 
 function BuyerProfile() {
@@ -24,56 +24,10 @@ function BuyerProfile() {
   const [profileImagePreview, setProfileImagePreview] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   const [orders, setOrders] = useState([]);
+  const [returns, setReturns] = useState([]);
+  const [loadingReturns, setLoadingReturns] = useState(false);
   const [loyaltyData, setLoyaltyData] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Sample orders data with detailed tracking
-  const [sampleOrders] = useState([
-    { 
-      id: '#ORD-001', 
-      date: '2026-03-01', 
-      total: 8500, 
-      status: 'Delivered', 
-      items: 2,
-      trackingNumber: 'TRK123456789',
-      estimatedDelivery: '2026-03-05',
-      paymentMethod: 'Online Payment',
-      shippingAddress: 'Kathmandu, Nepal',
-      products: [
-        { name: 'Vintage Jacket', quantity: 1, price: 8000 },
-        { name: 'T-Shirt', quantity: 1, price: 500 }
-      ]
-    },
-    { 
-      id: '#ORD-002', 
-      date: '2026-02-28', 
-      total: 5200, 
-      status: 'Shipped', 
-      items: 1,
-      trackingNumber: 'TRK987654321',
-      estimatedDelivery: '2026-03-06',
-      paymentMethod: 'Cash on Delivery',
-      shippingAddress: 'Lalitpur, Nepal',
-      products: [
-        { name: 'Hoodie', quantity: 1, price: 5200 }
-      ]
-    },
-    { 
-      id: '#ORD-003', 
-      date: '2026-02-25', 
-      total: 12000, 
-      status: 'Processing', 
-      items: 3,
-      trackingNumber: 'Pending',
-      estimatedDelivery: '2026-03-08',
-      paymentMethod: 'Online Payment',
-      shippingAddress: 'Pokhara, Nepal',
-      products: [
-        { name: 'Blazer', quantity: 2, price: 6200 },
-        { name: 'Jeans', quantity: 1, price: 5800 }
-      ]
-    },
-  ]);
 
   // Wishlist state - load from localStorage
   const [wishlist, setWishlist] = useState([]);
@@ -98,42 +52,16 @@ function BuyerProfile() {
   // Chat/Messages
   const [selectedChat, setSelectedChat] = useState(null);
   const [messageText, setMessageText] = useState('');
-  const [chats] = useState([
-    { 
-      id: 1, 
-      sellerName: 'Fashion Store', 
-      sellerAvatar: 'FS',
-      lastMessage: 'Is this item still available?',
-      time: '2 hours ago',
-      unread: 2,
-      messages: [
-        { id: 1, sender: 'buyer', text: 'Hi, is this jacket still available?', time: '10:30 AM' },
-        { id: 2, sender: 'seller', text: 'Yes, it is! Would you like to know more details?', time: '10:32 AM' },
-        { id: 3, sender: 'buyer', text: 'What size is it?', time: '10:35 AM' },
-        { id: 4, sender: 'seller', text: 'It\'s size M. We also have L available.', time: '10:36 AM' },
-      ]
-    },
-    { 
-      id: 2, 
-      sellerName: 'Vintage Closet', 
-      sellerAvatar: 'VC',
-      lastMessage: 'Thank you for your purchase!',
-      time: '1 day ago',
-      unread: 0,
-      messages: [
-        { id: 1, sender: 'buyer', text: 'When will my order ship?', time: 'Yesterday 3:20 PM' },
-        { id: 2, sender: 'seller', text: 'Your order will ship today! Tracking number will be sent soon.', time: 'Yesterday 3:25 PM' },
-        { id: 3, sender: 'seller', text: 'Thank you for your purchase!', time: 'Yesterday 3:26 PM' },
-      ]
-    },
-  ]);
+  const [chats, setChats] = useState([]);
+  const [loadingChats, setLoadingChats] = useState(false);
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationData, setVerificationData] = useState({
     matchesDescription: null,
-    customerNotes: ''
+    customerNotes: '',
+    images: []
   });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -150,6 +78,9 @@ function BuyerProfile() {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnData, setReturnData] = useState({
     orderId: null,
+    productId: null,
+    productName: '',
+    productImage: '',
     reason: '',
     description: '',
     images: []
@@ -162,23 +93,144 @@ function BuyerProfile() {
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmPassword, setDeleteConfirmPassword] = useState('');
+  
+  // Notification states
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const handleSendMessage = () => {
+  // Fetch conversations from backend
+  const fetchConversations = async () => {
+    if (!userData._id) {
+      console.log('Cannot fetch conversations: userData._id is missing');
+      return;
+    }
+    
+    try {
+      setLoadingChats(true);
+      console.log('Fetching conversations for user:', userData._id);
+      
+      const response = await messageAPI.getConversations(userData._id);
+      console.log('Conversations response:', response);
+      
+      if (response.success) {
+        // Transform backend data to match UI format
+        const transformedChats = response.conversations.map(conv => ({
+          id: conv.conversationId,
+          conversationId: conv.conversationId,
+          sellerName: conv.otherUser.name,
+          sellerAvatar: conv.otherUser.profileImage || conv.otherUser.name.substring(0, 2).toUpperCase(),
+          sellerId: conv.otherUser._id,
+          lastMessage: conv.lastMessage.message,
+          time: formatMessageTime(conv.lastMessage.createdAt),
+          unread: conv.unreadCount,
+          messages: [] // Will be loaded when chat is selected
+        }));
+        
+        console.log('Transformed chats:', transformedChats);
+        setChats(transformedChats);
+      }
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    } finally {
+      setLoadingChats(false);
+    }
+  };
+
+  // Fetch messages for a specific conversation
+  const fetchConversationMessages = async (conversationId) => {
+    if (!userData._id) return;
+    
+    try {
+      const response = await messageAPI.getConversation(conversationId, userData._id);
+      
+      if (response.success) {
+        // Transform messages to UI format
+        const transformedMessages = response.messages.map(msg => ({
+          id: msg._id,
+          sender: msg.senderId === userData._id ? 'buyer' : 'seller',
+          text: msg.message,
+          time: new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          read: msg.read
+        }));
+        
+        // Update the selected chat with messages
+        setSelectedChat(prev => ({
+          ...prev,
+          messages: transformedMessages
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
+
+  // Format message time
+  const formatMessageTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  const handleSendMessage = async () => {
     if (!messageText.trim() || !selectedChat) return;
     
-    // Add message to chat
-    const newMessage = {
-      id: selectedChat.messages.length + 1,
-      sender: 'buyer',
-      text: messageText,
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    };
+    // Get user ID from localStorage as fallback
+    const user = JSON.parse(localStorage.getItem('user'));
+    const userId = userData?._id || user?._id || user?.id;
     
-    selectedChat.messages.push(newMessage);
-    setMessageText('');
+    if (!userId) {
+      showToast('Please log in to send messages', 'error');
+      navigate('/login');
+      return;
+    }
     
-    // In a real app, this would send to backend
-    console.log('Message sent:', newMessage);
+    try {
+      const messageData = {
+        senderId: userId,
+        senderModel: 'Customer',
+        receiverId: selectedChat.sellerId,
+        receiverModel: 'Seller',
+        message: messageText
+      };
+      
+      console.log('Sending message:', messageData);
+      
+      const response = await messageAPI.send(messageData);
+      
+      if (response.success) {
+        // Add message to UI immediately
+        const newMessage = {
+          id: response.data._id,
+          sender: 'buyer',
+          text: messageText,
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          read: false
+        };
+        
+        setSelectedChat(prev => ({
+          ...prev,
+          messages: [...(prev.messages || []), newMessage]
+        }));
+        
+        setMessageText('');
+        
+        // Refresh conversations to update last message
+        fetchConversations();
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      showToast('Failed to send message', 'error');
+    }
   };
 
   const handleChangePassword = () => {
@@ -188,6 +240,120 @@ function BuyerProfile() {
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+  };
+
+  // Notification functions
+  const fetchNotifications = async () => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return;
+
+    const user = JSON.parse(userData);
+    setLoadingNotifications(true);
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/customer/${user._id}`);
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return;
+
+    const user = JSON.parse(userData);
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/customer/${user._id}/read-all`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  const markAsRead = async (notificationId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        setNotifications(notifications.map(n => 
+          n._id === notificationId ? { ...n, isRead: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking as read:', error);
+    }
+  };
+
+  const deleteNotification = async (notificationId, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        const notification = notifications.find(n => n._id === notificationId);
+        setNotifications(notifications.filter(n => n._id !== notificationId));
+        if (notification && !notification.isRead) {
+          setUnreadCount(prev => Math.max(0, prev - 1));
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
+
+  const getNotificationIcon = (type) => {
+    if (type === 'order') return <FiShoppingBag />;
+    if (type === 'message') return <FiMessageSquare />;
+    return <FiBell />;
+  };
+
+  const formatNotificationTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const handleNotificationClick = (notification) => {
+    markAsRead(notification._id);
+    setShowNotifications(false);
+    
+    if (notification.type === 'order') {
+      setActiveTab('orders');
+    } else if (notification.type === 'message') {
+      setActiveTab('messages');
+    }
   };
 
   const handlePasswordSubmit = async () => {
@@ -304,7 +470,29 @@ function BuyerProfile() {
   };
 
   useEffect(() => {
+    // Check if we should open a specific tab from navigation state
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+    
+    // Check if we should open a specific conversation
+    if (location.state?.openConversation) {
+      const convInfo = location.state.openConversation;
+      // Set the selected chat to open the conversation
+      setSelectedChat({
+        id: convInfo.conversationId,
+        conversationId: convInfo.conversationId,
+        sellerId: convInfo.sellerId,
+        sellerName: convInfo.sellerName,
+        sellerAvatar: convInfo.sellerAvatar || convInfo.sellerName.substring(0, 2).toUpperCase(),
+        messages: [],
+        unread: 0
+      });
+    }
+    
     const user = JSON.parse(localStorage.getItem('user'));
+    console.log('User from localStorage:', user);
+    
     if (user) {
       // Redirect sellers to seller dashboard
       if (user.userType === 'seller') {
@@ -312,7 +500,11 @@ function BuyerProfile() {
         return;
       }
       
+      const userId = user._id || user.id;
+      console.log('Setting userData with ID:', userId);
+      
       const data = {
+        _id: userId,
         fullName: user.fullName || 'John Doe',
         email: user.email || 'john.doe@example.com',
         phone: user.phone || '+977 9812345678',
@@ -323,10 +515,12 @@ function BuyerProfile() {
       setEditData(data);
       
       // Fetch customer profile, orders and loyalty data
-      if (user._id) {
-        fetchCustomerProfile(user._id);
-        fetchOrders(user._id);
-        fetchLoyaltyData(user._id);
+      if (userId) {
+        fetchCustomerProfile(userId);
+        fetchOrders(userId);
+        fetchReturns(userId);
+        fetchLoyaltyData(userId);
+        fetchNotifications();
       }
     } else {
       // Redirect to login if not logged in
@@ -343,6 +537,50 @@ function BuyerProfile() {
       setActiveTab(tab);
     }
   }, [location, navigate]);
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications) {
+        const notificationWrapper = document.querySelector('.notification-wrapper');
+        if (notificationWrapper && !notificationWrapper.contains(event.target)) {
+          setShowNotifications(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  // Fetch conversations when messages tab is active
+  useEffect(() => {
+    if (activeTab === 'messages') {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = userData._id || user?._id || user?.id;
+      
+      console.log('Messages tab active, userId:', userId);
+      
+      if (userId) {
+        // Update userData if it doesn't have _id
+        if (!userData._id && userId) {
+          setUserData(prev => ({ ...prev, _id: userId }));
+        }
+        fetchConversations();
+      } else {
+        console.log('Cannot fetch conversations: no user ID found');
+      }
+    }
+  }, [activeTab, userData._id]);
+
+  // Fetch messages when a chat is selected
+  useEffect(() => {
+    if (selectedChat && selectedChat.conversationId) {
+      fetchConversationMessages(selectedChat.conversationId);
+    }
+  }, [selectedChat?.conversationId]);
 
   const fetchCustomerProfile = async (userId) => {
     try {
@@ -394,16 +632,40 @@ function BuyerProfile() {
     }
   };
 
-  const loadWishlist = () => {
+  const loadWishlist = async () => {
     try {
-      const savedFavorites = localStorage.getItem('favorites');
-      const allProductsStr = localStorage.getItem('allProducts');
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = localStorage.getItem('token');
       
-      if (savedFavorites && allProductsStr) {
-        const favoriteIds = JSON.parse(savedFavorites);
-        const allProducts = JSON.parse(allProductsStr);
-        const wishlistItems = allProducts.filter(p => favoriteIds.includes(p.id));
-        setWishlist(wishlistItems);
+      if (!user || !token) {
+        setWishlist([]);
+        return;
+      }
+      
+      // Fetch wishlist from backend
+      const response = await fetch(`http://localhost:5000/api/wishlist/${user._id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Format wishlist items - backend returns { success, wishlist: { items: [...] } }
+        const wishlistItems = data.wishlist?.items || [];
+        const formattedWishlist = wishlistItems.map(item => ({
+          id: item.product._id || item.product,
+          name: item.product.name || item.productName,
+          price: item.product.price || item.price,
+          image: (item.product.images && item.product.images[0]) || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+          seller: item.product.seller || item.seller,
+          sellerName: item.product.sellerName || item.sellerName,
+          storeName: item.product.storeName || item.storeName,
+          stock: item.product.stock
+        }));
+        
+        setWishlist(formattedWishlist);
       } else {
         setWishlist([]);
       }
@@ -416,18 +678,42 @@ function BuyerProfile() {
   const fetchOrders = async (customerId) => {
     try {
       const fetchedOrders = await orderAPI.getCustomerOrders(customerId);
-      if (fetchedOrders && fetchedOrders.length > 0) {
-        setOrders(fetchedOrders);
-      } else {
-        // Use sample orders if no real orders
-        setOrders(sampleOrders);
-      }
+      setOrders(fetchedOrders || []);
     } catch (error) {
       console.error('Error fetching orders:', error);
-      setOrders(sampleOrders);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchReturns = async (customerId) => {
+    setLoadingReturns(true);
+    try {
+      const response = await fetch(`http://localhost:5000/api/returns/customer/${customerId}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setReturns(data.returns || []);
+      } else {
+        setReturns([]);
+      }
+    } catch (error) {
+      console.error('Error fetching returns:', error);
+      setReturns([]);
+    } finally {
+      setLoadingReturns(false);
+    }
+  };
+
+  // Calculate order counts by status
+  const getOrderCounts = () => {
+    return {
+      pending: orders.filter(o => o.status === 'Pending').length,
+      processing: orders.filter(o => o.status === 'Processing').length,
+      shipped: orders.filter(o => o.status === 'Shipped').length,
+      delivered: orders.filter(o => o.status === 'Delivered').length
+    };
   };
 
   const fetchLoyaltyData = async (customerId) => {
@@ -798,18 +1084,32 @@ function BuyerProfile() {
     }
   };
 
-  const handleRemoveFromWishlist = (itemId) => {
+  const handleRemoveFromWishlist = async (itemId) => {
     try {
-      // Remove from wishlist
-      const updatedWishlist = wishlist.filter(item => item.id !== itemId);
-      setWishlist(updatedWishlist);
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = localStorage.getItem('token');
       
-      // Update favorites in localStorage
-      const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-      const updatedFavorites = favorites.filter(id => id !== itemId);
-      localStorage.setItem('favorites', JSON.stringify(updatedFavorites));
+      if (!user || !token) {
+        showToast('Please login to manage wishlist', 'error');
+        return;
+      }
       
-      showToast('Item removed from wishlist', 'success');
+      // Remove from backend - using DELETE method with URL params
+      const response = await fetch(`http://localhost:5000/api/wishlist/${user._id}/remove/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        // Reload wishlist from backend
+        await loadWishlist();
+        showToast('Item removed from wishlist', 'success');
+      } else {
+        const data = await response.json();
+        showToast(data.message || 'Failed to remove item', 'error');
+      }
     } catch (error) {
       console.error('Error removing from wishlist:', error);
       showToast('Failed to remove item from wishlist', 'error');
@@ -829,8 +1129,13 @@ function BuyerProfile() {
   };
 
   const handleVerifyCondition = async (orderId) => {
-    setSelectedOrder(orders.find(o => o._id === orderId || o.id === orderId));
+    console.log('handleVerifyCondition called with orderId:', orderId);
+    console.log('Available orders:', orders);
+    const order = orders.find(o => o._id === orderId || o.id === orderId);
+    console.log('Found order:', order);
+    setSelectedOrder(order);
     setShowVerificationModal(true);
+    console.log('Modal should open now');
   };
 
   const submitVerification = async () => {
@@ -839,12 +1144,33 @@ function BuyerProfile() {
       return;
     }
     
+    // If "No" is selected, images are required
+    if (verificationData.matchesDescription === false && verificationData.images.length === 0) {
+      showToast('Please upload at least one image to support your claim', 'error');
+      return;
+    }
+    
     try {
-      await orderAPI.verifyCondition(selectedOrder._id || selectedOrder.id, {
-        matchesDescription: verificationData.matchesDescription,
-        customerNotes: verificationData.customerNotes || '',
-        images: []
+      // Convert boolean to string format expected by backend
+      const matchesDescriptionValue = verificationData.matchesDescription ? 'yes' : 'no';
+      
+      // Convert images to base64 or URLs (for now, just send preview URLs)
+      const imageUrls = verificationData.images.map(img => img.preview);
+      
+      console.log('Submitting verification:', {
+        orderId: selectedOrder._id || selectedOrder.id,
+        matchesDescription: matchesDescriptionValue,
+        customerNotes: verificationData.customerNotes,
+        images: imageUrls
       });
+      
+      const response = await orderAPI.verifyCondition(selectedOrder._id || selectedOrder.id, {
+        matchesDescription: matchesDescriptionValue,
+        customerNotes: verificationData.customerNotes || '',
+        images: imageUrls
+      });
+      
+      console.log('Verification response:', response);
       
       if (verificationData.matchesDescription) {
         showToast('Thank you! You earned 50 bonus loyalty points!', 'success');
@@ -853,7 +1179,7 @@ function BuyerProfile() {
       }
       
       setShowVerificationModal(false);
-      setVerificationData({ matchesDescription: null, customerNotes: '' });
+      setVerificationData({ matchesDescription: null, customerNotes: '', images: [] });
       
       // Refresh orders
       const user = JSON.parse(localStorage.getItem('user'));
@@ -863,8 +1189,46 @@ function BuyerProfile() {
       }
     } catch (error) {
       console.error('Error verifying condition:', error);
-      showToast('Failed to submit verification', 'error');
+      showToast(error.message || 'Failed to submit verification', 'error');
     }
+  };
+
+  const handleVerificationImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    
+    // Validate file types
+    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    if (validFiles.length !== files.length) {
+      showToast('Please select only image files', 'error');
+      return;
+    }
+    
+    // Limit to 3 images
+    if (verificationData.images.length + validFiles.length > 3) {
+      showToast('Maximum 3 images allowed', 'error');
+      return;
+    }
+    
+    // Create preview URLs
+    const newImages = validFiles.map(file => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+    
+    setVerificationData({
+      ...verificationData,
+      images: [...verificationData.images, ...newImages]
+    });
+  };
+
+  const handleRemoveVerificationImage = (index) => {
+    const newImages = [...verificationData.images];
+    URL.revokeObjectURL(newImages[index].preview);
+    newImages.splice(index, 1);
+    setVerificationData({
+      ...verificationData,
+      images: newImages
+    });
   };
 
   const handleCancelOrder = async (orderId) => {
@@ -1005,6 +1369,27 @@ function BuyerProfile() {
               <FiShoppingBag /> Orders
             </button>
             <button 
+              className={activeTab === 'returns' ? 'active' : ''} 
+              onClick={() => {
+                console.log('Returns clicked');
+                setActiveTab('returns');
+              }}
+              style={{cursor: 'pointer', userSelect: 'none'}}
+            >
+              <FiRefreshCw /> My Returns
+            </button>
+            <button 
+              type="button"
+              className={activeTab === 'verification' ? 'active' : ''} 
+              onClick={() => {
+                console.log('Condition Verification clicked');
+                setActiveTab('verification');
+              }}
+              style={{cursor: 'pointer', userSelect: 'none'}}
+            >
+              <FiCheckCircle /> Condition Verification
+            </button>
+            <button 
               className={activeTab === 'wishlist' ? 'active' : ''} 
               onClick={() => {
                 console.log('Wishlist clicked');
@@ -1056,6 +1441,87 @@ function BuyerProfile() {
                 <h1>My Account</h1>
                 <p>Manage your profile and track your orders</p>
               </div>
+              <div className="header-actions">
+                <div className="notification-wrapper">
+                  <button 
+                    className="notification-btn" 
+                    onClick={() => setShowNotifications(!showNotifications)}
+                  >
+                    <FiBell />
+                    {unreadCount > 0 && (
+                      <span className="notification-badge">{unreadCount}</span>
+                    )}
+                  </button>
+                  
+                  {showNotifications && (
+                    <div className="notification-dropdown">
+                      <div className="notification-header">
+                        <h3>Notifications</h3>
+                        {unreadCount > 0 && (
+                          <button className="notification-mark-read" onClick={markAllAsRead}>
+                            Mark all as read
+                          </button>
+                        )}
+                      </div>
+                      <div className="notification-list">
+                        {notifications.length === 0 ? (
+                          <div className="notification-empty">
+                            <div className="notification-empty-icon-wrapper">
+                              <FiBell />
+                            </div>
+                            <h4 className="notification-empty-title">No notifications</h4>
+                            <p>You're all caught up!</p>
+                          </div>
+                        ) : (
+                          notifications.map(notification => (
+                            <div 
+                              key={notification._id}
+                              className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
+                              onClick={() => handleNotificationClick(notification)}
+                            >
+                              <div className="notification-content">
+                                <div className={`notification-icon-wrapper ${notification.severity}`}>
+                                  {getNotificationIcon(notification.type)}
+                                </div>
+                                <div className="notification-body">
+                                  <div className="notification-title">
+                                    {notification.title}
+                                  </div>
+                                  <div className="notification-message">
+                                    {notification.message}
+                                  </div>
+                                  <div className="notification-footer">
+                                    <span className="notification-time">
+                                      {formatNotificationTime(notification.createdAt)}
+                                    </span>
+                                    <button 
+                                      className="notification-delete-btn"
+                                      onClick={(e) => deleteNotification(notification._id, e)}
+                                    >
+                                      <FiX /> Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="user">
+                  <img 
+                    src={profileImagePreview || userData.profileImage || 'https://i.pravatar.cc/100'} 
+                    alt="Profile" 
+                    className="user-avatar"
+                  />
+                  <div>
+                    <strong>{userData.fullName || 'User'}</strong>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Order Status Cards */}
@@ -1068,12 +1534,16 @@ function BuyerProfile() {
                 }}
                 style={{cursor: 'pointer'}}
               >
-                <div className="status-icon-wrapper payment">
-                  <FiShoppingBag className="status-icon" />
+                <div className="status-card-content">
+                  <div className="status-icon-wrapper payment">
+                    <FiShoppingBag className="status-icon" />
+                  </div>
+                  <div className="status-card-info">
+                    <h3>To Pay</h3>
+                    <p className="status-count">{getOrderCounts().pending}</p>
+                    <span className="status-desc">Pending Payment</span>
+                  </div>
                 </div>
-                <h3>To Pay</h3>
-                <p className="status-count">2</p>
-                <span className="status-desc">Pending Payment</span>
               </div>
               <div 
                 className="status-card"
@@ -1083,12 +1553,16 @@ function BuyerProfile() {
                 }}
                 style={{cursor: 'pointer'}}
               >
-                <div className="status-icon-wrapper shipping">
-                  <FiPackage className="status-icon" />
+                <div className="status-card-content">
+                  <div className="status-icon-wrapper shipping">
+                    <FiPackage className="status-icon" />
+                  </div>
+                  <div className="status-card-info">
+                    <h3>To Ship</h3>
+                    <p className="status-count">{getOrderCounts().processing}</p>
+                    <span className="status-desc">Processing</span>
+                  </div>
                 </div>
-                <h3>To Ship</h3>
-                <p className="status-count">1</p>
-                <span className="status-desc">Processing</span>
               </div>
               <div 
                 className="status-card"
@@ -1098,12 +1572,16 @@ function BuyerProfile() {
                 }}
                 style={{cursor: 'pointer'}}
               >
-                <div className="status-icon-wrapper delivery">
-                  <FiTruck className="status-icon" />
+                <div className="status-card-content">
+                  <div className="status-icon-wrapper delivery">
+                    <FiTruck className="status-icon" />
+                  </div>
+                  <div className="status-card-info">
+                    <h3>To Receive</h3>
+                    <p className="status-count">{getOrderCounts().shipped}</p>
+                    <span className="status-desc">In Transit</span>
+                  </div>
                 </div>
-                <h3>To Receive</h3>
-                <p className="status-count">3</p>
-                <span className="status-desc">In Transit</span>
               </div>
               <div 
                 className="status-card"
@@ -1113,12 +1591,16 @@ function BuyerProfile() {
                 }}
                 style={{cursor: 'pointer'}}
               >
-                <div className="status-icon-wrapper review">
-                  <FiStar className="status-icon" />
+                <div className="status-card-content">
+                  <div className="status-icon-wrapper review">
+                    <FiStar className="status-icon" />
+                  </div>
+                  <div className="status-card-info">
+                    <h3>To Review</h3>
+                    <p className="status-count">{getOrderCounts().delivered}</p>
+                    <span className="status-desc">Completed</span>
+                  </div>
                 </div>
-                <h3>To Review</h3>
-                <p className="status-count">5</p>
-                <span className="status-desc">Completed</span>
               </div>
             </div>
 
@@ -1192,31 +1674,39 @@ function BuyerProfile() {
                 <div className="points-display">
                   <div className="points-circle">
                     <FiGift className="points-icon" />
-                    <span className="points-number">{loyaltyData ? loyaltyData.totalPoints : 1250}</span>
+                    <span className="points-number">{loyaltyData ? loyaltyData.totalPoints : 0}</span>
                     <span className="points-label">Points</span>
                   </div>
                 </div>
                 <div className="rewards-list">
-                  <div className="reward-item">
-                    <div className="reward-icon-wrapper welcome">
-                      <FiGift className="reward-icon-svg" />
+                  {loyaltyData && loyaltyData.pointsHistory && loyaltyData.pointsHistory.length > 0 ? (
+                    <>
+                      {loyaltyData.pointsHistory.slice(-3).reverse().map((transaction, index) => (
+                        <div 
+                          key={index} 
+                          className="reward-item"
+                        >
+                          <div className={`reward-icon-wrapper ${transaction.type === 'earned' ? 'purchase' : 'redeem'}`}>
+                            {transaction.type === 'earned' ? <FiShoppingBag className="reward-icon-svg" /> : <FiGift className="reward-icon-svg" />}
+                          </div>
+                          <div>
+                            <h4>{transaction.reason || (transaction.type === 'earned' ? 'Points Earned' : 'Points Redeemed')}</h4>
+                            <p>{transaction.type === 'earned' ? '+' : '-'}{transaction.points} points • {new Date(transaction.date).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="reward-item">
+                      <div className="reward-icon-wrapper welcome">
+                        <FiGift className="reward-icon-svg" />
+                      </div>
+                      <div>
+                        <h4>No transactions yet</h4>
+                        <p>Start shopping to earn points!</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4>Welcome Bonus</h4>
-                      <p>500 points earned</p>
-                    </div>
-                    <FiChevronRight />
-                  </div>
-                  <div className="reward-item">
-                    <div className="reward-icon-wrapper purchase">
-                      <FiShoppingBag className="reward-icon-svg" />
-                    </div>
-                    <div>
-                      <h4>Purchase Rewards</h4>
-                      <p>750 points earned</p>
-                    </div>
-                    <FiChevronRight />
-                  </div>
+                  )}
                   <button 
                     className="redeem-btn"
                     onClick={(e) => {
@@ -1227,6 +1717,7 @@ function BuyerProfile() {
                     }}
                     type="button"
                     style={{cursor: 'pointer'}}
+                    disabled={!loyaltyData || loyaltyData.totalPoints === 0}
                   >
                     <FiGift /> Redeem Points
                   </button>
@@ -1292,88 +1783,83 @@ function BuyerProfile() {
                   return true;
                 })
                 .map(order => (
-                <div key={order.id} className="order-card">
-                  <div className="order-header">
-                    <div>
-                      <h3>{order.id}</h3>
-                      <span className="order-date">{order.date}</span>
+                <div key={order.id} className="order-card-compact">
+                  <div className="order-header-compact">
+                    <div className="order-id-date">
+                      <h3>Order ID : {order.id}</h3>
+                      <span className="order-date-compact">Order Placed On : {order.date}</span>
                     </div>
-                    <span className={`status-badge ${getStatusClass(order.status)}`}>
-                      {order.status}
-                    </span>
-                  </div>
-
-                  <div className="order-body">
-                    <div className="order-info-row">
-                      <span className="info-label">Items:</span>
-                      <span className="info-value">
-                        {typeof order.items === 'number' 
-                          ? `${order.items} items` 
-                          : Array.isArray(order.items) 
-                            ? `${order.items.length} items`
-                            : Array.isArray(order.products)
-                              ? `${order.products.length} items`
-                              : '0 items'
-                        }
-                      </span>
-                    </div>
-                    <div className="order-info-row">
-                      <span className="info-label">Total:</span>
-                      <span className="info-value total">Rs. {order.total.toLocaleString()}</span>
-                    </div>
-                    <div className="order-info-row">
-                      <span className="info-label">Payment:</span>
-                      <span className="info-value">{order.paymentMethod}</span>
-                    </div>
-                    <div className="order-info-row">
-                      <span className="info-label">Tracking:</span>
-                      <span className="info-value tracking">{order.trackingNumber}</span>
-                    </div>
-                    {order.status !== 'Delivered' && (
-                      <div className="order-info-row">
-                        <span className="info-label">Est. Delivery:</span>
-                        <span className="info-value">{order.estimatedDelivery}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="order-actions">
                     <button 
-                      className="view-details-btn"
+                      className="view-details-link"
                       onClick={() => {
                         setSelectedOrder(order);
                         setShowOrderDetails(true);
                       }}
                     >
-                      View Details
+                      View Details ›
                     </button>
-                    {order.status === 'Delivered' && !order.conditionVerification?.verified && (
-                      <button 
-                        className="verify-btn"
-                        onClick={() => handleVerifyCondition(order._id || order.id)}
-                      >
-                        Verify Condition
-                      </button>
-                    )}
-                    {order.status === 'Delivered' && order.conditionVerification?.verified && (
-                      <>
-                        <span className="verified-badge">✓ Verified</span>
-                        <button 
-                          className="return-btn"
-                          onClick={() => handleRequestReturn(order._id || order.id)}
-                        >
-                          Request Return
-                        </button>
-                      </>
-                    )}
-                    {order.status === 'Processing' && (
-                      <button 
-                        className="cancel-order-btn"
-                        onClick={() => handleCancelOrder(order._id || order.id)}
-                      >
-                        Cancel Order
-                      </button>
-                    )}
+                  </div>
+
+                  <div className="order-products-list">
+                    {(Array.isArray(order.items) ? order.items : Array.isArray(order.products) ? order.products : []).map((item, idx) => (
+                      <div key={idx} className="order-product-item">
+                        <img 
+                          src={item.image || item.productImage || 'https://via.placeholder.com/80'} 
+                          alt={item.name || item.productName}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/80';
+                          }}
+                        />
+                        <div className="product-item-details">
+                          <h4>{item.name || item.productName}</h4>
+                          <p className="product-quantity">Quantity : {item.quantity || 1}</p>
+                          <p className="product-price">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString()}</p>
+                        </div>
+                        <div className="product-item-actions">
+                          <span className={`status-badge-compact ${getStatusClass(order.status)}`}>
+                            {order.status}
+                          </span>
+                          {(order.status === 'Delivered' || order.status === 'delivered' || order.status === 'Completed') && (
+                            <button 
+                              className="return-btn-compact"
+                              onClick={() => {
+                                // Get the product ID - it could be an object with _id or just the ID string
+                                const productId = item.product?._id || item.product || item.productId;
+                                
+                                console.log('Return button clicked:', {
+                                  orderId: order._id || order.id,
+                                  productId: productId,
+                                  itemProduct: item.product,
+                                  itemId: item._id
+                                });
+                                
+                                setReturnData({
+                                  orderId: order._id || order.id,
+                                  productId: productId,
+                                  productName: item.name || item.productName,
+                                  productImage: item.image || item.productImage,
+                                  reason: '',
+                                  description: '',
+                                  images: []
+                                });
+                                setShowReturnModal(true);
+                              }}
+                            >
+                              <FiRefreshCw /> Return Item
+                            </button>
+                          )}
+                          {(order.status === 'Pending' || order.status === 'pending' || order.status === 'Processing' || order.status === 'processing' || order.status === 'Confirmed') && idx === 0 && (
+                            <button 
+                              className="cancel-btn-compact"
+                              onClick={() => handleCancelOrder(order._id || order.id)}
+                            >
+                              <FiX /> Cancel Order
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -1399,102 +1885,169 @@ function BuyerProfile() {
             {/* Order Details Modal */}
             {showOrderDetails && selectedOrder && (
               <div className="modal-overlay" onClick={() => setShowOrderDetails(false)}>
-                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                  <div className="modal-header">
-                    <h2>Order Details - {selectedOrder.id}</h2>
+                <div className="modal-content-compact" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header-compact">
+                    <h2>ITEM DETAILS</h2>
                     <button className="close-modal" onClick={() => setShowOrderDetails(false)}>
                       <FiX />
                     </button>
                   </div>
-                  <div className="modal-body">
-                    <div className="detail-section">
-                      <h4>Order Status</h4>
-                      <div className="tracking-timeline">
-                        <div className={`timeline-step ${['Processing', 'Shipped', 'Delivered'].includes(selectedOrder.status) ? 'completed' : ''}`}>
-                          <div className="step-icon">📦</div>
-                          <div className="step-info">
-                            <strong>Order Placed</strong>
-                            <span>{selectedOrder.date}</span>
+                  
+                  <div className="modal-body-compact">
+                    {/* Product Items */}
+                    <div className="modal-products-list">
+                      {(Array.isArray(selectedOrder.items) ? selectedOrder.items : Array.isArray(selectedOrder.products) ? selectedOrder.products : []).map((item, index) => (
+                        <div key={index} className="modal-product-item">
+                          <img 
+                            src={item.image || item.productImage || 'https://via.placeholder.com/80'} 
+                            alt={item.name || item.productName}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://via.placeholder.com/80';
+                            }}
+                          />
+                          <div className="modal-product-info">
+                            <h4>{item.name || item.productName}</h4>
+                            <p>Quantity : {item.quantity || 1}</p>
                           </div>
                         </div>
-                        <div className={`timeline-step ${['Shipped', 'Delivered'].includes(selectedOrder.status) ? 'completed' : ''}`}>
-                          <div className="step-icon">🚚</div>
-                          <div className="step-info">
-                            <strong>Shipped</strong>
-                            <span>{selectedOrder.status === 'Shipped' || selectedOrder.status === 'Delivered' ? 'In Transit' : 'Pending'}</span>
-                          </div>
+                      ))}
+                    </div>
+
+                    {/* Two Column Layout */}
+                    <div className="modal-details-grid">
+                      {/* Shipping Address */}
+                      <div className="modal-section">
+                        <h3>Shipping Address</h3>
+                        <div className="address-details">
+                          <p><FiUser style={{marginRight: '8px'}} />{selectedOrder.shippingAddress?.fullName || 'N/A'}</p>
+                          <p><FiMapPin style={{marginRight: '8px'}} />
+                            {selectedOrder.shippingAddress?.municipality || ''}, {selectedOrder.shippingAddress?.district || ''} - {selectedOrder.shippingAddress?.landmark || ''}, {selectedOrder.shippingAddress?.state || ''}
+                          </p>
+                          <p><FiPhone style={{marginRight: '8px'}} />{selectedOrder.shippingAddress?.phone || 'N/A'}</p>
                         </div>
-                        <div className={`timeline-step ${selectedOrder.status === 'Delivered' ? 'completed' : ''}`}>
-                          <div className="step-icon">✅</div>
-                          <div className="step-info">
-                            <strong>Delivered</strong>
-                            <span>{selectedOrder.status === 'Delivered' ? 'Completed' : selectedOrder.estimatedDelivery}</span>
+                      </div>
+
+                      {/* Bill Summary */}
+                      <div className="modal-section">
+                        <h3>Bill Summary</h3>
+                        <div className="bill-details">
+                          <div className="bill-row">
+                            <span>Subtotal</span>
+                            <span>Rs. {(selectedOrder.total - (selectedOrder.shippingCost || 0)).toLocaleString()}</span>
+                          </div>
+                          <div className="bill-row">
+                            <span>Shipping Charge</span>
+                            <span>Rs. {selectedOrder.shippingCost || 0}</span>
+                          </div>
+                          <div className="bill-row total-row">
+                            <span>Total</span>
+                            <span className="total-amount">Rs. {selectedOrder.total.toLocaleString()}</span>
+                          </div>
+                          <div className="payment-method">
+                            {selectedOrder.paymentMethod === 'cod' 
+                              ? 'To Pay By Cash on delivery (COD)' 
+                              : selectedOrder.paymentMethod === 'esewa'
+                                ? 'Paid By eSewa'
+                                : selectedOrder.paymentMethod === 'khalti'
+                                  ? 'Paid By Khalti'
+                                  : `Paid By ${selectedOrder.paymentMethod}`
+                            }
                           </div>
                         </div>
                       </div>
                     </div>
-
-                    <div className="detail-section">
-                      <h4>Products</h4>
-                      {Array.isArray(selectedOrder.products) && selectedOrder.products.length > 0 && selectedOrder.products.map((item, index) => {
-                        // Handle both product objects and item objects
-                        const productName = item.name || item.productName || 'Product';
-                        const productQty = item.quantity || 1;
-                        const productPrice = item.price || 0;
-                        
-                        return (
-                          <div key={index} className="product-row">
-                            <span>{productName} x {productQty}</span>
-                            <span>Rs. {productPrice.toLocaleString()}</span>
-                          </div>
-                        );
-                      })}
-                      {Array.isArray(selectedOrder.items) && selectedOrder.items.length > 0 && selectedOrder.items.map((item, index) => {
-                        // Handle backend order items structure
-                        // Safely extract product name from nested object
-                        let productName = 'Product';
-                        if (item.productName) {
-                          productName = item.productName;
-                        } else if (item.product && typeof item.product === 'object' && item.product.name) {
-                          productName = item.product.name;
-                        } else if (typeof item.product === 'string') {
-                          productName = item.product;
-                        }
-                        
-                        const productQty = item.quantity || 1;
-                        const productPrice = item.price || item.subtotal || 0;
-                        
-                        return (
-                          <div key={`item-${index}`} className="product-row">
-                            <span>{productName} x {productQty}</span>
-                            <span>Rs. {productPrice.toLocaleString()}</span>
-                          </div>
-                        );
-                      })}
-                      {(!selectedOrder.products || selectedOrder.products.length === 0) && 
-                       (!selectedOrder.items || selectedOrder.items.length === 0) && (
-                        <p style={{color: '#666', fontSize: '14px'}}>No product details available</p>
-                      )}
-                    </div>
-
-                    <div className="detail-section">
-                      <h4>Shipping Address</h4>
-                      <p>
-                        {typeof selectedOrder.shippingAddress === 'string' 
-                          ? selectedOrder.shippingAddress
-                          : selectedOrder.shippingAddress && typeof selectedOrder.shippingAddress === 'object'
-                            ? `${selectedOrder.shippingAddress.fullName || ''}, ${selectedOrder.shippingAddress.phone || ''}, ${selectedOrder.shippingAddress.address || ''}, ${selectedOrder.shippingAddress.city || ''} ${selectedOrder.shippingAddress.postalCode || ''}`.trim()
-                            : 'No address provided'
-                        }
-                      </p>
-                    </div>
-
-                    <div className="detail-section">
-                      <h4>Payment Method</h4>
-                      <p>{selectedOrder.paymentMethod}</p>
-                    </div>
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* My Returns Tab */}
+        {activeTab === 'returns' && (
+          <div className="returns-section">
+            <div className="section-header">
+              <div>
+                <h1>My Returns</h1>
+                <p>Track your return requests and refunds</p>
+              </div>
+            </div>
+
+            {loadingReturns ? (
+              <div style={{textAlign: 'center', padding: '60px 20px', color: '#999'}}>
+                <p>Loading returns...</p>
+              </div>
+            ) : returns.length === 0 ? (
+              <div style={{textAlign: 'center', padding: '60px 20px', color: '#999'}}>
+                <FiRefreshCw size={64} style={{marginBottom: '20px', opacity: 0.3}} />
+                <h3 style={{fontSize: '20px', marginBottom: '10px', color: '#666'}}>No return requests</h3>
+                <p>You haven't requested any returns yet</p>
+              </div>
+            ) : (
+              <div className="returns-list">
+                {returns.map((returnItem) => (
+                  <div key={returnItem._id} className="return-item-card">
+                    {/* Product Info with Image */}
+                    <div className="return-item-main">
+                      <img 
+                        src={returnItem.product?.images?.[0] || 'https://via.placeholder.com/100'} 
+                        alt={returnItem.product?.name}
+                        className="return-item-image"
+                      />
+                      <div className="return-item-details">
+                        <h3 className="return-item-name">{returnItem.product?.name}</h3>
+                        <div className="return-item-meta">
+                          <span className="return-item-order">Order #{returnItem.orderId?.orderId || 'N/A'}</span>
+                          <span className="return-item-dot">•</span>
+                          <span className="return-item-date">{new Date(returnItem.requestedAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="return-item-reason">
+                          <strong>Reason:</strong> {returnItem.reason}
+                        </div>
+                      </div>
+                      <div className="return-item-status-section">
+                        <span className={`return-status-badge status-${returnItem.status.toLowerCase()}`}>
+                          {returnItem.status}
+                        </span>
+                        <div className="return-item-amount">Rs. {returnItem.refundAmount.toLocaleString()}</div>
+                      </div>
+                    </div>
+
+                    {/* Seller Response */}
+                    {returnItem.sellerResponse && (
+                      <div className="return-seller-response">
+                        <div className="response-header">
+                          <FiMessageSquare size={16} />
+                          <span>Seller's Response</span>
+                        </div>
+                        <p className="response-text">{returnItem.sellerResponse}</p>
+                      </div>
+                    )}
+
+                    {/* Status Messages */}
+                    {returnItem.status === 'Approved' && (
+                      <div className="return-status-message approved">
+                        <FiCheckCircle size={16} />
+                        <span>Return approved! Please ship the item back to receive your refund.</span>
+                      </div>
+                    )}
+
+                    {returnItem.status === 'Refunded' && (
+                      <div className="return-status-message refunded">
+                        <FiCheckCircle size={16} />
+                        <span>Refund of Rs. {returnItem.refundAmount.toLocaleString()} has been processed to your account.</span>
+                      </div>
+                    )}
+
+                    {returnItem.status === 'Rejected' && (
+                      <div className="return-status-message rejected">
+                        <FiX size={16} />
+                        <span>Return request was not approved.</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -1571,6 +2124,102 @@ function BuyerProfile() {
           </div>
         )}
 
+        {/* Condition Verification Tab */}
+        {activeTab === 'verification' && (
+          <div className="verification-section">
+            <div className="section-header">
+              <div>
+                <h1>Condition Verification</h1>
+                <p>Verify the condition of your delivered items</p>
+              </div>
+            </div>
+
+            <div className="verification-info-card">
+              <FiCheckCircle size={24} style={{color: '#00bcd4'}} />
+              <div>
+                <h3>Earn Loyalty Points!</h3>
+                <p>Verify the condition of delivered items and earn 50 bonus loyalty points for each verification.</p>
+              </div>
+            </div>
+
+            <div className="orders-grid">
+              {orders
+                .filter(order => {
+                  const status = order.status.toLowerCase();
+                  return (status === 'delivered' || status === 'completed');
+                })
+                .map(order => (
+                <div key={order.id} className="order-card-compact">
+                  <div className="order-header-compact">
+                    <div className="order-id-date">
+                      <h3>Order ID : {order.id}</h3>
+                      <span className="order-date-compact">Delivered On : {order.deliveredDate || order.date}</span>
+                    </div>
+                    <span className={`status-badge-compact ${getStatusClass(order.status)}`}>
+                      {order.status}
+                    </span>
+                  </div>
+
+                  <div className="order-products-list">
+                    {(Array.isArray(order.items) ? order.items : Array.isArray(order.products) ? order.products : []).map((item, idx) => (
+                      <div key={idx} className="order-product-item">
+                        <img 
+                          src={item.image || item.productImage || 'https://via.placeholder.com/80'} 
+                          alt={item.name || item.productName}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = 'https://via.placeholder.com/80';
+                          }}
+                        />
+                        <div className="product-item-details">
+                          <h4>{item.name || item.productName}</h4>
+                          <p className="product-quantity">Quantity : {item.quantity || 1}</p>
+                          <p className="product-price">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="verification-actions">
+                    {order.conditionVerified ? (
+                      <div className="verified-badge-large">
+                        <FiCheckCircle /> VERIFIED
+                      </div>
+                    ) : (
+                      <button 
+                        type="button"
+                        className="verify-btn"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Verify button clicked!');
+                          console.log('Order:', order);
+                          handleVerifyCondition(order._id || order.id);
+                        }}
+                        style={{cursor: 'pointer', pointerEvents: 'auto'}}
+                      >
+                        <FiCheckCircle /> VERIFY CONDITION
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Empty State */}
+            {orders.filter(order => {
+              const status = order.status.toLowerCase();
+              return (status === 'delivered' || status === 'completed');
+            }).length === 0 && (
+              <div style={{textAlign: 'center', padding: '60px 20px', color: '#999'}}>
+                <FiCheckCircle size={64} style={{marginBottom: '20px', opacity: 0.3}} />
+                <h3 style={{fontSize: '20px', marginBottom: '10px', color: '#666'}}>No delivered orders</h3>
+                <p>You don't have any delivered orders yet.</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Messages Tab */}
         {activeTab === 'messages' && (
           <div className="messages-section">
@@ -1587,25 +2236,37 @@ function BuyerProfile() {
                 <div className="chat-list-header">
                   <h3>Conversations</h3>
                 </div>
-                {chats.map(chat => (
-                  <div 
-                    key={chat.id} 
-                    className={`chat-item ${selectedChat?.id === chat.id ? 'active' : ''}`}
-                    onClick={() => setSelectedChat(chat)}
-                  >
-                    <div className="chat-avatar">{chat.sellerAvatar}</div>
-                    <div className="chat-info">
-                      <div className="chat-header-row">
-                        <h4>{chat.sellerName}</h4>
-                        <span className="chat-time">{chat.time}</span>
-                      </div>
-                      <p className="chat-last-message">{chat.lastMessage}</p>
-                    </div>
-                    {chat.unread > 0 && (
-                      <span className="unread-badge">{chat.unread}</span>
-                    )}
+                {loadingChats ? (
+                  <div className="loading-chats">
+                    <p>Loading conversations...</p>
                   </div>
-                ))}
+                ) : chats.length === 0 ? (
+                  <div className="no-chats">
+                    <FiMessageSquare size={48} />
+                    <p>No conversations yet</p>
+                    <small>Start chatting with sellers from product pages</small>
+                  </div>
+                ) : (
+                  chats.map(chat => (
+                    <div 
+                      key={chat.id} 
+                      className={`chat-item ${selectedChat?.id === chat.id ? 'active' : ''}`}
+                      onClick={() => setSelectedChat(chat)}
+                    >
+                      <div className="chat-avatar">{chat.sellerAvatar}</div>
+                      <div className="chat-info">
+                        <div className="chat-header-row">
+                          <h4>{chat.sellerName}</h4>
+                          <span className="chat-time">{chat.time}</span>
+                        </div>
+                        <p className="chat-last-message">{chat.lastMessage}</p>
+                      </div>
+                      {chat.unread > 0 && (
+                        <span className="unread-badge">{chat.unread}</span>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Chat Window */}
@@ -1616,7 +2277,12 @@ function BuyerProfile() {
                       <div className="seller-info">
                         <div className="chat-avatar">{selectedChat.sellerAvatar}</div>
                         <div>
-                          <h3>{selectedChat.sellerName}</h3>
+                          <h3 
+                            onClick={() => navigate(`/seller/${selectedChat.sellerId}`)}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {selectedChat.sellerName}
+                          </h3>
                           <span className="online-status">Online</span>
                         </div>
                       </div>
@@ -2197,63 +2863,6 @@ function BuyerProfile() {
               </div>
             )}
 
-            {/* Order Verification Modal */}
-            {showVerificationModal && selectedOrder && (
-              <div className="modal-overlay" onClick={() => setShowVerificationModal(false)}>
-                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                  <div className="modal-header">
-                    <h2>Verify Order Condition</h2>
-                    <button className="close-modal" onClick={() => setShowVerificationModal(false)}>
-                      <FiX />
-                    </button>
-                  </div>
-                  <div className="modal-body">
-                    <p style={{marginBottom: '20px', color: '#666'}}>
-                      Order: <strong>{selectedOrder.id}</strong>
-                    </p>
-                    <div className="verification-question">
-                      <label>Does the item match the seller's description?</label>
-                      <div className="verification-options">
-                        <button 
-                          className={`verification-btn ${verificationData.matchesDescription === true ? 'selected' : ''}`}
-                          onClick={() => setVerificationData({...verificationData, matchesDescription: true})}
-                        >
-                          ✓ Yes, it matches
-                        </button>
-                        <button 
-                          className={`verification-btn ${verificationData.matchesDescription === false ? 'selected' : ''}`}
-                          onClick={() => setVerificationData({...verificationData, matchesDescription: false})}
-                        >
-                          ✕ No, it doesn't match
-                        </button>
-                      </div>
-                    </div>
-                    <div className="form-field">
-                      <label>Additional Notes (Optional)</label>
-                      <textarea
-                        value={verificationData.customerNotes}
-                        onChange={(e) => setVerificationData({...verificationData, customerNotes: e.target.value})}
-                        placeholder="Any comments about the item condition..."
-                        rows="4"
-                        style={{width: '100%', padding: '12px', border: '1px solid #e0e0e0', borderRadius: '4px', fontFamily: 'Arial, sans-serif'}}
-                      />
-                    </div>
-                    {verificationData.matchesDescription === true && (
-                      <p className="bonus-note">🎁 You will earn 50 bonus loyalty points!</p>
-                    )}
-                    <div className="modal-actions">
-                      <button className="save-btn" onClick={submitVerification}>
-                        <FiSave /> Submit Verification
-                      </button>
-                      <button className="cancel-btn" onClick={() => setShowVerificationModal(false)}>
-                        <FiX /> Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="settings-card">
               <h3>Password & Security</h3>
               <div className="setting-item">
@@ -2457,6 +3066,140 @@ function BuyerProfile() {
           </div>
         )}
       </main>
+
+      {/* Order Verification Modal */}
+      {showVerificationModal && selectedOrder && (
+        <div className="modal-overlay" onClick={() => setShowVerificationModal(false)}>
+          <div className="modal-content modal-content-small" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Verify Order Condition</h2>
+              <button className="close-modal" onClick={() => setShowVerificationModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{marginBottom: '16px', color: '#666', fontSize: '13px'}}>
+                Order: <strong>{selectedOrder.id}</strong>
+              </p>
+              <div className="verification-question">
+                <label style={{fontSize: '14px', fontWeight: '600', marginBottom: '12px'}}>Does the item match the seller's description?</label>
+                <div className="verification-options">
+                  <button 
+                    className={`verification-btn ${verificationData.matchesDescription === true ? 'selected' : ''}`}
+                    onClick={() => setVerificationData({...verificationData, matchesDescription: true})}
+                  >
+                    ✓ Yes, it matches
+                  </button>
+                  <button 
+                    className={`verification-btn ${verificationData.matchesDescription === false ? 'selected' : ''}`}
+                    onClick={() => setVerificationData({...verificationData, matchesDescription: false})}
+                  >
+                    ✕ No, it doesn't match
+                  </button>
+                </div>
+              </div>
+              
+              {/* Image Upload Section */}
+              <div className="form-field" style={{marginTop: '16px'}}>
+                <label style={{fontSize: '13px', fontWeight: '500', marginBottom: '8px', display: 'block'}}>
+                  Upload Images {verificationData.matchesDescription === false && <span style={{color: '#e53e3e'}}>*</span>}
+                  {verificationData.matchesDescription === true && <span style={{color: '#666', fontWeight: 'normal'}}> (Optional)</span>}
+                  {verificationData.matchesDescription === false && <span style={{color: '#666', fontWeight: 'normal'}}> (Required)</span>}
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleVerificationImageSelect}
+                  style={{display: 'none'}}
+                  id="verification-image-upload"
+                />
+                <label 
+                  htmlFor="verification-image-upload" 
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 16px',
+                    background: '#f5f5f5',
+                    border: '1px dashed #00bcd4',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#00bcd4',
+                    fontWeight: '500'
+                  }}
+                >
+                  + Add Images (Max 3)
+                </label>
+                
+                {/* Image Previews */}
+                {verificationData.images.length > 0 && (
+                  <div style={{display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap'}}>
+                    {verificationData.images.map((img, index) => (
+                      <div key={index} style={{position: 'relative', width: '80px', height: '80px'}}>
+                        <img 
+                          src={img.preview} 
+                          alt={`Preview ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            borderRadius: '4px',
+                            border: '1px solid #e0e0e0'
+                          }}
+                        />
+                        <button
+                          onClick={() => handleRemoveVerificationImage(index)}
+                          style={{
+                            position: 'absolute',
+                            top: '-6px',
+                            right: '-6px',
+                            background: '#e53e3e',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '20px',
+                            height: '20px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '12px',
+                            padding: 0
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <div className="form-field" style={{marginTop: '16px'}}>
+                <label style={{fontSize: '13px', fontWeight: '500', marginBottom: '8px', display: 'block'}}>Notes</label>
+                <textarea
+                  value={verificationData.customerNotes}
+                  onChange={(e) => setVerificationData({...verificationData, customerNotes: e.target.value})}
+                  placeholder="Any comments about the item condition..."
+                  rows="3"
+                  style={{width: '100%', padding: '10px', border: '1px solid #e0e0e0', borderRadius: '4px', fontFamily: 'Arial, sans-serif', fontSize: '13px'}}
+                />
+              </div>
+              {verificationData.matchesDescription === true && (
+                <p className="bonus-note" style={{fontSize: '13px', padding: '8px 12px', margin: '12px 0 0 0'}}>🎁 You will earn 50 bonus loyalty points!</p>
+              )}
+              <div className="modal-actions" style={{marginTop: '16px'}}>
+                <button className="save-btn" onClick={submitVerification} style={{padding: '10px 20px', fontSize: '13px'}}>
+                  <FiSave /> Submit Verification
+                </button>
+                <button className="cancel-btn" onClick={() => setShowVerificationModal(false)} style={{padding: '10px 20px', fontSize: '13px'}}>
+                  <FiX /> Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast.show && (
@@ -2707,6 +3450,132 @@ function BuyerProfile() {
                 </button>
                 <button className="cancel-btn" onClick={() => setShowDeleteModal(false)}>
                   Keep My Account
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Item Modal */}
+      {showReturnModal && (
+        <div className="modal-overlay" onClick={() => setShowReturnModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Return Item</h2>
+              <button className="close-modal" onClick={() => setShowReturnModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="modal-body">
+              {returnData.productName && (
+                <div className="return-product-info" style={{display: 'flex', gap: '15px', marginBottom: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '8px'}}>
+                  <img 
+                    src={returnData.productImage || 'https://via.placeholder.com/80'} 
+                    alt={returnData.productName}
+                    style={{width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px'}}
+                  />
+                  <div>
+                    <h4 style={{margin: '0 0 5px 0', fontSize: '16px'}}>{returnData.productName}</h4>
+                    <p style={{margin: 0, color: '#666', fontSize: '14px'}}>Order ID: {returnData.orderId}</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="form-field">
+                <label>Reason for Return *</label>
+                <select
+                  value={returnData.reason}
+                  onChange={(e) => setReturnData({...returnData, reason: e.target.value})}
+                  required
+                  style={{width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px'}}
+                >
+                  <option value="">Select a reason</option>
+                  <option value="Defective/Damaged">Defective/Damaged</option>
+                  <option value="Wrong Item">Wrong Item</option>
+                  <option value="Not as Described">Not as Described</option>
+                  <option value="Size Issue">Size Issue</option>
+                  <option value="Changed Mind">Changed Mind</option>
+                  <option value="Quality Issue">Quality Issue</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label>Description *</label>
+                <textarea
+                  value={returnData.description}
+                  onChange={(e) => setReturnData({...returnData, description: e.target.value})}
+                  placeholder="Please provide details about why you want to return this item..."
+                  rows="4"
+                  required
+                  style={{width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', fontFamily: 'inherit', resize: 'vertical'}}
+                />
+              </div>
+
+              <div className="info-box" style={{background: '#e3f2fd', padding: '12px', borderRadius: '6px', marginTop: '15px'}}>
+                <p style={{margin: 0, fontSize: '13px', color: '#1976d2'}}>
+                  <strong>Note:</strong> The seller will review your return request. If approved, you'll receive instructions for returning the item and processing your refund.
+                </p>
+              </div>
+
+              <div className="modal-actions">
+                <button 
+                  className="save-btn" 
+                  onClick={async () => {
+                    if (!returnData.reason || !returnData.description.trim()) {
+                      showToast('Please fill in all required fields', 'error');
+                      return;
+                    }
+
+                    try {
+                      const response = await fetch('http://localhost:5000/api/returns/create', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          orderId: returnData.orderId,
+                          productId: returnData.productId,
+                          reason: returnData.reason,
+                          description: returnData.description,
+                          images: returnData.images
+                        }),
+                      });
+
+                      const data = await response.json();
+                      
+                      if (response.ok) {
+                        showToast('Return request submitted successfully! The seller will review your request.', 'success');
+                        setShowReturnModal(false);
+                        setReturnData({
+                          orderId: null,
+                          productId: null,
+                          productName: '',
+                          productImage: '',
+                          reason: '',
+                          description: '',
+                          images: []
+                        });
+                        
+                        // Refresh returns list
+                        const user = JSON.parse(localStorage.getItem('user'));
+                        if (user && user._id) {
+                          fetchReturns(user._id);
+                        }
+                      } else {
+                        showToast(data.message || 'Failed to submit return request', 'error');
+                      }
+                    } catch (error) {
+                      console.error('Error submitting return:', error);
+                      showToast('Failed to submit return request', 'error');
+                    }
+                  }}
+                >
+                  Submit Return Request
+                </button>
+                <button className="cancel-btn" onClick={() => setShowReturnModal(false)}>
+                  Cancel
                 </button>
               </div>
             </div>

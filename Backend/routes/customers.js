@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Customer = require('../models/Customer');
 const User = require('../models/User');
+const LoyaltyPoints = require('../models/LoyaltyPoints');
 const { upload, cloudinary } = require('../config/cloudinary');
 
 // Middleware to extract user ID from token
@@ -51,18 +52,18 @@ router.post('/:userId/profile-image', upload.single('profileImage'), async (req,
       });
     } else {
       // Delete old image from cloudinary if exists
-      if (customer.profileImage) {
+      if (Customer.profileImage) {
         try {
-          const publicId = customer.profileImage.split('/').pop().split('.')[0];
+          const publicId = Customer.profileImage.split('/').pop().split('.')[0];
           await cloudinary.uploader.destroy(`rebuy-products/${publicId}`);
         } catch (err) {
           console.error('Error deleting old image:', err);
         }
       }
-      customer.profileImage = imageUrl;
+      Customer.profileImage = imageUrl;
     }
 
-    await customer.save();
+    await Customer.save();
 
     res.json({ 
       message: 'Profile image uploaded successfully', 
@@ -83,17 +84,17 @@ router.delete('/:userId/profile-image', async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
 
-    if (customer.profileImage) {
+    if (Customer.profileImage) {
       try {
-        const publicId = customer.profileImage.split('/').pop().split('.')[0];
+        const publicId = Customer.profileImage.split('/').pop().split('.')[0];
         await cloudinary.uploader.destroy(`rebuy-products/${publicId}`);
       } catch (err) {
         console.error('Error deleting image from cloudinary:', err);
       }
     }
 
-    customer.profileImage = '';
-    await customer.save();
+    Customer.profileImage = '';
+    await Customer.save();
 
     res.json({ message: 'Profile image deleted successfully' });
   } catch (error) {
@@ -155,18 +156,18 @@ router.put('/:userId', async (req, res) => {
     
     if (customer) {
       // Update existing customer
-      customer.fullName = fullName;
-      customer.email = email;
-      customer.phone = phone || customer.phone;
+      Customer.fullName = fullName;
+      Customer.email = email;
+      Customer.phone = phone || Customer.phone;
       
       if (preferences) {
-        customer.preferences = {
-          ...customer.preferences,
+        Customer.preferences = {
+          ...Customer.preferences,
           ...preferences
         };
       }
       
-      await customer.save();
+      await Customer.save();
     } else {
       // Create new customer
       customer = new Customer({
@@ -177,7 +178,7 @@ router.put('/:userId', async (req, res) => {
         preferences: preferences || {}
       });
       
-      await customer.save();
+      await Customer.save();
     }
     
     // Also update User model
@@ -203,7 +204,7 @@ router.get('/:userId/addresses', async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
     
-    res.json(customer.addresses);
+    res.json(Customer.addresses);
   } catch (error) {
     console.error('Error fetching addresses:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -246,7 +247,7 @@ router.post('/addresses', extractUserId, async (req, res) => {
     
     // If this is set as default, unset other defaults
     if (isDefault) {
-      customer.addresses.forEach(addr => {
+      Customer.addresses.forEach(addr => {
         addr.isDefault = false;
       });
     }
@@ -262,13 +263,13 @@ router.post('/addresses', extractUserId, async (req, res) => {
       city: municipality, // Use municipality as city for compatibility
       landmark,
       deliveryType: label?.toLowerCase() === 'office' ? 'office' : 'home',
-      isDefault: isDefault || customer.addresses.length === 0
+      isDefault: isDefault || Customer.addresses.length === 0
     };
     
-    customer.addresses.push(newAddress);
-    await customer.save();
+    Customer.addresses.push(newAddress);
+    await Customer.save();
     
-    res.status(201).json({ addresses: customer.addresses });
+    res.status(201).json({ addresses: Customer.addresses });
   } catch (error) {
     console.error('Error adding address:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -305,7 +306,7 @@ router.post('/:userId/addresses', async (req, res) => {
     
     // If this is set as default, unset other defaults
     if (isDefault) {
-      customer.addresses.forEach(addr => {
+      Customer.addresses.forEach(addr => {
         addr.isDefault = false;
       });
     }
@@ -321,13 +322,13 @@ router.post('/:userId/addresses', async (req, res) => {
       city,
       landmark,
       deliveryType: deliveryType || 'home',
-      isDefault: isDefault || customer.addresses.length === 0
+      isDefault: isDefault || Customer.addresses.length === 0
     };
     
-    customer.addresses.push(newAddress);
-    await customer.save();
+    Customer.addresses.push(newAddress);
+    await Customer.save();
     
-    res.status(201).json(customer.addresses);
+    res.status(201).json(Customer.addresses);
   } catch (error) {
     console.error('Error adding address:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -345,7 +346,7 @@ router.put('/:userId/addresses/:addressId', async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
     
-    const address = customer.addresses.id(req.params.addressId);
+    const address = Customer.addresses.id(req.params.addressId);
     
     if (!address) {
       return res.status(404).json({ message: 'Address not found' });
@@ -353,7 +354,7 @@ router.put('/:userId/addresses/:addressId', async (req, res) => {
     
     // If this is set as default, unset other defaults
     if (isDefault) {
-      customer.addresses.forEach(addr => {
+      Customer.addresses.forEach(addr => {
         if (addr._id.toString() !== req.params.addressId) {
           addr.isDefault = false;
         }
@@ -361,20 +362,20 @@ router.put('/:userId/addresses/:addressId', async (req, res) => {
     }
     
     // Update address fields
-    address.label = label || address.label;
-    address.fullName = fullName || address.fullName;
-    address.phone = phone || address.phone;
-    address.state = state || address.state;
-    address.district = district || address.district;
-    address.municipality = municipality || address.municipality;
-    address.city = city || address.city;
-    address.landmark = landmark || address.landmark;
-    address.deliveryType = deliveryType || address.deliveryType;
-    address.isDefault = isDefault !== undefined ? isDefault : address.isDefault;
+    Customer.label = label || Customer.label;
+    Customer.fullName = fullName || Customer.fullName;
+    Customer.phone = phone || Customer.phone;
+    Customer.state = state || Customer.state;
+    Customer.district = district || Customer.district;
+    Customer.municipality = municipality || Customer.municipality;
+    Customer.city = city || Customer.city;
+    Customer.landmark = landmark || Customer.landmark;
+    Customer.deliveryType = deliveryType || Customer.deliveryType;
+    Customer.isDefault = isDefault !== undefined ? isDefault : Customer.isDefault;
     
-    await customer.save();
+    await Customer.save();
     
-    res.json(customer.addresses);
+    res.json(Customer.addresses);
   } catch (error) {
     console.error('Error updating address:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -393,27 +394,27 @@ router.delete('/:userId/addresses/:addressId', async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
     
-    const address = customer.addresses.id(req.params.addressId);
+    const address = Customer.addresses.id(req.params.addressId);
     
     if (!address) {
       console.log('Address not found');
       return res.status(404).json({ message: 'Address not found' });
     }
     
-    const wasDefault = address.isDefault;
+    const wasDefault = Customer.isDefault;
     
     // Use pull instead of remove for better compatibility
-    customer.addresses.pull(req.params.addressId);
+    Customer.addresses.pull(req.params.addressId);
     
     // If deleted address was default, set first address as default
-    if (wasDefault && customer.addresses.length > 0) {
-      customer.addresses[0].isDefault = true;
+    if (wasDefault && Customer.addresses.length > 0) {
+      Customer.addresses[0].isDefault = true;
     }
     
-    await customer.save();
+    await Customer.save();
     
     console.log('Address deleted successfully');
-    res.json(customer.addresses);
+    res.json(Customer.addresses);
   } catch (error) {
     console.error('Error deleting address:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -429,23 +430,23 @@ router.patch('/:userId/addresses/:addressId/default', async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
     
-    const address = customer.addresses.id(req.params.addressId);
+    const address = Customer.addresses.id(req.params.addressId);
     
     if (!address) {
       return res.status(404).json({ message: 'Address not found' });
     }
     
     // Unset all defaults
-    customer.addresses.forEach(addr => {
+    Customer.addresses.forEach(addr => {
       addr.isDefault = false;
     });
     
     // Set this address as default
-    address.isDefault = true;
+    Customer.isDefault = true;
     
-    await customer.save();
+    await Customer.save();
     
-    res.json(customer.addresses);
+    res.json(Customer.addresses);
   } catch (error) {
     console.error('Error setting default address:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -464,23 +465,23 @@ router.patch('/:userId/preferences', async (req, res) => {
     }
     
     if (notifications) {
-      customer.preferences.notifications = {
-        ...customer.preferences.notifications,
+      Customer.preferences.notifications = {
+        ...Customer.preferences.notifications,
         ...notifications
       };
     }
     
     if (language) {
-      customer.preferences.language = language;
+      Customer.preferences.language = language;
     }
     
     if (currency) {
-      customer.preferences.currency = currency;
+      Customer.preferences.currency = currency;
     }
     
-    await customer.save();
+    await Customer.save();
     
-    res.json(customer.preferences);
+    res.json(Customer.preferences);
   } catch (error) {
     console.error('Error updating preferences:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -511,8 +512,8 @@ router.patch('/:userId/status', async (req, res) => {
     // Try to update Customer if exists
     const customer = await Customer.findOne({ user: req.params.userId });
     if (customer) {
-      customer.accountStatus = status;
-      await customer.save();
+      Customer.accountStatus = status;
+      await Customer.save();
     }
     
     // Try to update Seller if exists
@@ -542,19 +543,19 @@ router.patch('/:userId/2fa', async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
     
-    customer.twoFactorEnabled = enabled;
+    Customer.twoFactorEnabled = enabled;
     if (enabled) {
-      customer.twoFactorEnabledDate = new Date();
+      Customer.twoFactorEnabledDate = new Date();
     }
     
-    await customer.save();
+    await Customer.save();
     
     // Also update User model
     await User.findByIdAndUpdate(req.params.userId, {
       twoFactorEnabled: enabled
     });
     
-    res.json({ message: '2FA updated', twoFactorEnabled: customer.twoFactorEnabled });
+    res.json({ message: '2FA updated', twoFactorEnabled: Customer.twoFactorEnabled });
   } catch (error) {
     console.error('Error updating 2FA:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -572,23 +573,23 @@ router.post('/:userId/login-history', async (req, res) => {
       return res.status(404).json({ message: 'Customer not found' });
     }
     
-    customer.loginHistory.push({
+    Customer.loginHistory.push({
       timestamp: new Date(),
       ipAddress,
       device,
       location
     });
     
-    customer.lastLogin = new Date();
+    Customer.lastLogin = new Date();
     
     // Keep only last 10 login entries
-    if (customer.loginHistory.length > 10) {
-      customer.loginHistory = customer.loginHistory.slice(-10);
+    if (Customer.loginHistory.length > 10) {
+      Customer.loginHistory = Customer.loginHistory.slice(-10);
     }
     
-    await customer.save();
+    await Customer.save();
     
-    res.json(customer.loginHistory);
+    res.json(Customer.loginHistory);
   } catch (error) {
     console.error('Error adding login history:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -596,3 +597,30 @@ router.post('/:userId/login-history', async (req, res) => {
 });
 
 module.exports = router;
+
+
+// Get customer loyalty points
+router.get('/:userId/loyalty-points', async (req, res) => {
+  try {
+    let loyaltyAccount = await LoyaltyPoints.findOne({ customer: req.params.userId });
+    
+    if (!loyaltyAccount) {
+      // Create new account with welcome bonus
+      loyaltyAccount = new LoyaltyPoints({
+        customer: req.params.userId,
+        totalPoints: 0,
+        pointsHistory: []
+      });
+      await loyaltyAccount.save();
+    }
+    
+    res.json({
+      totalPoints: loyaltyAccount.totalPoints,
+      tier: loyaltyAccount.tier,
+      pointsHistory: loyaltyAccount.pointsHistory
+    });
+  } catch (error) {
+    console.error('Error fetching loyalty points:', error);
+    res.status(500).json({ message: 'Error fetching loyalty points' });
+  }
+});

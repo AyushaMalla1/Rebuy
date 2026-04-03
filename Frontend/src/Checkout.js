@@ -28,6 +28,9 @@ function Checkout() {
   });
 
   const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [applyingPoints, setApplyingPoints] = useState(false);
 
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -37,15 +40,23 @@ function Checkout() {
       // Handle both frontend and backend cart item structures
       if (item.product && typeof item.product === 'object') {
         // Backend structure with nested product
+        const product = item.product;
+        const hasDiscount = product.discount && product.discount.percentage > 0;
+        const discountedPrice = hasDiscount ? product.price * (1 - product.discount.percentage / 100) : null;
+        
         return {
-          id: item.product._id || item.product,
-          name: item.product.name || item.productName || 'Product',
-          price: item.product.price || item.price || 0,
-          image: (item.product.images && item.product.images[0]) || item.productImage || item.image || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+          id: product._id || product,
+          name: product.name || item.productName || 'Product',
+          price: product.price || item.price || 0,
+          originalPrice: product.price || item.price || 0,
+          discountedPrice: discountedPrice,
+          discount: hasDiscount ? product.discount.percentage : null,
+          bundleDiscount: item.bundleDiscount || 0,
+          image: (product.images && product.images[0]) || item.productImage || item.image || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
           quantity: item.quantity || 1,
-          seller: item.product.seller || item.seller,
-          sellerName: item.product.sellerName || item.sellerName || 'Unknown Seller',
-          storeName: item.product.storeName || item.storeName || 'Thrift Store'
+          seller: product.seller || item.seller,
+          sellerName: product.sellerName || item.sellerName || 'Unknown Seller',
+          storeName: product.storeName || item.storeName || 'Thrift Store'
         };
       } else {
         // Frontend structure (already normalized)
@@ -53,6 +64,10 @@ function Checkout() {
           id: item.id || item._id,
           name: item.name || item.productName || 'Product',
           price: item.price || 0,
+          originalPrice: item.originalPrice || item.price || 0,
+          discountedPrice: item.discountedPrice || null,
+          discount: item.discount || null,
+          bundleDiscount: item.bundleDiscount || 0,
           image: item.image || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
           quantity: item.quantity || 1,
           seller: item.seller,
@@ -66,6 +81,9 @@ function Checkout() {
 
     // Load addresses from backend
     loadAddressesFromBackend();
+    
+    // Load loyalty points
+    loadLoyaltyPoints();
   }, []);
 
   const loadAddressesFromBackend = async () => {
@@ -84,21 +102,42 @@ function Checkout() {
         if (data.customer && data.customer.addresses) {
           setSavedAddresses(data.customer.addresses);
           
-          // Set default address data but don't show it until user confirms
-          const defaultAddr = data.customer.addresses.find(addr => addr.isDefault);
-          if (defaultAddr) {
-            setSelectedAddressIndex(data.customer.addresses.indexOf(defaultAddr));
-            setShippingAddress({
-              fullName: defaultAddr.fullName,
-              phone: defaultAddr.phone,
-              addressLabel: defaultAddr.label || 'Home',
-              state: defaultAddr.state,
-              district: defaultAddr.district,
-              municipality: defaultAddr.municipality,
-              landmark: defaultAddr.landmark,
-              isDefault: defaultAddr.isDefault
-            });
-            // Don't set addressConfirmed to true here - let user confirm it
+          // Check if there's a previously confirmed address in localStorage
+          const confirmedAddress = localStorage.getItem('confirmedCheckoutAddress');
+          
+          if (confirmedAddress) {
+            // Use the previously confirmed address
+            const addr = JSON.parse(confirmedAddress);
+            setShippingAddress(addr);
+            setAddressConfirmed(true); // IMPORTANT: Set this to true!
+            
+            // Find the index of this address in saved addresses
+            const index = data.customer.addresses.findIndex(a => 
+              a.fullName === addr.fullName && 
+              a.phone === addr.phone && 
+              a.landmark === addr.landmark
+            );
+            if (index !== -1) {
+              setSelectedAddressIndex(index);
+            }
+          } else {
+            // No confirmed address yet - load default but don't confirm it
+            const defaultAddr = data.customer.addresses.find(addr => addr.isDefault);
+            if (defaultAddr) {
+              setSelectedAddressIndex(data.customer.addresses.indexOf(defaultAddr));
+              setShippingAddress({
+                fullName: defaultAddr.fullName,
+                phone: defaultAddr.phone,
+                addressLabel: defaultAddr.label || 'Home',
+                state: defaultAddr.state,
+                district: defaultAddr.district,
+                municipality: defaultAddr.municipality,
+                landmark: defaultAddr.landmark,
+                isDefault: defaultAddr.isDefault
+              });
+              // Don't set addressConfirmed to true - let user confirm it
+              setAddressConfirmed(false);
+            }
           }
         }
       }
@@ -107,12 +146,53 @@ function Checkout() {
     }
   };
 
+  const loadLoyaltyPoints = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      if (!token || !user) return;
+
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/customers/${user._id}/loyalty-points`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setLoyaltyPoints(data.totalPoints || 0);
+      }
+    } catch (error) {
+      console.error('Error loading loyalty points:', error);
+    }
+  };
+
   const calculateTotal = () => {
-    return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    return cartItems.reduce((sum, item) => {
+      const itemTotal = (item.price * item.quantity) - (item.bundleDiscount || 0);
+      return sum + itemTotal;
+    }, 0);
+  };
+
+  const getBundleDiscount = () => {
+    return cartItems.reduce((sum, item) => sum + (item.bundleDiscount || 0), 0);
   };
 
   const shippingCost = calculateTotal() >= 2000 ? 0 : 100;
-  const finalTotal = calculateTotal() + shippingCost;
+  const pointsDiscount = pointsToRedeem; // 1 point = Rs. 1
+  const finalTotal = Math.max(0, calculateTotal() + shippingCost - pointsDiscount);
+
+  const handleApplyPoints = () => {
+    const maxPoints = Math.min(loyaltyPoints, calculateTotal() + shippingCost);
+    setPointsToRedeem(maxPoints);
+    setApplyingPoints(true);
+  };
+
+  const handleRemovePoints = () => {
+    setPointsToRedeem(0);
+    setApplyingPoints(false);
+  };
 
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
@@ -190,8 +270,12 @@ function Checkout() {
         setSavedAddresses(data.addresses);
         setSelectedAddressIndex(data.addresses.length - 1);
         setAddressConfirmed(true); // Mark as confirmed when new address is saved
+        
+        // Save confirmed address to localStorage
+        localStorage.setItem('confirmedCheckoutAddress', JSON.stringify(shippingAddress));
+        
         setShowAddressForm(false);
-        setShowAddressModal(true); // Show address list after saving
+        setShowAddressModal(false); // Close modal after saving
         alert('Address saved successfully!');
       } else {
         const error = await response.json();
@@ -238,11 +322,17 @@ function Checkout() {
     if (selectedAddressIndex !== null) {
       setAddressConfirmed(true);
       setShowAddressModal(false);
+      
+      // Save confirmed address to localStorage
+      localStorage.setItem('confirmedCheckoutAddress', JSON.stringify(shippingAddress));
     } 
     // If no address is selected but there's a default address loaded, use it
     else if (shippingAddress.fullName && shippingAddress.state) {
       setAddressConfirmed(true);
       setShowAddressModal(false);
+      
+      // Save confirmed address to localStorage
+      localStorage.setItem('confirmedCheckoutAddress', JSON.stringify(shippingAddress));
     }
     // Otherwise, show error
     else {
@@ -368,6 +458,8 @@ function Checkout() {
         paymentMethod,
         subtotal: calculateTotal(),
         shippingCost,
+        pointsRedeemed: pointsToRedeem,
+        pointsDiscount: pointsDiscount,
         total: finalTotal,
         customerNotes: ''
       };
@@ -452,6 +544,11 @@ function Checkout() {
         }
       }
 
+      // Reload loyalty points to reflect the deduction
+      if (pointsToRedeem > 0) {
+        await loadLoyaltyPoints();
+      }
+
       setOrderPlaced(true);
 
       setTimeout(() => {
@@ -490,8 +587,28 @@ function Checkout() {
 
         <div className="checkout-content">
           <div className="checkout-main">
-            {/* Add Address Button - Only show if no address is confirmed */}
-            {!addressConfirmed && (
+            {/* Address Section - Always show something */}
+            {addressConfirmed && shippingAddress.fullName && shippingAddress.state ? (
+              /* Show confirmed address with Change button */
+              <div className="selected-address-compact">
+                <div className="address-info">
+                  <div className="address-header-compact">
+                    <FiMapPin className="address-icon" />
+                    <div className="address-details">
+                      <p className="deliver-to">Deliver To: <strong>{shippingAddress.fullName}</strong> ({shippingAddress.phone})</p>
+                      <p className="address-text">{shippingAddress.landmark}, {shippingAddress.municipality}, {shippingAddress.district} - {shippingAddress.state}</p>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => {
+                  setShowAddressModal(true);
+                  setShowAddressForm(false);
+                }} className="change-btn-compact">
+                  Change
+                </button>
+              </div>
+            ) : (
+              /* Show Add Address button */
               <button className="add-address-btn" onClick={() => {
                 // Reset form to blank when adding new address
                 setShippingAddress({
@@ -510,27 +627,6 @@ function Checkout() {
                 <FiMapPin />
                 <span>+ Add New Delivery Address</span>
               </button>
-            )}
-
-            {/* Show selected address if exists and confirmed */}
-            {addressConfirmed && shippingAddress.fullName && shippingAddress.state && (
-              <div className="selected-address-compact">
-                <div className="address-info">
-                  <div className="address-header-compact">
-                    <FiMapPin className="address-icon" />
-                    <div className="address-details">
-                      <p className="deliver-to">Deliver To: <strong>{shippingAddress.fullName}</strong> ({shippingAddress.phone})</p>
-                      <p className="address-text">{shippingAddress.landmark}, {shippingAddress.municipality}, {shippingAddress.district} - {shippingAddress.state}</p>
-                    </div>
-                  </div>
-                </div>
-                <button onClick={() => {
-                  setShowAddressModal(true);
-                  setShowAddressForm(false);
-                }} className="change-btn-compact">
-                  Change
-                </button>
-              </div>
             )}
 
             {/* Product List */}
@@ -563,6 +659,40 @@ function Checkout() {
           </div>
 
           <div className="checkout-sidebar">
+            {/* Loyalty Points Section */}
+            {loyaltyPoints > 0 && (
+              <div className="loyalty-points-section">
+                <div className="loyalty-header">
+                  <h3>🎁 Loyalty Points</h3>
+                  <span className="points-badge">{loyaltyPoints} points</span>
+                </div>
+                <p className="points-info">You have {loyaltyPoints} loyalty points available (Rs. {loyaltyPoints})</p>
+                
+                {!applyingPoints ? (
+                  <button 
+                    className="apply-points-btn"
+                    onClick={handleApplyPoints}
+                    disabled={loyaltyPoints === 0}
+                  >
+                    Apply Points
+                  </button>
+                ) : (
+                  <div className="points-applied">
+                    <div className="applied-info">
+                      <FiCheck className="check-icon" />
+                      <span>{pointsToRedeem} points applied (Rs. {pointsToRedeem} discount)</span>
+                    </div>
+                    <button 
+                      className="remove-points-btn"
+                      onClick={handleRemovePoints}
+                    >
+                      <FiX /> Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Payment Method */}
             <div className="order-summary">
               <h2>Select A Payment Method</h2>
@@ -611,8 +741,14 @@ function Checkout() {
               <div className="summary-totals">
                 <div className="total-row">
                   <span>Items Total</span>
-                  <span>Rs. {calculateTotal().toLocaleString()}</span>
+                  <span>Rs. {cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()}</span>
                 </div>
+                {getBundleDiscount() > 0 && (
+                  <div className="total-row" style={{color: '#10b981'}}>
+                    <span>Bundle Discount</span>
+                    <span>- Rs. {getBundleDiscount().toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="total-row">
                   <span>Delivery Charge</span>
                   <span>{shippingCost === 0 ? 'FREE' : `Rs. ${shippingCost}`}</span>
@@ -620,10 +756,22 @@ function Checkout() {
                 {shippingCost === 0 && (
                   <p className="free-shipping-note">🎉 You got free shipping!</p>
                 )}
+                {pointsToRedeem > 0 && (
+                  <div className="total-row discount-row">
+                    <span>Loyalty Points Discount</span>
+                    <span className="discount-amount">- Rs. {pointsDiscount.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="total-row final">
                   <span>Total Payment</span>
                   <span>Rs. {finalTotal.toLocaleString()}</span>
                 </div>
+                {pointsToRedeem > 0 && (
+                  <p className="savings-note">💰 You saved Rs. {pointsDiscount} with loyalty points!</p>
+                )}
+                {getBundleDiscount() > 0 && (
+                  <p className="savings-note" style={{color: '#10b981'}}>🎁 You saved Rs. {getBundleDiscount().toLocaleString()} with bundle deals!</p>
+                )}
               </div>
 
               <button onClick={handlePlaceOrder} className="place-order-btn">

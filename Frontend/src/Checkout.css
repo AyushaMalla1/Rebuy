@@ -183,16 +183,16 @@
 .payment-options {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .payment-option {
   display: block;
   background: #f8f9fa;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 14px 16px;
+  border-radius: 6px;
+  padding: 12px 14px;
   cursor: pointer;
   transition: all 0.3s;
 }
@@ -200,13 +200,13 @@
 .payment-option:hover {
   border-color: #00bcd4;
   background: white;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
 .payment-option.selected {
   border-color: #00bcd4;
   background: rgba(0, 188, 212, 0.05);
-  box-shadow: 0 2px 8px rgba(0, 188, 212, 0.15);
+  box-shadow: 0 2px 6px rgba(0, 188, 212, 0.15);
 }
 
 .payment-option input[type="radio"] {
@@ -216,12 +216,12 @@
 .option-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .option-icon {
-  width: 50px;
-  height: 32px;
+  width: 40px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -234,14 +234,14 @@
 }
 
 .option-content h3 {
-  font-size: 15px;
+  font-size: 14px;
   color: #333;
   margin: 0;
   font-weight: 600;
 }
 
 .option-content p {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
   margin: 0;
 }
@@ -368,10 +368,10 @@
 /* Order Summary Sidebar */
 .order-summary {
   background: white;
-  border-radius: 12px;
-  padding: 25px;
+  border-radius: 8px;
+  padding: 16px;
   border: 1px solid #e8e8e8;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
   position: sticky;
   top: 20px;
   max-height: calc(100vh - 40px);
@@ -379,10 +379,10 @@
 }
 
 .order-summary h2 {
-  font-size: 20px;
+  font-size: 16px;
   color: #333;
-  margin: 0 0 20px 0;
-  padding-bottom: 15px;
+  margin: 0 0 14px 0;
+  padding-bottom: 10px;
   border-bottom: 1px solid #e8e8e8;
   font-weight: 600;
 }
@@ -1436,4 +1436,127 @@
 .change-btn-compact:hover {
   background: #00bcd4;
   color: white;
+}
+
+/* Loyalty Points Section */
+.loyalty-points-section {
+  background: linear-gradient(135deg, #fff9e6 0%, #fff3d6 100%);
+  border: 2px solid #ffd700;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.loyalty-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.loyalty-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.points-badge {
+  background: #ffd700;
+  color: #333;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.points-info {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.apply-points-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #333;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.apply-points-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(255, 215, 0, 0.4);
+}
+
+.apply-points-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.points-applied {
+  background: white;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.applied-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #059669;
+  font-weight: 500;
+}
+
+.check-icon {
+  color: #059669;
+  font-size: 16px;
+}
+
+.remove-points-btn {
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.2s ease;
+}
+
+.remove-points-btn:hover {
+  background: #fecaca;
+}
+
+.discount-row {
+  color: #059669;
+  font-weight: 600;
+}
+
+.discount-amount {
+  color: #059669;
+}
+
+.savings-note {
+  background: #d1fae5;
+  color: #059669;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+  text-align: center;
 }
