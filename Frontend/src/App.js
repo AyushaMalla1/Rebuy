@@ -14,10 +14,7 @@ import Checkout from './Checkout';
 import Cart from './Cart';
 import About from './About';
 import Contact from './Contact';
-import Careers from './Careers';
-import Press from './Press';
 import Sustainability from './Sustainability';
-import Affiliates from './Affiliates';
 import FAQ from './FAQ';
 import OrderStatus from './OrderStatus';
 import PaymentOptions from './PaymentOptions';
@@ -29,11 +26,11 @@ import SellerProfile from './SellerProfile';
 import MensOutlet from './MensOutlet';
 import WomensOutlet from './WomensOutlet';
 import MensJacket from './components/MensJacket';
-import MensShirt from './components/MensShirt';
+import MensHoodie from './components/MensHoodie';
 import MensPants from './components/MensPants';
-import WomensJacket from './components/WomensJacket';
-import WomensShirt from './components/WomensShirt';
-import WomensPants from './components/WomensPants';
+import WomensBlazer from './components/WomensBlazer';
+import WomensSkirt from './components/WomensSkirt';
+import WomensTop from './components/WomensTop';
 
 // Protected Landing Page - redirects admin/seller to their dashboards
 function ProtectedLandingPage() {
@@ -87,10 +84,7 @@ function App() {
       <Route path="/shop" element={<Shop />} />
       <Route path="/about" element={<About />} />
       <Route path="/contact" element={<Contact />} />
-      <Route path="/careers" element={<Careers />} />
-      <Route path="/press" element={<Press />} />
       <Route path="/sustainability" element={<Sustainability />} />
-      <Route path="/affiliates" element={<Affiliates />} />
       <Route path="/faq" element={<FAQ />} />
       <Route path="/order-status" element={<OrderStatus />} />
       <Route path="/payment-options" element={<PaymentOptions />} />
@@ -100,11 +94,11 @@ function App() {
       <Route path="/mens-outlet" element={<MensOutlet />} />
       <Route path="/womens-outlet" element={<WomensOutlet />} />
       <Route path="/mens-jacket" element={<MensJacket />} />
-      <Route path="/mens-shirt" element={<MensShirt />} />
+      <Route path="/mens-hoodie" element={<MensHoodie />} />
       <Route path="/mens-pants" element={<MensPants />} />
-      <Route path="/womens-jacket" element={<WomensJacket />} />
-      <Route path="/womens-shirt" element={<WomensShirt />} />
-      <Route path="/womens-pants" element={<WomensPants />} />
+      <Route path="/womens-blazer" element={<WomensBlazer />} />
+      <Route path="/womens-skirt" element={<WomensSkirt />} />
+      <Route path="/womens-top" element={<WomensTop />} />
     </Routes>
   );
 }

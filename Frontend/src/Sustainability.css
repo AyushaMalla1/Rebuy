@@ -7,21 +7,21 @@
 
 .sustainability-hero {
   text-align: center;
-  padding: 60px 20px;
-  background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
   color: white;
   border-radius: 12px;
-  margin-bottom: 40px;
+  margin-bottom: 32px;
 }
 
 .sustainability-hero h1 {
-  font-size: 48px;
-  margin: 0 0 16px 0;
+  font-size: 28px;
+  margin: 0 0 12px 0;
   font-weight: 700;
 }
 
 .sustainability-hero p {
-  font-size: 20px;
+  font-size: 14px;
   margin: 0;
   opacity: 0.95;
 }
@@ -33,176 +33,180 @@
 
 .mission-section {
   background: white;
-  padding: 48px;
+  padding: 32px 24px;
   border-radius: 12px;
-  margin-bottom: 40px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 32px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   text-align: center;
 }
 
 .mission-section h2 {
-  font-size: 32px;
+  font-size: 20px;
   color: #333;
-  margin: 0 0 24px 0;
+  margin: 0 0 16px 0;
 }
 
 .mission-text {
-  font-size: 18px;
+  font-size: 14px;
   color: #666;
-  line-height: 1.8;
-  max-width: 900px;
+  line-height: 1.6;
+  max-width: 800px;
   margin: 0 auto;
 }
 
 .initiatives-section {
-  margin-bottom: 60px;
+  margin-bottom: 40px;
 }
 
 .initiatives-section h2 {
   text-align: center;
-  font-size: 32px;
+  font-size: 20px;
   color: #333;
-  margin-bottom: 40px;
+  margin-bottom: 24px;
 }
 
 .initiatives-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
 }
 
 .initiative-card {
   background: white;
-  padding: 32px;
+  padding: 20px;
   border-radius: 12px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   transition: all 0.3s;
 }
 
 .initiative-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
 }
 
 .initiative-icon {
-  color: #4caf50;
-  margin-bottom: 16px;
+  color: #00bcd4;
+  margin-bottom: 12px;
 }
 
 .initiative-card h3 {
-  font-size: 20px;
+  font-size: 15px;
   color: #333;
-  margin: 0 0 12px 0;
+  margin: 0 0 8px 0;
 }
 
 .initiative-card p {
-  font-size: 14px;
+  font-size: 13px;
   color: #666;
-  margin: 0 0 16px 0;
-  line-height: 1.6;
+  margin: 0 0 12px 0;
+  line-height: 1.5;
 }
 
 .impact-badge {
-  padding: 8px 16px;
-  background: #e8f5e9;
-  color: #4caf50;
-  border-radius: 20px;
-  font-size: 13px;
+  padding: 6px 12px;
+  background: #e0f7fa;
+  color: #00bcd4;
+  border-radius: 16px;
+  font-size: 12px;
   font-weight: 600;
   display: inline-block;
 }
 
 .impact-section {
-  margin-bottom: 60px;
+  margin-bottom: 40px;
 }
 
 .impact-section h2 {
   text-align: center;
-  font-size: 32px;
+  font-size: 20px;
   color: #333;
-  margin-bottom: 40px;
+  margin-bottom: 24px;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
 }
 
 .stat-card {
   background: white;
-  padding: 40px 20px;
+  padding: 24px 16px;
   border-radius: 12px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border-top: 4px solid #4caf50;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  border-top: 3px solid #00bcd4;
 }
 
 .stat-card h3 {
-  font-size: 36px;
-  color: #4caf50;
-  margin: 0 0 8px 0;
+  font-size: 24px;
+  color: #00bcd4;
+  margin: 0 0 6px 0;
   font-weight: 700;
 }
 
 .stat-card p {
-  font-size: 16px;
+  font-size: 13px;
   color: #666;
   margin: 0;
 }
 
 .join-section {
   background: white;
-  padding: 60px 20px;
+  padding: 32px 20px;
   border-radius: 12px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 .join-section h2 {
-  font-size: 32px;
+  font-size: 20px;
   color: #333;
-  margin: 0 0 16px 0;
+  margin: 0 0 12px 0;
 }
 
 .join-section p {
-  font-size: 18px;
+  font-size: 14px;
   color: #666;
-  margin: 0 0 32px 0;
-  max-width: 700px;
+  margin: 0 0 20px 0;
+  max-width: 600px;
   margin-left: auto;
   margin-right: auto;
 }
 
 .cta-btn {
-  padding: 16px 40px;
-  background: #4caf50;
+  padding: 12px 28px;
+  background: #00bcd4;
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .cta-btn:hover {
-  background: #388e3c;
+  background: #0097a7;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 188, 212, 0.3);
 }
 
 @media (max-width: 768px) {
   .sustainability-hero h1 {
-    font-size: 32px;
+    font-size: 24px;
   }
 
   .mission-section {
-    padding: 32px 20px;
+    padding: 24px 16px;
   }
 
   .mission-text {
-    font-size: 16px;
+    font-size: 13px;
+  }
+  
+  .sustainability-page {
+    padding: 16px;
   }
 }

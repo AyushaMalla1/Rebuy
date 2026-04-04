@@ -7,7 +7,7 @@ function PaymentOptions() {
 
   const paymentMethods = [
     {
-      icon: <FiCreditCard size={48} />,
+      icon: <FiCreditCard size={36} />,
       name: 'eSewa',
       color: '#60bb46',
       description: 'Nepal\'s leading digital wallet for instant payments',
@@ -15,23 +15,7 @@ function PaymentOptions() {
       howTo: ['Select eSewa at checkout', 'Login to your eSewa account', 'Confirm payment', 'Order confirmed instantly']
     },
     {
-      icon: <FiCreditCard size={48} />,
-      name: 'Khalti',
-      color: '#5d2e8e',
-      description: 'Popular digital wallet for seamless online transactions',
-      features: ['Quick payment process', 'Cashback offers available', 'Bank account linking', 'Easy refund process'],
-      howTo: ['Choose Khalti at checkout', 'Enter your Khalti PIN', 'Verify transaction', 'Payment complete']
-    },
-    {
-      icon: <FiCreditCard size={48} />,
-      name: 'Credit/Debit Cards',
-      color: '#ff6b6b',
-      description: 'Pay with Visa, Mastercard, or other major cards',
-      features: ['Widely accepted', 'Secure payment gateway', 'International cards supported', 'EMI options available'],
-      howTo: ['Select card payment', 'Enter card details', 'Complete OTP verification', 'Order confirmed']
-    },
-    {
-      icon: <FiDollarSign size={48} />,
+      icon: <FiDollarSign size={36} />,
       name: 'Cash on Delivery',
       color: '#00bcd4',
       description: 'Pay when you receive your order at your doorstep',
@@ -53,7 +37,7 @@ function PaymentOptions() {
 
       <div className="payment-content">
         <section className="security-section">
-          <FiShield size={48} color="#00bcd4" />
+          <FiShield size={32} color="#00bcd4" />
           <h2>100% Secure Payments</h2>
           <p>All transactions are encrypted and protected with industry-standard security protocols</p>
         </section>
@@ -107,7 +91,7 @@ function PaymentOptions() {
             </div>
             <div className="info-card">
               <h3>Transaction Fees</h3>
-              <p>No additional fees for eSewa and Khalti. Card payments may have minimal processing fees. COD may have delivery charges.</p>
+              <p>No additional fees for eSewa. COD may have delivery charges.</p>
             </div>
             <div className="info-card">
               <h3>Payment Issues</h3>
@@ -124,16 +108,16 @@ function PaymentOptions() {
               <p>Payment methods cannot be changed after order confirmation. Please cancel and place a new order if needed.</p>
             </div>
             <div className="faq-item">
-              <h4>Is it safe to save my card details?</h4>
-              <p>Yes, we use tokenization to securely store card information. Your actual card details are never stored on our servers.</p>
+              <h4>What if my eSewa payment fails?</h4>
+              <p>If payment fails, the amount will be automatically refunded within 5-7 business days. You can retry the payment or choose Cash on Delivery.</p>
             </div>
             <div className="faq-item">
-              <h4>What if my payment fails?</h4>
-              <p>If payment fails, the amount will be automatically refunded within 5-7 business days. You can retry the payment or choose a different method.</p>
+              <h4>Are there extra charges for Cash on Delivery?</h4>
+              <p>COD may have minimal delivery charges depending on your location. The exact amount will be shown at checkout.</p>
             </div>
             <div className="faq-item">
-              <h4>Do you accept international payments?</h4>
-              <p>Yes, we accept international credit and debit cards. However, eSewa and Khalti are only available for Nepali users.</p>
+              <h4>Is eSewa payment secure?</h4>
+              <p>Yes, eSewa uses bank-level encryption and security. Your payment information is completely safe and secure.</p>
             </div>
           </div>
         </section>
