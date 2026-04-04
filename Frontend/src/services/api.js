@@ -262,25 +262,61 @@ export const customerAPI = {
   }),
   
   uploadProfileImage: async (userId, imageFile) => {
-    const formData = new FormData();
-    formData.append('profileImage', imageFile);
-    
-    const response = await fetch(`${API_URL}/customers/${userId}/profile-image`, {
-      method: 'POST',
-      body: formData,
+    // Convert image file to base64
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(imageFile);
+      reader.onload = async () => {
+        try {
+          const base64Image = reader.result;
+          
+          const response = await fetch(`${API_URL}/customers/${userId}/profile-image`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ profileImage: base64Image }),
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.message || 'Failed to upload image');
+          }
+          
+          resolve(data);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = (error) => reject(error);
     });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to upload image');
-    }
-    
-    return data;
   },
   
   deleteProfileImage: (userId) => apiCall(`/customers/${userId}/profile-image`, {
     method: 'DELETE',
+  }),
+  
+  getLoginHistory: (userId) => apiCall(`/customers/${userId}/login-history`),
+  
+  get2FAStatus: (userId) => apiCall(`/customers/${userId}/2fa-status`),
+  
+  update2FA: (userId, enabled) => apiCall(`/customers/${userId}/2fa`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled }),
+  }),
+  
+  deactivateAccount: (userId) => apiCall(`/customers/${userId}/deactivate`, {
+    method: 'PATCH',
+  }),
+  
+  reactivateAccount: (userId) => apiCall(`/customers/${userId}/reactivate`, {
+    method: 'PATCH',
+  }),
+  
+  deleteAccount: (userId, password) => apiCall(`/customers/${userId}/account`, {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
   }),
 };
 

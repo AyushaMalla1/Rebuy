@@ -25,52 +25,42 @@ const extractUserId = (req, res, next) => {
   }
 };
 
-// Upload profile image
-router.post('/:userId/profile-image', upload.single('profileImage'), async (req, res) => {
+// Upload profile image - accepts base64 or URL
+router.post('/:userId/profile-image', async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No image file provided' });
-    }
-
-    const imageUrl = req.file.path;
-
-    // Update customer profile image
-    let customer = await Customer.findOne({ user: req.params.userId });
+    console.log('Profile image upload request received for user:', req.params.userId);
     
-    if (!customer) {
-      const user = await User.findById(req.params.userId);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-      
-      customer = new Customer({
-        user: req.params.userId,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone || '',
-        profileImage: imageUrl
-      });
-    } else {
-      // Delete old image from cloudinary if exists
-      if (Customer.profileImage) {
-        try {
-          const publicId = Customer.profileImage.split('/').pop().split('.')[0];
-          await cloudinary.uploader.destroy(`rebuy-products/${publicId}`);
-        } catch (err) {
-          console.error('Error deleting old image:', err);
-        }
-      }
-      Customer.profileImage = imageUrl;
+    const { profileImage } = req.body;
+    
+    if (!profileImage) {
+      console.error('No profileImage in request body');
+      return res.status(400).json({ message: 'No image data provided' });
     }
 
-    await Customer.save();
+    console.log('Image data received (first 50 chars):', profileImage.substring(0, 50));
+
+    // Update user profile image
+    const user = await User.findById(req.params.userId);
+    
+    if (!user) {
+      console.error('User not found:', req.params.userId);
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    console.log('User found:', user.email);
+    
+    user.profileImage = profileImage;
+    await user.save();
+    
+    console.log('Profile image updated successfully');
 
     res.json({ 
       message: 'Profile image uploaded successfully', 
-      profileImage: imageUrl 
+      profileImage: profileImage 
     });
   } catch (error) {
     console.error('Error uploading profile image:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -78,23 +68,23 @@ router.post('/:userId/profile-image', upload.single('profileImage'), async (req,
 // Delete profile image
 router.delete('/:userId/profile-image', async (req, res) => {
   try {
-    const customer = await Customer.findOne({ user: req.params.userId });
+    const user = await User.findById(req.params.userId);
     
-    if (!customer) {
-      return res.status(404).json({ message: 'Customer not found' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    if (Customer.profileImage) {
+    if (user.profileImage) {
       try {
-        const publicId = Customer.profileImage.split('/').pop().split('.')[0];
+        const publicId = user.profileImage.split('/').pop().split('.')[0];
         await cloudinary.uploader.destroy(`rebuy-products/${publicId}`);
       } catch (err) {
         console.error('Error deleting image from cloudinary:', err);
       }
     }
 
-    Customer.profileImage = '';
-    await Customer.save();
+    user.profileImage = '';
+    await user.save();
 
     res.json({ message: 'Profile image deleted successfully' });
   } catch (error) {
@@ -103,7 +93,28 @@ router.delete('/:userId/profile-image', async (req, res) => {
   }
 });
 
-// Get customer profile (authenticated route)
+// Get login history
+router.get('/:userId/login-history', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select('loginHistory');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Return last 10 login activities, sorted by most recent
+    const loginHistory = user.loginHistory
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 10);
+    
+    res.json({ success: true, loginHistory });
+  } catch (error) {
+    console.error('Error fetching login history:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get customer profile (authenticated route)you know what 
 router.get('/profile', extractUserId, async (req, res) => {
   try {
     const userId = req.userId;
@@ -128,13 +139,19 @@ router.get('/profile', extractUserId, async (req, res) => {
 // Get customer profile by user ID
 router.get('/:userId', async (req, res) => {
   try {
-    const customer = await Customer.findOne({ user: req.params.userId }).populate('user', 'fullName email');
+    const customer = await Customer.findOne({ user: req.params.userId }).populate('user', 'fullName email profileImage');
     
     if (!customer) {
       return res.status(404).json({ message: 'Customer profile not found' });
     }
     
-    res.json(customer);
+    // Add profileImage from user to customer object
+    const customerData = customer.toObject();
+    if (customer.user && customer.user.profileImage) {
+      customerData.profileImage = customer.user.profileImage;
+    }
+    
+    res.json(customerData);
   } catch (error) {
     console.error('Error fetching customer:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -533,31 +550,53 @@ router.patch('/:userId/status', async (req, res) => {
 });
 
 // Enable/disable 2FA
+// Enable/Disable 2FA
 router.patch('/:userId/2fa', async (req, res) => {
   try {
     const { enabled } = req.body;
+    const user = await User.findById(req.params.userId);
     
-    const customer = await Customer.findOne({ user: req.params.userId });
-    
-    if (!customer) {
-      return res.status(404).json({ message: 'Customer not found' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
     
-    Customer.twoFactorEnabled = enabled;
+    user.twoFactorEnabled = enabled;
+    
+    // If enabling 2FA, generate a secret (in production, use speakeasy or similar)
     if (enabled) {
-      Customer.twoFactorEnabledDate = new Date();
+      user.twoFactorSecret = Math.random().toString(36).substring(2, 15);
+    } else {
+      user.twoFactorSecret = '';
     }
     
-    await Customer.save();
+    await user.save();
     
-    // Also update User model
-    await User.findByIdAndUpdate(req.params.userId, {
-      twoFactorEnabled: enabled
+    res.json({ 
+      success: true, 
+      message: enabled ? '2FA enabled successfully' : '2FA disabled successfully',
+      twoFactorEnabled: user.twoFactorEnabled 
     });
-    
-    res.json({ message: '2FA updated', twoFactorEnabled: Customer.twoFactorEnabled });
   } catch (error) {
     console.error('Error updating 2FA:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get 2FA status
+router.get('/:userId/2fa-status', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select('twoFactorEnabled');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({ 
+      success: true, 
+      twoFactorEnabled: user.twoFactorEnabled || false 
+    });
+  } catch (error) {
+    console.error('Error fetching 2FA status:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -592,6 +631,135 @@ router.post('/:userId/login-history', async (req, res) => {
     res.json(Customer.loginHistory);
   } catch (error) {
     console.error('Error adding login history:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Enable/Disable 2FA
+router.patch('/:userId/2fa', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const user = await User.findById(req.params.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    user.twoFactorEnabled = enabled;
+    
+    // If enabling 2FA, generate a secret (in production, use speakeasy or similar)
+    if (enabled) {
+      user.twoFactorSecret = Math.random().toString(36).substring(2, 15);
+    } else {
+      user.twoFactorSecret = '';
+    }
+    
+    await user.save();
+    
+    res.json({ 
+      success: true, 
+      message: enabled ? '2FA enabled successfully' : '2FA disabled successfully',
+      twoFactorEnabled: user.twoFactorEnabled 
+    });
+  } catch (error) {
+    console.error('Error updating 2FA:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get 2FA status
+router.get('/:userId/2fa-status', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId).select('twoFactorEnabled');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({ 
+      success: true, 
+      twoFactorEnabled: user.twoFactorEnabled || false 
+    });
+  } catch (error) {
+    console.error('Error fetching 2FA status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Deactivate account
+router.patch('/:userId/deactivate', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    user.isActive = false;
+    user.deactivatedAt = new Date();
+    await user.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'Account deactivated successfully. You can reactivate by logging in again.' 
+    });
+  } catch (error) {
+    console.error('Error deactivating account:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Reactivate account
+router.patch('/:userId/reactivate', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    user.isActive = true;
+    user.deactivatedAt = null;
+    await user.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'Account reactivated successfully' 
+    });
+  } catch (error) {
+    console.error('Error reactivating account:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Delete account (soft delete - mark for deletion)
+router.delete('/:userId/account', async (req, res) => {
+  try {
+    const { password } = req.body;
+    const user = await User.findById(req.params.userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Verify password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
+    
+    // Mark account for deletion (30 days grace period)
+    user.isActive = false;
+    user.deactivatedAt = new Date();
+    // In production, you'd set a deletionScheduledDate and have a cron job to actually delete
+    await user.save();
+    
+    res.json({ 
+      success: true, 
+      message: 'Account scheduled for deletion. You have 30 days to cancel by logging in.' 
+    });
+  } catch (error) {
+    console.error('Error deleting account:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

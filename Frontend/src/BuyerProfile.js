@@ -70,6 +70,8 @@ function BuyerProfile() {
     confirmPassword: ''
   });
   const [showLoginActivityModal, setShowLoginActivityModal] = useState(false);
+  const [loginHistory, setLoginHistory] = useState([]);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showPaymentMethodsModal, setShowPaymentMethodsModal] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
@@ -407,11 +409,40 @@ function BuyerProfile() {
     setRedeemAmount('');
   };
 
-  const handleEnable2FA = () => {
-    showToast('Two-Factor Authentication setup will be available soon!', 'success');
+  const handleEnable2FA = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user._id) {
+        showToast('Please login to enable 2FA', 'error');
+        return;
+      }
+      
+      // Toggle 2FA
+      const response = await customerAPI.update2FA(user._id, !twoFactorEnabled);
+      
+      if (response.success) {
+        setTwoFactorEnabled(!twoFactorEnabled);
+        showToast(response.message, 'success');
+      }
+    } catch (error) {
+      console.error('Error updating 2FA:', error);
+      showToast(error.message || 'Failed to update 2FA settings', 'error');
+    }
   };
 
-  const handleViewLoginActivity = () => {
+  const handleViewLoginActivity = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (user && user._id) {
+        const response = await customerAPI.getLoginHistory(user._id);
+        if (response.success) {
+          // Store login history in state (we'll need to add this state)
+          setLoginHistory(response.loginHistory);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching login history:', error);
+    }
     setShowLoginActivityModal(true);
   };
 
@@ -433,16 +464,31 @@ function BuyerProfile() {
     setShowDeactivateModal(true);
   };
 
-  const confirmDeactivateAccount = () => {
-    // In a real app, this would call the backend API
-    showToast('Account deactivated successfully. You can reactivate anytime by logging in.', 'success');
-    setShowDeactivateModal(false);
-    // Optionally logout user
-    setTimeout(() => {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/');
-    }, 2000);
+  const confirmDeactivateAccount = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user._id) {
+        showToast('Please login to deactivate account', 'error');
+        return;
+      }
+      
+      const response = await customerAPI.deactivateAccount(user._id);
+      
+      if (response.success) {
+        showToast(response.message, 'success');
+        setShowDeactivateModal(false);
+        
+        // Logout user after deactivation
+        setTimeout(() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          navigate('/');
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error deactivating account:', error);
+      showToast(error.message || 'Failed to deactivate account', 'error');
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -450,23 +496,37 @@ function BuyerProfile() {
     setDeleteConfirmPassword('');
   };
 
-  const confirmDeleteAccount = () => {
+  const confirmDeleteAccount = async () => {
     if (!deleteConfirmPassword.trim()) {
       showToast('Please enter your password to confirm deletion', 'error');
       return;
     }
     
-    // In a real app, this would verify password and call backend API
-    showToast('Account deletion scheduled for April 12, 2026. You can cancel by logging in before that date.', 'warning');
-    setShowDeleteModal(false);
-    setDeleteConfirmPassword('');
-    
-    // Optionally logout user
-    setTimeout(() => {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/');
-    }, 3000);
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user._id) {
+        showToast('Please login to delete account', 'error');
+        return;
+      }
+      
+      const response = await customerAPI.deleteAccount(user._id, deleteConfirmPassword);
+      
+      if (response.success) {
+        showToast(response.message, 'warning');
+        setShowDeleteModal(false);
+        setDeleteConfirmPassword('');
+        
+        // Logout user after deletion
+        setTimeout(() => {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          navigate('/');
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      showToast(error.message || 'Failed to delete account. Please check your password.', 'error');
+    }
   };
 
   useEffect(() => {
@@ -521,6 +581,7 @@ function BuyerProfile() {
         fetchReturns(userId);
         fetchLoyaltyData(userId);
         fetchNotifications();
+        fetch2FAStatus(userId);
       }
     } else {
       // Redirect to login if not logged in
@@ -574,6 +635,14 @@ function BuyerProfile() {
       }
     }
   }, [activeTab, userData._id]);
+
+  // Reload wishlist when wishlist tab is active
+  useEffect(() => {
+    if (activeTab === 'wishlist') {
+      console.log('Wishlist tab active, reloading wishlist...');
+      loadWishlist();
+    }
+  }, [activeTab]);
 
   // Fetch messages when a chat is selected
   useEffect(() => {
@@ -637,7 +706,10 @@ function BuyerProfile() {
       const user = JSON.parse(localStorage.getItem('user'));
       const token = localStorage.getItem('token');
       
+      console.log('Loading wishlist for user:', user?._id);
+      
       if (!user || !token) {
+        console.log('No user or token found');
         setWishlist([]);
         return;
       }
@@ -649,24 +721,37 @@ function BuyerProfile() {
         }
       });
       
+      console.log('Wishlist response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Wishlist data received:', data);
         
         // Format wishlist items - backend returns { success, wishlist: { items: [...] } }
         const wishlistItems = data.wishlist?.items || [];
-        const formattedWishlist = wishlistItems.map(item => ({
-          id: item.product._id || item.product,
-          name: item.product.name || item.productName,
-          price: item.product.price || item.price,
-          image: (item.product.images && item.product.images[0]) || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
-          seller: item.product.seller || item.seller,
-          sellerName: item.product.sellerName || item.sellerName,
-          storeName: item.product.storeName || item.storeName,
-          stock: item.product.stock
-        }));
+        console.log('Wishlist items count:', wishlistItems.length);
         
+        const formattedWishlist = wishlistItems
+          .filter(item => item.product && typeof item.product === 'object') // Only include items with populated products
+          .map(item => {
+            console.log('Processing wishlist item:', item);
+            return {
+              id: item.product._id || item.product,
+              name: item.product.name || 'Unknown Product',
+              price: item.product.price || 0,
+              image: (item.product.images && item.product.images[0]) || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
+              seller: item.product.seller || item.seller,
+              sellerName: item.product.sellerName || 'Unknown Seller',
+              storeName: item.product.storeName || 'Store',
+              stock: item.product.stock || 0
+            };
+          });
+        
+        console.log('Formatted wishlist:', formattedWishlist);
         setWishlist(formattedWishlist);
       } else {
+        const errorData = await response.json();
+        console.error('Wishlist fetch failed:', errorData);
         setWishlist([]);
       }
     } catch (error) {
@@ -725,6 +810,19 @@ function BuyerProfile() {
     }
   };
 
+  const fetch2FAStatus = async (userId) => {
+    try {
+      const response = await customerAPI.get2FAStatus(userId);
+      if (response && response.success) {
+        setTwoFactorEnabled(response.twoFactorEnabled || false);
+      }
+    } catch (error) {
+      console.error('Error fetching 2FA status:', error);
+      // Set default to false if fetch fails
+      setTwoFactorEnabled(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -775,11 +873,22 @@ function BuyerProfile() {
       setUploadingImage(true);
       const user = JSON.parse(localStorage.getItem('user'));
       
+      console.log('User from localStorage:', user);
+      console.log('User ID:', user?._id);
+      
       if (!user || !user._id) {
         showToast('Please login to upload profile image', 'error');
         return;
       }
       
+      // Validate user ID format (MongoDB ObjectId is 24 hex characters)
+      if (typeof user._id !== 'string' || user._id.length !== 24) {
+        console.error('Invalid user ID format:', user._id);
+        showToast('Invalid user ID. Please log out and log in again.', 'error');
+        return;
+      }
+      
+      console.log('Uploading image for user:', user._id);
       const result = await customerAPI.uploadProfileImage(user._id, profileImage);
       
       setUserData(prev => ({ ...prev, profileImage: result.profileImage }));
@@ -2088,6 +2197,13 @@ function BuyerProfile() {
               ) : (
                 wishlist.map(item => (
                   <div key={item.id} className="wishlist-card">
+                    <button 
+                      className="remove-btn"
+                      onClick={() => handleRemoveFromWishlist(item.id)}
+                      title="Remove from wishlist"
+                    >
+                      <FiX size={16} />
+                    </button>
                     <img 
                       src={item.image} 
                       alt={item.name}
@@ -2108,12 +2224,6 @@ function BuyerProfile() {
                           onClick={() => handleAddToCartFromWishlist(item)}
                         >
                           Add to Cart
-                        </button>
-                        <button 
-                          className="remove-btn"
-                          onClick={() => handleRemoveFromWishlist(item.id)}
-                        >
-                          <FiX /> Remove
                         </button>
                       </div>
                     </div>
@@ -2381,9 +2491,18 @@ function BuyerProfile() {
                     onChange={handleImageSelect}
                     style={{ display: 'none' }}
                   />
-                  <label htmlFor="profileImageInput" className="upload-image-btn">
-                    <FiEdit2 /> Choose Image
-                  </label>
+                  
+                  {/* Show Choose Image button only if no image is uploaded yet */}
+                  {!profileImagePreview && (
+                    <>
+                      <label htmlFor="profileImageInput" className="upload-image-btn">
+                        <FiEdit2 /> Choose Image
+                      </label>
+                      <p className="image-hint">Max size: 5MB. Formats: JPG, PNG, WEBP</p>
+                    </>
+                  )}
+                  
+                  {/* Show Save Image button only when a new image is selected but not yet uploaded */}
                   {profileImage && (
                     <button 
                       className="save-image-btn" 
@@ -2393,12 +2512,13 @@ function BuyerProfile() {
                       {uploadingImage ? 'Uploading...' : 'Save Image'}
                     </button>
                   )}
+                  
+                  {/* Show Remove button only when there's an uploaded image */}
                   {profileImagePreview && !profileImage && (
                     <button className="delete-image-btn" onClick={handleImageDelete}>
                       <FiX /> Remove
                     </button>
                   )}
-                  <p className="image-hint">Max size: 5MB. Formats: JPG, PNG, WEBP</p>
                 </div>
               </div>
 
@@ -2445,33 +2565,6 @@ function BuyerProfile() {
                   )}
                 </div>
 
-                <div className="info-field">
-                  <label><FiMapPin /> City</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      name="city"
-                      value={editData.city}
-                      onChange={handleChange}
-                    />
-                  ) : (
-                    <p>{userData.city}</p>
-                  )}
-                </div>
-
-                <div className="info-field full-width">
-                  <label><FiMapPin /> Address</label>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      name="address"
-                      value={editData.address}
-                      onChange={handleChange}
-                    />
-                  ) : (
-                    <p>{userData.address}</p>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -2737,28 +2830,27 @@ function BuyerProfile() {
                   </div>
                   <div className="modal-body">
                     <div className="activity-list">
-                      <div className="activity-item">
-                        <div className="activity-icon success">✓</div>
-                        <div className="activity-details">
-                          <h4>March 13, 2026 - 10:30 AM</h4>
-                          <p>Windows PC - Kathmandu, Nepal</p>
-                          <span className="activity-status">Current Session</span>
-                        </div>
-                      </div>
-                      <div className="activity-item">
-                        <div className="activity-icon success">✓</div>
-                        <div className="activity-details">
-                          <h4>March 12, 2026 - 3:45 PM</h4>
-                          <p>Mobile Device - Kathmandu, Nepal</p>
-                        </div>
-                      </div>
-                      <div className="activity-item">
-                        <div className="activity-icon success">✓</div>
-                        <div className="activity-details">
-                          <h4>March 11, 2026 - 9:15 AM</h4>
-                          <p>Windows PC - Kathmandu, Nepal</p>
-                        </div>
-                      </div>
+                      {loginHistory.length === 0 ? (
+                        <p style={{textAlign: 'center', padding: '20px', color: '#999'}}>No login history available</p>
+                      ) : (
+                        loginHistory.map((activity, index) => (
+                          <div key={index} className="activity-item">
+                            <div className="activity-icon success">✓</div>
+                            <div className="activity-details">
+                              <h4>{new Date(activity.timestamp).toLocaleString('en-US', { 
+                                month: 'long', 
+                                day: 'numeric', 
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true
+                              })}</h4>
+                              <p>{activity.userAgent || 'Unknown Device'} - {activity.location || 'Unknown Location'}</p>
+                              {index === 0 && <span className="activity-status">Current Session</span>}
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                     <p className="security-note">All sessions are secure. If you notice any suspicious activity, please change your password immediately.</p>
                   </div>
@@ -2877,7 +2969,9 @@ function BuyerProfile() {
                   <h4>Two-Factor Authentication</h4>
                   <p>Add an extra layer of security to your account</p>
                 </div>
-                <button className="setting-btn" onClick={handleEnable2FA}>Enable</button>
+                <button className="setting-btn" onClick={handleEnable2FA}>
+                  {twoFactorEnabled ? 'Disable' : 'Enable'}
+                </button>
               </div>
               <div className="setting-item">
                 <div>
