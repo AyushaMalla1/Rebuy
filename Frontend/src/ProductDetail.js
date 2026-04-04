@@ -25,6 +25,7 @@ function ProductDetail() {
     subject: '',
     message: ''
   });
+  const [similarProducts, setSimilarProducts] = useState([]);
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -34,6 +35,57 @@ function ProductDetail() {
   useEffect(() => {
     fetchProduct();
   }, [id]);
+
+  useEffect(() => {
+    const fetchSimilarProducts = async () => {
+      if (product && product.category) {
+        try {
+          const response = await fetch('http://localhost:5000/api/products');
+          const allProducts = await response.json();
+          
+          console.log('Current product:', {
+            id: product._id,
+            name: product.name,
+            category: product.category,
+            subcategory: product.subcategory || 'NOT SET'
+          });
+          
+          // Filter products by same subcategory (if exists), otherwise same category
+          const similar = allProducts
+            .filter(p => {
+              if (p._id === product._id) return false; // Exclude current product
+              
+              // If current product has subcategory, match by subcategory
+              if (product.subcategory) {
+                const matches = p.category === product.category && p.subcategory === product.subcategory;
+                console.log(`Product ${p.name}: category=${p.category}, subcategory=${p.subcategory || 'NOT SET'}, matches=${matches}`);
+                return matches;
+              }
+              
+              // Otherwise, match by category only
+              const matches = p.category === product.category;
+              console.log(`Product ${p.name}: category=${p.category}, subcategory=${p.subcategory || 'NOT SET'}, matches by category only=${matches}`);
+              return matches;
+            })
+            .slice(0, 4) // Show max 4 similar products
+            .map(p => ({
+              id: p._id,
+              name: p.name,
+              price: p.price,
+              image: p.images?.[0] || 'https://via.placeholder.com/300',
+              rating: p.rating || 4.5
+            }));
+          
+          console.log('Similar products found:', similar.length);
+          setSimilarProducts(similar);
+        } catch (error) {
+          console.error('Error fetching similar products:', error);
+        }
+      }
+    };
+    
+    fetchSimilarProducts();
+  }, [product]);
 
   const fetchProduct = async () => {
     try {
@@ -306,9 +358,6 @@ function ProductDetail() {
       navigate('/checkout');
     }
   };
-
-  // Similar products (empty for now - can be populated from API)
-  const similarProducts = [];
 
   return (
     <div className="product-detail-page">

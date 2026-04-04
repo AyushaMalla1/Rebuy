@@ -409,7 +409,7 @@ router.put('/:id', async (req, res) => {
     }
     
     // Update fields
-    const updates = ['name', 'description', 'price', 'category', 'condition', 'size', 'brand', 'stock', 'images', 'story', 'paymentOptions', 'discount', 'bundleDeal'];
+    const updates = ['name', 'description', 'price', 'category', 'subcategory', 'condition', 'size', 'brand', 'stock', 'images', 'story', 'paymentOptions', 'discount', 'bundleDeal'];
     const oldStock = product.stock;
     const wasBundleDeal = product.isBundleDeal;
     
