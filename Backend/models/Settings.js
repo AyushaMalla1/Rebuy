@@ -47,6 +47,18 @@ const settingsSchema = new mongoose.Schema({
     type: Number,
     default: 100000
   },
+  commissionRate: {
+    type: Number,
+    default: 5,
+    min: 0,
+    max: 100
+  },
+  returnWindow: {
+    type: Number,
+    default: 7,
+    min: 0,
+    max: 30
+  },
   loyaltyPointsEnabled: {
     type: Boolean,
     default: true

@@ -1285,7 +1285,6 @@ function SellerDashboard() {
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (imageFiles.length + files.length > 10) {
-      alert('You can upload maximum 10 images');
       return;
     }
 
@@ -2063,69 +2062,33 @@ function SellerDashboard() {
                         <option value="">Select Subcategory</option>
                         {newProduct.category === "Men's Collection" && (
                           <>
-                            <optgroup label="Tops">
-                              <option value="T-Shirts">T-Shirts</option>
-                              <option value="Shirts">Shirts</option>
-                              <option value="Polos">Polos</option>
-                              <option value="Hoodies">Hoodies</option>
-                              <option value="Sweaters">Sweaters</option>
-                            </optgroup>
-                            <optgroup label="Bottoms">
-                              <option value="Jeans">Jeans</option>
-                              <option value="Pants">Pants</option>
-                              <option value="Shorts">Shorts</option>
-                              <option value="Joggers">Joggers</option>
-                            </optgroup>
-                            <optgroup label="Outerwear">
-                              <option value="Jackets">Jackets</option>
-                              <option value="Coats">Coats</option>
-                              <option value="Blazers">Blazers</option>
-                              <option value="Vests">Vests</option>
-                            </optgroup>
+                            <option value="Men's Hoodie">Men's Hoodie</option>
+                            <option value="Men's Pants">Men's Pants</option>
+                            <option value="Men's Jacket">Men's Jacket</option>
+                            <option value="Other">Other</option>
                           </>
                         )}
                         {newProduct.category === "Women's Collection" && (
                           <>
-                            <optgroup label="Tops">
-                              <option value="T-Shirts">T-Shirts</option>
-                              <option value="Blouses">Blouses</option>
-                              <option value="Sweaters">Sweaters</option>
-                              <option value="Hoodies">Hoodies</option>
-                              <option value="Tank Tops">Tank Tops</option>
-                            </optgroup>
-                            <optgroup label="Bottoms">
-                              <option value="Jeans">Jeans</option>
-                              <option value="Pants">Pants</option>
-                              <option value="Skirts">Skirts</option>
-                              <option value="Leggings">Leggings</option>
-                            </optgroup>
-                            <optgroup label="Dresses">
-                              <option value="Casual Dresses">Casual Dresses</option>
-                              <option value="Formal Dresses">Formal Dresses</option>
-                              <option value="Maxi Dresses">Maxi Dresses</option>
-                              <option value="Mini Dresses">Mini Dresses</option>
-                            </optgroup>
+                            <option value="Women's Skirt">Women's Skirt</option>
+                            <option value="Women's Blazer">Women's Blazer</option>
+                            <option value="Women's Top">Women's Top</option>
+                            <option value="Other">Other</option>
                           </>
                         )}
                         {newProduct.category === "Sportswear" && (
                           <>
-                            <optgroup label="Athletic Wear">
-                              <option value="Sports T-Shirts">Sports T-Shirts</option>
-                              <option value="Tank Tops">Tank Tops</option>
-                              <option value="Jerseys">Jerseys</option>
-                              <option value="Tracksuits">Tracksuits</option>
-                            </optgroup>
-                            <optgroup label="Bottoms">
-                              <option value="Joggers">Joggers</option>
-                              <option value="Track Pants">Track Pants</option>
-                              <option value="Sports Shorts">Sports Shorts</option>
-                              <option value="Leggings">Leggings</option>
-                            </optgroup>
-                            <optgroup label="Outerwear">
-                              <option value="Windbreakers">Windbreakers</option>
-                              <option value="Sports Hoodies">Sports Hoodies</option>
-                              <option value="Sports Jackets">Sports Jackets</option>
-                            </optgroup>
+                            <option value="Sports T-Shirts">Sports T-Shirts</option>
+                            <option value="Tank Tops">Tank Tops</option>
+                            <option value="Jerseys">Jerseys</option>
+                            <option value="Tracksuits">Tracksuits</option>
+                            <option value="Joggers">Joggers</option>
+                            <option value="Track Pants">Track Pants</option>
+                            <option value="Sports Shorts">Sports Shorts</option>
+                            <option value="Leggings">Leggings</option>
+                            <option value="Windbreakers">Windbreakers</option>
+                            <option value="Sports Hoodies">Sports Hoodies</option>
+                            <option value="Sports Jackets">Sports Jackets</option>
                           </>
                         )}
                         {newProduct.category === "Vintage" && (
@@ -2188,25 +2151,18 @@ function SellerDashboard() {
                     />
                   </div>
 
-                  <div className="form-group story-field-enhanced">
+                  <div className="form-group">
                     <label className="form-label">
-                      <span className="label-icon">📖</span>
                       Product Story
-                      <span className="label-badge-important">Recommended</span>
                     </label>
-                    <p className="field-hint">
-                      Share the unique story behind this item. Add personality and emotional value to help buyers connect with your product.
-                    </p>
                     <textarea
                       value={newProduct.story}
                       onChange={(e) => setNewProduct({...newProduct, story: e.target.value})}
                       rows="4"
-                      placeholder='Example: "This vintage denim jacket is from the 90s collection. It was worn only twice and has been carefully preserved. The distressed look is authentic, not artificially created. Perfect for anyone who loves authentic vintage fashion!"'
-                      className="form-textarea story-textarea"
+                      placeholder="Share the unique story behind this item..."
+                      className="form-textarea"
+                      required
                     />
-                    <div className="character-count">
-                      {newProduct.story?.length || 0} characters
-                    </div>
                   </div>
 
                   {/* Bundle Deal Section */}
@@ -3695,7 +3651,7 @@ function SellerDashboard() {
                   <label className="modal-form-label">Category *</label>
                   <select
                     value={editingProduct.category}
-                    onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
+                    onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value, subcategory: ''})}
                     required
                     className="modal-form-select"
                   >
@@ -3704,6 +3660,56 @@ function SellerDashboard() {
                     <option value="Women's Collection">Women's Collection</option>
                     <option value="Sportswear">Sportswear</option>
                     <option value="Vintage">Vintage</option>
+                  </select>
+                </div>
+                <div className="modal-form-group">
+                  <label className="modal-form-label">Subcategory</label>
+                  <select
+                    value={editingProduct.subcategory || ''}
+                    onChange={(e) => setEditingProduct({...editingProduct, subcategory: e.target.value})}
+                    className="modal-form-select"
+                    disabled={!editingProduct.category}
+                  >
+                    <option value="">Select Subcategory</option>
+                    {editingProduct.category === "Men's Collection" && (
+                      <>
+                        <option value="Men's Hoodie">Men's Hoodie</option>
+                        <option value="Men's Pants">Men's Pants</option>
+                        <option value="Men's Jacket">Men's Jacket</option>
+                        <option value="Other">Other</option>
+                      </>
+                    )}
+                    {editingProduct.category === "Women's Collection" && (
+                      <>
+                        <option value="Women's Skirt">Women's Skirt</option>
+                        <option value="Women's Blazer">Women's Blazer</option>
+                        <option value="Women's Top">Women's Top</option>
+                        <option value="Other">Other</option>
+                      </>
+                    )}
+                    {editingProduct.category === "Sportswear" && (
+                      <>
+                        <option value="Sports T-Shirts">Sports T-Shirts</option>
+                        <option value="Tank Tops">Tank Tops</option>
+                        <option value="Jerseys">Jerseys</option>
+                        <option value="Tracksuits">Tracksuits</option>
+                        <option value="Joggers">Joggers</option>
+                        <option value="Track Pants">Track Pants</option>
+                        <option value="Sports Shorts">Sports Shorts</option>
+                        <option value="Leggings">Leggings</option>
+                        <option value="Windbreakers">Windbreakers</option>
+                        <option value="Sports Hoodies">Sports Hoodies</option>
+                        <option value="Sports Jackets">Sports Jackets</option>
+                      </>
+                    )}
+                    {editingProduct.category === "Vintage" && (
+                      <>
+                        <option value="Vintage Tops">Vintage Tops</option>
+                        <option value="Vintage Bottoms">Vintage Bottoms</option>
+                        <option value="Vintage Dresses">Vintage Dresses</option>
+                        <option value="Vintage Outerwear">Vintage Outerwear</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

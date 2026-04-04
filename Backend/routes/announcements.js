@@ -3,7 +3,6 @@ const router = express.Router();
 const Announcement = require('../models/Announcement');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
-const Customer = require('../models/Customer');
 const Seller = require('../models/Seller');
 
 // Get all announcements (admin)

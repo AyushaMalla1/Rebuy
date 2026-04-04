@@ -5544,6 +5544,15 @@
   border: 2px solid #e5e7eb;
 }
 
+.seller-container .image-preview-item-bordered .image-preview-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Image remove button small */
 .seller-container .image-remove-btn-small {
   position: absolute;
