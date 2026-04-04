@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiChevronDown, FiSearch } from 'react-icons/fi';
 import './CategoryPage.css';
 
-function WomensPants() {
+function WomensSkirt() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,12 +17,11 @@ function WomensPants() {
     try {
       const response = await fetch('http://localhost:5000/api/products');
       const data = await response.json();
-      const pants = data.filter(p => 
-        (p.gender === 'Women' || p.gender === 'Unisex') && 
-        (p.category?.toLowerCase().includes('pant') || p.category?.toLowerCase().includes('jean') || 
-         p.name?.toLowerCase().includes('pant') || p.name?.toLowerCase().includes('jean'))
+      const skirts = data.filter(p => 
+        p.category === "Women's Collection" && 
+        p.subcategory === "Women's Skirt"
       );
-      setProducts(pants);
+      setProducts(skirts);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -33,10 +32,10 @@ function WomensPants() {
   return (
     <div className="outlet-page">
       <div className="outlet-breadcrumb">
-        <span onClick={() => navigate('/')}>Home</span> / <span>Women's Pants</span>
+        <span onClick={() => navigate('/')}>Home</span> / <span>Women's Skirt</span>
       </div>
 
-      <h1 className="outlet-title">Women's Pants</h1>
+      <h1 className="outlet-title">Women's Skirt</h1>
 
       <div className="outlet-container">
         <aside className="outlet-sidebar">
@@ -44,7 +43,7 @@ function WomensPants() {
             <FiSearch className="search-icon" />
             <input 
               type="text" 
-              placeholder="Search pants" 
+              placeholder="Search shirts" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -83,4 +82,4 @@ function WomensPants() {
   );
 }
 
-export default WomensPants;
+export default WomensSkirt;

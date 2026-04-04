@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiChevronDown, FiSearch } from 'react-icons/fi';
 import './CategoryPage.css';
 
-function WomensJacket() {
+function WomensBlazer() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,11 +17,11 @@ function WomensJacket() {
     try {
       const response = await fetch('http://localhost:5000/api/products');
       const data = await response.json();
-      const jackets = data.filter(p => 
-        (p.gender === 'Women' || p.gender === 'Unisex') && 
-        (p.category?.toLowerCase().includes('jacket') || p.name?.toLowerCase().includes('jacket'))
+      const blazers = data.filter(p => 
+        p.category === "Women's Collection" && 
+        p.subcategory === "Women's Blazer"
       );
-      setProducts(jackets);
+      setProducts(blazers);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -32,10 +32,10 @@ function WomensJacket() {
   return (
     <div className="outlet-page">
       <div className="outlet-breadcrumb">
-        <span onClick={() => navigate('/')}>Home</span> / <span>Women's Jacket</span>
+        <span onClick={() => navigate('/')}>Home</span> / <span>Women's Blazer</span>
       </div>
 
-      <h1 className="outlet-title">Women's Jacket</h1>
+      <h1 className="outlet-title">Women's Blazer</h1>
 
       <div className="outlet-container">
         <aside className="outlet-sidebar">
@@ -82,4 +82,4 @@ function WomensJacket() {
   );
 }
 
-export default WomensJacket;
+export default WomensBlazer;

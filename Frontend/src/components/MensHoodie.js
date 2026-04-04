@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiChevronDown, FiSearch } from 'react-icons/fi';
 import './CategoryPage.css';
 
-function WomensShirt() {
+function MensHoodie() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,12 +17,11 @@ function WomensShirt() {
     try {
       const response = await fetch('http://localhost:5000/api/products');
       const data = await response.json();
-      const shirts = data.filter(p => 
-        (p.gender === 'Women' || p.gender === 'Unisex') && 
-        (p.category?.toLowerCase().includes('shirt') || p.category?.toLowerCase().includes('top') ||
-         p.name?.toLowerCase().includes('shirt') || p.name?.toLowerCase().includes('top') || p.name?.toLowerCase().includes('t-shirt'))
+      const hoodies = data.filter(p => 
+        p.category === "Men's Collection" && 
+        p.subcategory === "Men's Hoodie"
       );
-      setProducts(shirts);
+      setProducts(hoodies);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -33,10 +32,10 @@ function WomensShirt() {
   return (
     <div className="outlet-page">
       <div className="outlet-breadcrumb">
-        <span onClick={() => navigate('/')}>Home</span> / <span>Women's Shirt</span>
+        <span onClick={() => navigate('/')}>Home</span> / <span>Men's Hoodie</span>
       </div>
 
-      <h1 className="outlet-title">Women's Shirt</h1>
+      <h1 className="outlet-title">Men's Hoodie</h1>
 
       <div className="outlet-container">
         <aside className="outlet-sidebar">
@@ -83,4 +82,4 @@ function WomensShirt() {
   );
 }
 
-export default WomensShirt;
+export default MensHoodie;

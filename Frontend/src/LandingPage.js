@@ -22,6 +22,7 @@ function LandingPage() {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedSubcategory, setSelectedSubcategory] = useState('ALL');
   const [activeFaqTab, setActiveFaqTab] = useState('all');
+  const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchResults, setSearchResults] = useState({ products: [], sellers: [], pages: [] });
   const [activeDropdown, setActiveDropdown] = useState(null);
@@ -72,7 +73,7 @@ function LandingPage() {
     // Load favorites from localStorage
     const savedFavorites = localStorage.getItem('favorites');
     if (savedFavorites) setFavorites(JSON.parse(savedFavorites));
-
+    
     // Fetch products from backend
     fetchProducts();
     
@@ -130,21 +131,29 @@ function LandingPage() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await productAPI.getAll({ limit: 100, status: 'Approved' });
+      console.log('Starting to fetch products from backend...');
       
-      // Handle both array response and object with products array
-      const productsArray = Array.isArray(response) ? response : (response.products || []);
+      const response = await fetch('http://localhost:5000/api/products');
+      console.log('Response status:', response.status);
       
-      if (productsArray && productsArray.length > 0) {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Fetched products count:', data.length);
+      console.log('First product:', data[0]);
+      
+      if (data && data.length > 0) {
         // Map backend products to frontend format
-        const mappedProducts = productsArray.map(p => ({
+        const mappedProducts = data.map(p => ({
           id: p._id,
           _id: p._id,
           name: p.name,
           price: p.price,
           discountedPrice: p.discount?.active ? p.price * (1 - p.discount.percentage / 100) : null,
-          category: p.featured ? 'TOP' : 'NEW',
-          backendCategory: p.category, // Store original category
+          category: 'NEW',
+          backendCategory: p.category,
           subcategory: p.subcategory,
           image: (p.images && p.images[0]) || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
           images: p.images || [],
@@ -153,6 +162,7 @@ function LandingPage() {
           condition: p.condition,
           size: p.size,
           brand: p.brand,
+          description: p.description || '',
           story: p.story,
           seller: p.seller,
           sellerName: p.sellerName,
@@ -160,45 +170,25 @@ function LandingPage() {
           stock: p.stock,
           paymentOptions: p.paymentOptions
         }));
+        
+        console.log('Mapped products count:', mappedProducts.length);
         setAllProducts(mappedProducts);
-        localStorage.setItem('allProducts', JSON.stringify(mappedProducts));
       } else {
-        // Use demo products if backend is empty
-        setAllProducts(demoProducts);
-        localStorage.setItem('allProducts', JSON.stringify(demoProducts));
+        console.log('No products returned from backend');
+        setAllProducts([]);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
-      // Use demo products on error
-      setAllProducts(demoProducts);
-      localStorage.setItem('allProducts', JSON.stringify(demoProducts));
+      console.error('Error details:', error.message);
+      setAllProducts([]);
     } finally {
       setLoading(false);
     }
   };
 
   // Filter products based on active tab, category, subcategory, and search
-  const filteredProducts = allProducts.filter(product => {
-    const matchesTab = activeTab === 'ALL' || product.category === activeTab;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.brand?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    // Match by category
-    let matchesCategory = selectedCategory === 'ALL';
-    if (!matchesCategory && product.backendCategory) {
-      if (selectedCategory === 'MEN') matchesCategory = product.backendCategory === "Men's Collection";
-      else if (selectedCategory === 'WOMEN') matchesCategory = product.backendCategory === "Women's Collection";
-      else if (selectedCategory === 'SPORTSWEAR') matchesCategory = product.backendCategory === "Sportswear";
-      else if (selectedCategory === 'VINTAGE') matchesCategory = product.backendCategory === "Vintage";
-    }
-    
-    // Match by subcategory
-    const matchesSubcategory = selectedSubcategory === 'ALL' || 
-                                product.subcategory === selectedSubcategory;
-    
-    return matchesTab && matchesSearch && matchesCategory && matchesSubcategory;
-  });
+  // Temporarily show all products to diagnose the issue
+  const filteredProducts = allProducts;
 
   const handleCategoryClick = (category) => {
     setSelectedCategory(category);
@@ -559,10 +549,7 @@ function LandingPage() {
       { name: 'Contact', path: '/contact', keywords: ['contact', 'support', 'help', 'email', 'phone'] },
       { name: 'Become a Seller', path: '/seller', keywords: ['seller', 'sell', 'vendor', 'merchant', 'shop'] },
       { name: 'FAQ', path: '/faq', keywords: ['faq', 'questions', 'help', 'answers', 'support'] },
-      { name: 'Careers', path: '/careers', keywords: ['careers', 'jobs', 'work', 'hiring', 'employment'] },
-      { name: 'Press', path: '/press', keywords: ['press', 'media', 'news', 'announcements'] },
       { name: 'Sustainability', path: '/sustainability', keywords: ['sustainability', 'environment', 'green', 'eco'] },
-      { name: 'Affiliates', path: '/affiliates', keywords: ['affiliates', 'partner', 'commission', 'earn'] },
       { name: 'Order Status', path: '/order-status', keywords: ['order', 'status', 'track', 'tracking', 'delivery'] },
       { name: 'Payment Options', path: '/payment-options', keywords: ['payment', 'pay', 'esewa', 'khalti', 'card', 'cod'] },
       { name: 'My Cart', path: '/cart', keywords: ['cart', 'basket', 'checkout'] },
@@ -1187,15 +1174,11 @@ function LandingPage() {
       {/* Trending Products */}
       <section className="trending-products">
         <h2>OUR TRENDING PRODUCT</h2>
-        <div className="filter-tabs">
-          <button className={activeTab === 'ALL' ? 'active' : ''} onClick={() => setActiveTab('ALL')}>ALL</button>
-          <button className={activeTab === 'NEW' ? 'active' : ''} onClick={() => setActiveTab('NEW')}>NEW ARRIVALS</button>
-        </div>
         {loading ? (
           <div className="loading-message">
             <p>Loading products...</p>
           </div>
-        ) : (
+        ) : displayedProducts.length > 0 ? (
           <div className="product-grid">
             {displayedProducts.map(product => (
             <div key={product.id} className="product-card" onClick={() => navigate(`/product/${product.id}`)}>
@@ -1219,9 +1202,8 @@ function LandingPage() {
             </div>
             ))}
           </div>
-        )}
-        {!loading && filteredProducts.length === 0 && (
-          <p className="no-products">No products found matching your search.</p>
+        ) : (
+          <p className="no-products">No products found. Total products loaded: {allProducts.length}</p>
         )}
         {filteredProducts.length > 8 && (
           <button 
@@ -1250,9 +1232,9 @@ function LandingPage() {
           </div>
           <h3>MEN'S APPAREL</h3>
           <ul>
-            <li onClick={(e) => { e.stopPropagation(); navigate('/mens-jacket'); }}>Men's Jacket</li>
-            <li onClick={(e) => { e.stopPropagation(); navigate('/mens-shirt'); }}>Men's Shirt</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/mens-hoodie'); }}>Men's Hoodie</li>
             <li onClick={(e) => { e.stopPropagation(); navigate('/mens-pants'); }}>Men's Pants</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/mens-jacket'); }}>Men's Jacket</li>
           </ul>
         </div>
         <div className="category-card" onClick={() => navigate('/womens-outlet')} style={{cursor: 'pointer'}}>
@@ -1270,9 +1252,9 @@ function LandingPage() {
           </div>
           <h3>WOMEN'S APPAREL</h3>
           <ul>
-            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-jacket'); }}>Women's Jacket</li>
-            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-shirt'); }}>Women's Shirt</li>
-            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-pants'); }}>Women's Pants</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-skirt'); }}>Women's Skirt</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-blazer'); }}>Women's Blazer</li>
+            <li onClick={(e) => { e.stopPropagation(); navigate('/womens-top'); }}>Women's Top</li>
           </ul>
         </div>
         <div className="category-card" onClick={handleExploreMore} style={{cursor: 'pointer'}}>
@@ -1321,18 +1303,51 @@ function LandingPage() {
         </div>
         <div className="faq-items">
           {(activeFaqTab === 'all' || activeFaqTab === 'returns') && (
-            <div className="faq-item" style={{cursor: 'pointer'}} onClick={() => alert('You can cancel your order within 24 hours of placing it from your profile page.')}>
-              <p>Can I cancel my order?</p>
+            <div 
+              className="faq-item" 
+              style={{cursor: 'pointer'}} 
+              onClick={() => setOpenFaqIndex(openFaqIndex === 0 ? null : 0)}
+            >
+              <p style={{fontWeight: '600', marginBottom: openFaqIndex === 0 ? '8px' : '0'}}>
+                Can I cancel my order?
+              </p>
+              {openFaqIndex === 0 && (
+                <p style={{fontSize: '13px', color: '#666', marginTop: '8px'}}>
+                  You can cancel your order within 24 hours of placing it from your profile page.
+                </p>
+              )}
             </div>
           )}
           {(activeFaqTab === 'all' || activeFaqTab === 'shipping') && (
-            <div className="faq-item" style={{cursor: 'pointer'}} onClick={() => alert('You can change the shipping address before the order is shipped. Contact support for assistance.')}>
-              <p>Can I change the shipping address on my order?</p>
+            <div 
+              className="faq-item" 
+              style={{cursor: 'pointer'}} 
+              onClick={() => setOpenFaqIndex(openFaqIndex === 1 ? null : 1)}
+            >
+              <p style={{fontWeight: '600', marginBottom: openFaqIndex === 1 ? '8px' : '0'}}>
+                Can I change the shipping address on my order?
+              </p>
+              {openFaqIndex === 1 && (
+                <p style={{fontSize: '13px', color: '#666', marginTop: '8px'}}>
+                  You can change the shipping address before the order is shipped. Contact support for assistance.
+                </p>
+              )}
             </div>
           )}
           {(activeFaqTab === 'all' || activeFaqTab === 'returns') && (
-            <div className="faq-item" style={{cursor: 'pointer'}} onClick={() => alert('You cannot modify items after placing an order. Please cancel and create a new order.')}>
-              <p>Can I add or remove an item from my order?</p>
+            <div 
+              className="faq-item" 
+              style={{cursor: 'pointer'}} 
+              onClick={() => setOpenFaqIndex(openFaqIndex === 2 ? null : 2)}
+            >
+              <p style={{fontWeight: '600', marginBottom: openFaqIndex === 2 ? '8px' : '0'}}>
+                Can I add or remove an item from my order?
+              </p>
+              {openFaqIndex === 2 && (
+                <p style={{fontSize: '13px', color: '#666', marginTop: '8px'}}>
+                  You cannot modify items after placing an order. Please cancel and create a new order.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -1345,26 +1360,21 @@ function LandingPage() {
           <ul>
             <li onClick={() => handleCategoryClick('MEN')} style={{cursor: 'pointer'}}>Men</li>
             <li onClick={() => handleCategoryClick('WOMEN')} style={{cursor: 'pointer'}}>Women</li>
-            <li onClick={handleExploreMore} style={{cursor: 'pointer'}}>Brands</li>
-            <li onClick={handleExploreMore} style={{cursor: 'pointer'}}>On Sale</li>
+            <li onClick={handleExploreMore} style={{cursor: 'pointer'}}>sportswear</li>
+            <li onClick={handleExploreMore} style={{cursor: 'pointer'}}>vintage</li>
           </ul>
         </div>
         <div className="footer-section">
           <h4>COMPANY INFO</h4>
           <ul>
             <li onClick={() => navigate('/about')} style={{cursor: 'pointer'}}>About Us</li>
-            <li onClick={() => navigate('/careers')} style={{cursor: 'pointer'}}>Careers</li>
-            <li onClick={() => navigate('/press')} style={{cursor: 'pointer'}}>Press</li>
             <li onClick={() => navigate('/sustainability')} style={{cursor: 'pointer'}}>Sustainability</li>
-            <li onClick={() => navigate('/affiliates')} style={{cursor: 'pointer'}}>Affiliates Program</li>
           </ul>
         </div>
         <div className="footer-section">
           <h4>SUPPORT</h4>
           <ul>
             <li onClick={() => navigate('/faq')} style={{cursor: 'pointer'}}>F.A.Q</li>
-            <li onClick={() => navigate('/faq')} style={{cursor: 'pointer'}}>Shipping</li>
-            <li onClick={() => navigate('/faq')} style={{cursor: 'pointer'}}>Returns</li>
             <li onClick={() => navigate('/order-status')} style={{cursor: 'pointer'}}>Order Status</li>
             <li onClick={() => navigate('/payment-options')} style={{cursor: 'pointer'}}>Payment Options</li>
             <li onClick={() => navigate('/contact')} style={{cursor: 'pointer'}}>Contact Us</li>

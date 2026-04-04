@@ -17,7 +17,8 @@ function WomensOutlet() {
     try {
       const response = await fetch('http://localhost:5000/api/products');
       const data = await response.json();
-      const womensProducts = data.filter(p => p.gender === 'Women' || p.gender === 'Unisex');
+      // Filter by category "Women's Collection"
+      const womensProducts = data.filter(p => p.category === "Women's Collection");
       setProducts(womensProducts);
     } catch (error) {
       console.error('Error fetching products:', error);

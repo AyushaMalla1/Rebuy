@@ -18,9 +18,8 @@ function MensPants() {
       const response = await fetch('http://localhost:5000/api/products');
       const data = await response.json();
       const pants = data.filter(p => 
-        (p.gender === 'Men' || p.gender === 'Unisex') && 
-        (p.category?.toLowerCase().includes('pant') || p.category?.toLowerCase().includes('jean') || 
-         p.name?.toLowerCase().includes('pant') || p.name?.toLowerCase().includes('jean'))
+        p.category === "Men's Collection" && 
+        p.subcategory === "Men's Pants"
       );
       setProducts(pants);
     } catch (error) {
