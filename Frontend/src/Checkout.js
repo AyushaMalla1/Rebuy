@@ -34,7 +34,7 @@ function Checkout() {
 
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    
+
     // Normalize cart items to ensure consistent structure
     const normalizedCart = cart.map(item => {
       // Handle both frontend and backend cart item structures
@@ -43,7 +43,7 @@ function Checkout() {
         const product = item.product;
         const hasDiscount = product.discount && product.discount.percentage > 0;
         const discountedPrice = hasDiscount ? product.price * (1 - product.discount.percentage / 100) : null;
-        
+
         return {
           id: product._id || product,
           name: product.name || item.productName || 'Product',
@@ -76,12 +76,12 @@ function Checkout() {
         };
       }
     });
-    
+
     setCartItems(normalizedCart);
 
     // Load addresses from backend
     loadAddressesFromBackend();
-    
+
     // Load loyalty points
     loadLoyaltyPoints();
   }, []);
@@ -101,20 +101,20 @@ function Checkout() {
         const data = await response.json();
         if (data.customer && data.customer.addresses) {
           setSavedAddresses(data.customer.addresses);
-          
+
           // Check if there's a previously confirmed address in localStorage
           const confirmedAddress = localStorage.getItem('confirmedCheckoutAddress');
-          
+
           if (confirmedAddress) {
             // Use the previously confirmed address
             const addr = JSON.parse(confirmedAddress);
             setShippingAddress(addr);
             setAddressConfirmed(true); // IMPORTANT: Set this to true!
-            
+
             // Find the index of this address in saved addresses
-            const index = data.customer.addresses.findIndex(a => 
-              a.fullName === addr.fullName && 
-              a.phone === addr.phone && 
+            const index = data.customer.addresses.findIndex(a =>
+              a.fullName === addr.fullName &&
+              a.phone === addr.phone &&
               a.landmark === addr.landmark
             );
             if (index !== -1) {
@@ -150,7 +150,7 @@ function Checkout() {
     try {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
-      
+
       if (!token || !user) return;
 
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/customers/${user._id}/loyalty-points`, {
@@ -196,18 +196,18 @@ function Checkout() {
 
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validate required fields
     if (!shippingAddress.fullName.trim()) {
       alert('Please enter your full name');
       return;
     }
-    
+
     if (!shippingAddress.phone.trim()) {
       alert('Please enter your phone number');
       return;
     }
-    
+
     // Validate phone number format (Nepal format)
     const phoneRegex = /^(\+977)?[9][6-9]\d{8}$/;
     const cleanPhone = shippingAddress.phone.replace(/[\s-]/g, '');
@@ -215,31 +215,31 @@ function Checkout() {
       alert('Please enter a valid phone number (e.g., 9812345678 or +9779812345678)');
       return;
     }
-    
+
     if (!shippingAddress.state.trim()) {
       alert('Please select a state');
       return;
     }
-    
+
     if (!shippingAddress.district.trim()) {
       alert('Please select a district');
       return;
     }
-    
+
     if (!shippingAddress.municipality.trim()) {
       alert('Please select a municipality');
       return;
     }
-    
+
     if (!shippingAddress.landmark.trim()) {
       alert('Please enter a landmark');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
-      
+
       if (!token || !user) {
         alert('Please login to save address');
         return;
@@ -270,10 +270,10 @@ function Checkout() {
         setSavedAddresses(data.addresses);
         setSelectedAddressIndex(data.addresses.length - 1);
         setAddressConfirmed(true); // Mark as confirmed when new address is saved
-        
+
         // Save confirmed address to localStorage
         localStorage.setItem('confirmedCheckoutAddress', JSON.stringify(shippingAddress));
-        
+
         setShowAddressForm(false);
         setShowAddressModal(false); // Close modal after saving
         alert('Address saved successfully!');
@@ -322,15 +322,15 @@ function Checkout() {
     if (selectedAddressIndex !== null) {
       setAddressConfirmed(true);
       setShowAddressModal(false);
-      
+
       // Save confirmed address to localStorage
       localStorage.setItem('confirmedCheckoutAddress', JSON.stringify(shippingAddress));
-    } 
+    }
     // If no address is selected but there's a default address loaded, use it
     else if (shippingAddress.fullName && shippingAddress.state) {
       setAddressConfirmed(true);
       setShowAddressModal(false);
-      
+
       // Save confirmed address to localStorage
       localStorage.setItem('confirmedCheckoutAddress', JSON.stringify(shippingAddress));
     }
@@ -342,7 +342,7 @@ function Checkout() {
 
   const handlePaymentSubmit = (e) => {
     e.preventDefault();
-    
+
     // Check if address is filled
     if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.address || !shippingAddress.city) {
       alert('Please add a delivery address first');
@@ -354,7 +354,7 @@ function Checkout() {
   const handleEsewaPayment = async (orderId) => {
     try {
       setPaymentProcessing(true);
-      
+
       // Call backend to initiate payment
       const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payment/initiate`, {
         method: 'POST',
@@ -364,9 +364,9 @@ function Checkout() {
         },
         body: JSON.stringify({ orderId })
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success && data.paymentUrl && data.paymentData) {
         // Create form and submit to eSewa
         const form = document.createElement('form');
@@ -385,13 +385,17 @@ function Checkout() {
         form.submit();
         document.body.removeChild(form);
       } else {
-        alert('Payment gateway not configured. Please contact support.');
+        alert('eSewa payment gateway is currently unavailable. Please use Cash on Delivery (COD) instead.');
         setPaymentProcessing(false);
+        // Auto-switch to COD
+        setPaymentMethod('cod');
       }
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Failed to initiate payment. Please try again.');
+      alert('eSewa service is currently unavailable. Please use Cash on Delivery (COD) instead.');
       setPaymentProcessing(false);
+      // Auto-switch to COD
+      setPaymentMethod('cod');
     }
   };
 
@@ -422,13 +426,13 @@ function Checkout() {
 
     try {
       const user = JSON.parse(localStorage.getItem('user'));
-      
+
       if (!user || !user._id) {
         alert('Please login to place an order');
         navigate('/login');
         return;
       }
-      
+
       // Prepare order data for backend with new address format
       const orderData = {
         customerId: user._id,
@@ -468,19 +472,19 @@ function Checkout() {
 
       // Create order in backend first
       const response = await orderAPI.create(orderData);
-      
+
       if (!response || !response.order) {
         throw new Error('Invalid response from server');
       }
-      
+
       const orderId = response.order._id;
-      
+
       console.log('Order created successfully! Order ID:', orderId);
       console.log('Full order details:', response.order);
-      
+
       // Store order ID in localStorage for manual verification
       localStorage.setItem('lastOrderId', orderId);
-      
+
       // Handle payment based on method
       if (paymentMethod === 'esewa') {
         await handleEsewaPayment(orderId);
@@ -501,7 +505,7 @@ function Checkout() {
   const completeOrderSuccess = async (order) => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));
-      
+
       // Save order to localStorage for immediate display
       const orders = JSON.parse(localStorage.getItem('orders') || '[]');
       orders.push({
@@ -528,7 +532,7 @@ function Checkout() {
 
       // Clear cart from localStorage
       localStorage.setItem('cart', JSON.stringify([]));
-      
+
       // Clear cart from backend database
       if (user && user._id) {
         try {
@@ -631,11 +635,11 @@ function Checkout() {
 
             {/* Product List */}
             <div className="checkout-section">
-              <h2 style={{fontSize: '18px', color: '#333', marginBottom: '20px', fontWeight: '600'}}>Order Items</h2>
+              <h2 style={{ fontSize: '18px', color: '#333', marginBottom: '20px', fontWeight: '600' }}>Order Items</h2>
               {Array.isArray(cartItems) && cartItems.map((item, index) => (
                 <div key={item.id || index} className="product-card-checkout">
-                  <img 
-                    src={item.image || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg'} 
+                  <img
+                    src={item.image || item.productImage || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg'}
                     alt={item.name || item.productName || 'Product'}
                     loading="lazy"
                     onError={(e) => {
@@ -667,9 +671,9 @@ function Checkout() {
                   <span className="points-badge">{loyaltyPoints} points</span>
                 </div>
                 <p className="points-info">You have {loyaltyPoints} loyalty points available (Rs. {loyaltyPoints})</p>
-                
+
                 {!applyingPoints ? (
-                  <button 
+                  <button
                     className="apply-points-btn"
                     onClick={handleApplyPoints}
                     disabled={loyaltyPoints === 0}
@@ -682,7 +686,7 @@ function Checkout() {
                       <FiCheck className="check-icon" />
                       <span>{pointsToRedeem} points applied (Rs. {pointsToRedeem} discount)</span>
                     </div>
-                    <button 
+                    <button
                       className="remove-points-btn"
                       onClick={handleRemovePoints}
                     >
@@ -696,6 +700,20 @@ function Checkout() {
             {/* Payment Method */}
             <div className="order-summary">
               <h2>Select A Payment Method</h2>
+
+              {/* eSewa Status Notice */}
+              <div style={{
+                padding: '12px',
+                background: '#fff3cd',
+                border: '1px solid #ffc107',
+                borderRadius: '8px',
+                marginBottom: '15px',
+                fontSize: '13px',
+                color: '#856404'
+              }}>
+                ℹ️ Note: If eSewa environment is temporarily unavailable, we recommend using Cash on Delivery (COD) for a smooth checkout experience.
+              </div>
+
               <div className="payment-options">
                 <label className={`payment-option ${paymentMethod === 'cod' ? 'selected' : ''}`}>
                   <input
@@ -707,7 +725,7 @@ function Checkout() {
                   />
                   <div className="option-content">
                     <div className="option-icon">
-                      <FiPackage style={{fontSize: '24px', color: '#00bcd4'}} />
+                      <FiPackage style={{ fontSize: '24px', color: '#00bcd4' }} />
                     </div>
                     <div>
                       <h3>Cash on Delivery (COD)</h3>
@@ -725,7 +743,7 @@ function Checkout() {
                   />
                   <div className="option-content">
                     <div className="option-icon">
-                      <img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" style={{width: '50px'}} />
+                      <img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" style={{ width: '50px' }} />
                     </div>
                     <div>
                       <h3>eSewa</h3>
@@ -736,7 +754,7 @@ function Checkout() {
             </div>
 
             {/* Order Summary */}
-            <div className="order-summary" style={{marginTop: '20px'}}>
+            <div className="order-summary" style={{ marginTop: '20px' }}>
               <h2>Order Summary</h2>
               <div className="summary-totals">
                 <div className="total-row">
@@ -744,7 +762,7 @@ function Checkout() {
                   <span>Rs. {cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()}</span>
                 </div>
                 {getBundleDiscount() > 0 && (
-                  <div className="total-row" style={{color: '#10b981'}}>
+                  <div className="total-row" style={{ color: '#10b981' }}>
                     <span>Bundle Discount</span>
                     <span>- Rs. {getBundleDiscount().toLocaleString()}</span>
                   </div>
@@ -770,7 +788,7 @@ function Checkout() {
                   <p className="savings-note">💰 You saved Rs. {pointsDiscount} with loyalty points!</p>
                 )}
                 {getBundleDiscount() > 0 && (
-                  <p className="savings-note" style={{color: '#10b981'}}>🎁 You saved Rs. {getBundleDiscount().toLocaleString()} with bundle deals!</p>
+                  <p className="savings-note" style={{ color: '#10b981' }}>🎁 You saved Rs. {getBundleDiscount().toLocaleString()} with bundle deals!</p>
                 )}
               </div>
 
@@ -796,7 +814,7 @@ function Checkout() {
                 <FiX />
               </button>
             </div>
-            
+
             <div className="address-modal-body">
               {/* Always show Add New Address button */}
               <button className="add-new-address-btn" onClick={() => {
@@ -822,8 +840,8 @@ function Checkout() {
                 <>
                   <div className="saved-addresses-list">
                     {savedAddresses.map((addr, index) => (
-                      <div 
-                        key={index} 
+                      <div
+                        key={index}
                         className={`saved-address-card ${selectedAddressIndex === index ? 'selected' : ''}`}
                         onClick={() => handleSelectAddress(index)}
                       >
@@ -834,11 +852,11 @@ function Checkout() {
                           <p>{addr.landmark}</p>
                           {addr.isDefault && <span className="default-badge">Default</span>}
                         </div>
-                        <button 
+                        <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEditAddress(index);
-                          }} 
+                          }}
                           className="edit-address-btn"
                         >
                           Edit
@@ -880,7 +898,7 @@ function Checkout() {
                 <FiX />
               </button>
             </div>
-            
+
             <div className="address-modal-body">
               <form onSubmit={handleAddressSubmit}>
                 <div className="form-row">
@@ -889,7 +907,7 @@ function Checkout() {
                     <input
                       type="text"
                       value={shippingAddress.fullName}
-                      onChange={(e) => setShippingAddress({...shippingAddress, fullName: e.target.value})}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, fullName: e.target.value })}
                       required
                     />
                   </div>
@@ -899,7 +917,7 @@ function Checkout() {
                     <input
                       type="tel"
                       value={shippingAddress.phone}
-                      onChange={(e) => setShippingAddress({...shippingAddress, phone: e.target.value})}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
                       placeholder="+977"
                       required
                     />
@@ -912,21 +930,21 @@ function Checkout() {
                     <button
                       type="button"
                       className={`label-btn ${shippingAddress.addressLabel === 'Home' ? 'active' : ''}`}
-                      onClick={() => setShippingAddress({...shippingAddress, addressLabel: 'Home'})}
+                      onClick={() => setShippingAddress({ ...shippingAddress, addressLabel: 'Home' })}
                     >
                       Home
                     </button>
                     <button
                       type="button"
                       className={`label-btn ${shippingAddress.addressLabel === 'Office' ? 'active' : ''}`}
-                      onClick={() => setShippingAddress({...shippingAddress, addressLabel: 'Office'})}
+                      onClick={() => setShippingAddress({ ...shippingAddress, addressLabel: 'Office' })}
                     >
                       Office
                     </button>
                     <button
                       type="button"
                       className={`label-btn ${shippingAddress.addressLabel === 'Other' ? 'active' : ''}`}
-                      onClick={() => setShippingAddress({...shippingAddress, addressLabel: 'Other'})}
+                      onClick={() => setShippingAddress({ ...shippingAddress, addressLabel: 'Other' })}
                     >
                       Other
                     </button>
@@ -938,7 +956,7 @@ function Checkout() {
                   <div className="address-selects-compact">
                     <select
                       value={shippingAddress.state}
-                      onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
                       required
                     >
                       <option value="">Select State</option>
@@ -952,7 +970,7 @@ function Checkout() {
                     </select>
                     <select
                       value={shippingAddress.district}
-                      onChange={(e) => setShippingAddress({...shippingAddress, district: e.target.value})}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, district: e.target.value })}
                       required
                     >
                       <option value="">Select District</option>
@@ -962,7 +980,7 @@ function Checkout() {
                     </select>
                     <select
                       value={shippingAddress.municipality}
-                      onChange={(e) => setShippingAddress({...shippingAddress, municipality: e.target.value})}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, municipality: e.target.value })}
                       required
                     >
                       <option value="">Select Municipality</option>
@@ -978,7 +996,7 @@ function Checkout() {
                   <input
                     type="text"
                     value={shippingAddress.landmark}
-                    onChange={(e) => setShippingAddress({...shippingAddress, landmark: e.target.value})}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, landmark: e.target.value })}
                     placeholder="Near landmark or building"
                     required
                   />
@@ -989,7 +1007,7 @@ function Checkout() {
                     <input
                       type="checkbox"
                       checked={shippingAddress.isDefault}
-                      onChange={(e) => setShippingAddress({...shippingAddress, isDefault: e.target.checked})}
+                      onChange={(e) => setShippingAddress({ ...shippingAddress, isDefault: e.target.checked })}
                     />
                     <span>Set as Default Shipping Address</span>
                   </label>
@@ -1014,7 +1032,7 @@ function Checkout() {
             <button className="modal-close" onClick={() => setShowEsewaModal(false)}>
               <FiX />
             </button>
-            
+
             <div className="modal-header">
               <img src="https://esewa.com.np/common/images/esewa_logo.png" alt="eSewa" className="esewa-logo" />
               <h2>Pay with eSewa</h2>
@@ -1051,7 +1069,7 @@ function Checkout() {
                 <span>PAYMENT METHOD</span>
               </div>
 
-              <button 
+              <button
                 className="esewa-pay-btn"
                 onClick={() => {
                   setShowEsewaModal(false);
