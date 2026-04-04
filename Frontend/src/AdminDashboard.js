@@ -7,6 +7,7 @@ import {
   FiBarChart2, FiPieChart, FiActivity, FiClock, FiAlertCircle,
   FiUserCheck, FiMonitor, FiAward, FiBell, FiMessageSquare, FiGrid, FiUser, FiChevronRight
 } from 'react-icons/fi';
+import { FaEdit, FaUser as FaUserIcon, FaChartBar, FaBox, FaShoppingCart, FaChartLine } from 'react-icons/fa';
 import { 
   MdPeople, MdStorefront, MdInventory, MdAttachMoney, MdShowChart, MdAccessTime
 } from 'react-icons/md';
@@ -28,9 +29,16 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedMetric, setSelectedMetric] = useState(null); // null, 'revenue', 'orders', 'sellers', 'customers', 'avgOrder', 'commission', 'topCategory'
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState({
+    users: [],
+    products: [],
+    orders: [],
+    sellers: []
+  });
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [auditFilter, setAuditFilter] = useState('all');
 
@@ -91,6 +99,16 @@ function AdminDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [profileData, setProfileData] = useState({
+    fullName: 'Administrator',
+    email: 'admin@rebuy.com',
+    phone: '',
+    city: '',
+    address: '',
+    country: 'Nepal'
+  });
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileImage, setProfileImage] = useState('https://i.pravatar.cc/100');
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
@@ -218,7 +236,7 @@ function AdminDashboard() {
 
       console.log('Fetching admin data from backend...');
 
-      const [statsRes, usersRes, pendingSellersRes, approvedSellersRes, suspendedSellersRes, rejectedSellersRes, productsRes, ordersRes, fraudRes, auditRes, announcementsRes, loyaltyRes, settingsRes] = await Promise.all([
+      const [statsRes, usersRes, pendingSellersRes, approvedSellersRes, suspendedSellersRes, rejectedSellersRes, productsRes, ordersRes, fraudRes, auditRes, announcementsRes, loyaltyRes, settingsRes, profileRes] = await Promise.all([
         fetch('http://localhost:5000/api/admin/stats', { headers }).catch(err => {
           console.error('Stats fetch error:', err);
           return { ok: false, status: 500 };
@@ -270,6 +288,10 @@ function AdminDashboard() {
         fetch('http://localhost:5000/api/admin/settings', { headers }).catch(err => {
           console.error('Settings fetch error:', err);
           return { ok: false, status: 500 };
+        }),
+        fetch('http://localhost:5000/api/admin/profile', { headers }).catch(err => {
+          console.error('Profile fetch error:', err);
+          return { ok: false, status: 500 };
         })
       ]);
 
@@ -286,7 +308,8 @@ function AdminDashboard() {
         audit: auditRes.status,
         announcements: announcementsRes.status,
         loyalty: loyaltyRes.status,
-        settings: settingsRes.status
+        settings: settingsRes.status,
+        profile: profileRes.status
       });
 
       // Check for authentication errors
@@ -311,6 +334,7 @@ function AdminDashboard() {
       const announcementsData = await announcementsRes.json().catch(() => ({ success: false }));
       const loyaltyData = await loyaltyRes.json().catch(() => ({ success: false }));
       const settingsData = await settingsRes.json().catch(() => ({ success: false }));
+      const profileDataRes = await profileRes.json().catch(() => ({ success: false }));
 
       console.log('Parsed data:', { stats, usersData, pendingSellersData, approvedSellersData, suspendedSellersData, rejectedSellersData, productsData, ordersData, fraudData, auditData, announcementsData, loyaltyData, settingsData });
 
@@ -413,6 +437,22 @@ function AdminDashboard() {
       }
       if (settingsData.success) {
         setSettings(settingsData.settings || settings);
+      }
+      if (profileDataRes.success && profileDataRes.admin) {
+        const admin = profileDataRes.admin;
+        setProfileData({
+          fullName: admin.fullName || admin.name || 'Administrator',
+          email: admin.email || 'admin@rebuy.com',
+          phone: admin.phone || '',
+          city: admin.city || '',
+          address: admin.address || '',
+          country: admin.country || 'Nepal'
+        });
+        if (admin.profileImage) {
+          setProfileImage(admin.profileImage);
+        }
+      } else {
+        console.log('Profile data not available, using defaults');
       }
 
       console.log('Admin data loaded successfully');
@@ -903,6 +943,98 @@ function AdminDashboard() {
     } catch (err) {
       console.error(err);
       alert('Error saving settings');
+    }
+  };
+
+  // Search functionality
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setShowSearchResults(false);
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    
+    // Search users
+    const filteredUsers = users.filter(user => 
+      user.name?.toLowerCase().includes(lowerQuery) ||
+      user.email?.toLowerCase().includes(lowerQuery) ||
+      user.type?.toLowerCase().includes(lowerQuery)
+    );
+
+    // Search products
+    const filteredProducts = products.filter(product =>
+      product.name?.toLowerCase().includes(lowerQuery) ||
+      product.seller?.toLowerCase().includes(lowerQuery) ||
+      product.status?.toLowerCase().includes(lowerQuery)
+    );
+
+    // Search orders
+    const filteredOrders = orders.filter(order =>
+      order.id?.toLowerCase().includes(lowerQuery) ||
+      order.customer?.toLowerCase().includes(lowerQuery) ||
+      order.product?.toLowerCase().includes(lowerQuery) ||
+      order.status?.toLowerCase().includes(lowerQuery)
+    );
+
+    // Search sellers (from all seller lists)
+    const allSellers = [...pendingSellers, ...approvedSellers, ...suspendedSellers, ...rejectedSellers];
+    const filteredSellers = allSellers.filter(seller =>
+      seller.name?.toLowerCase().includes(lowerQuery) ||
+      seller.email?.toLowerCase().includes(lowerQuery) ||
+      seller.storeName?.toLowerCase().includes(lowerQuery)
+    );
+
+    setSearchResults({
+      users: filteredUsers.slice(0, 5),
+      products: filteredProducts.slice(0, 5),
+      orders: filteredOrders.slice(0, 5),
+      sellers: filteredSellers.slice(0, 5)
+    });
+
+    setShowSearchResults(true);
+  };
+
+  const handleProfileImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setProfileImage(reader.result);
+      setProfileData({ ...profileData, profileImage: reader.result });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/admin/profile', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...profileData,
+          profileImage: profileImage
+        }),
+      });
+
+      if (response.ok) {
+        alert('Profile updated successfully!');
+        setIsEditingProfile(false);
+      } else {
+        const data = await response.json();
+        alert(data.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile');
     }
   };
 
@@ -1546,6 +1678,7 @@ function AdminDashboard() {
               {activeTab === 'audit' && 'Audit Log'}
               {activeTab === 'announcements' && 'Announcements'}
               {activeTab === 'loyalty' && 'Loyalty Points'}
+              {activeTab === 'profile' && 'Admin Profile'}
               {activeTab === 'settings' && 'Settings'}
             </h1>
             <p className="header-subtitle">
@@ -1560,6 +1693,7 @@ function AdminDashboard() {
               {activeTab === 'audit' && 'View system activity logs'}
               {activeTab === 'announcements' && 'Manage platform announcements'}
               {activeTab === 'loyalty' && 'Manage loyalty points program'}
+              {activeTab === 'profile' && 'Manage your admin account'}
               {activeTab === 'settings' && 'Configure platform settings'}
             </p>
           </div>
@@ -1663,10 +1797,126 @@ function AdminDashboard() {
                 type="text" 
                 placeholder="Search anything..." 
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearch(e.target.value)}
+                onFocus={() => searchQuery && setShowSearchResults(true)}
               />
+              
+              {/* Search Results Dropdown */}
+              {showSearchResults && (
+                <div className="search-results-dropdown">
+                  <div className="search-results-header">
+                    <h4>Search Results</h4>
+                    <button onClick={() => setShowSearchResults(false)} className="close-search-btn">
+                      <FiXCircle />
+                    </button>
+                  </div>
+                  
+                  {searchResults.users.length === 0 && 
+                   searchResults.products.length === 0 && 
+                   searchResults.orders.length === 0 && 
+                   searchResults.sellers.length === 0 ? (
+                    <div className="no-search-results">
+                      <p>No results found for "{searchQuery}"</p>
+                    </div>
+                  ) : (
+                    <div className="search-results-content">
+                      {searchResults.users.length > 0 && (
+                        <div className="search-category">
+                          <h5>Users ({searchResults.users.length})</h5>
+                          {searchResults.users.map(user => (
+                            <div 
+                              key={user.id} 
+                              className="search-result-item"
+                              onClick={() => {
+                                setActiveTab('users');
+                                setShowSearchResults(false);
+                                setSearchQuery('');
+                              }}
+                            >
+                              <FiUsers className="result-icon" />
+                              <div>
+                                <p className="result-title">{user.name}</p>
+                                <p className="result-subtitle">{user.email} • {user.type}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {searchResults.products.length > 0 && (
+                        <div className="search-category">
+                          <h5>Products ({searchResults.products.length})</h5>
+                          {searchResults.products.map(product => (
+                            <div 
+                              key={product.id} 
+                              className="search-result-item"
+                              onClick={() => {
+                                setActiveTab('products');
+                                setShowSearchResults(false);
+                                setSearchQuery('');
+                              }}
+                            >
+                              <FiPackage className="result-icon" />
+                              <div>
+                                <p className="result-title">{product.name}</p>
+                                <p className="result-subtitle">Rs. {product.price} • {product.seller}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {searchResults.orders.length > 0 && (
+                        <div className="search-category">
+                          <h5>Orders ({searchResults.orders.length})</h5>
+                          {searchResults.orders.map(order => (
+                            <div 
+                              key={order.id} 
+                              className="search-result-item"
+                              onClick={() => {
+                                setActiveTab('orders');
+                                setShowSearchResults(false);
+                                setSearchQuery('');
+                              }}
+                            >
+                              <FiShoppingBag className="result-icon" />
+                              <div>
+                                <p className="result-title">{order.customer}</p>
+                                <p className="result-subtitle">Rs. {order.amount} • {order.status}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {searchResults.sellers.length > 0 && (
+                        <div className="search-category">
+                          <h5>Sellers ({searchResults.sellers.length})</h5>
+                          {searchResults.sellers.map(seller => (
+                            <div 
+                              key={seller.id} 
+                              className="search-result-item"
+                              onClick={() => {
+                                setActiveTab('seller-approval');
+                                setShowSearchResults(false);
+                                setSearchQuery('');
+                              }}
+                            >
+                              <MdStorefront className="result-icon" />
+                              <div>
+                                <p className="result-title">{seller.storeName}</p>
+                                <p className="result-subtitle">{seller.name} • {seller.email}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="admin-info">
+            <div className="admin-info" onClick={() => setActiveTab('profile')} style={{cursor: 'pointer'}}>
               <div className="admin-avatar">
                 <FiShield />
               </div>
@@ -1711,7 +1961,6 @@ function AdminDashboard() {
                   <div className="stat-content">
                     <p className="stat-label">Total Users</p>
                     <h3 className="stat-value">{totalUsers}</h3>
-                    <p className="stat-description">+5 new users this month</p>
                   </div>
                 </div>
                 <div className="click-indicator">
@@ -1731,7 +1980,6 @@ function AdminDashboard() {
                   <div className="stat-content">
                     <p className="stat-label">Total Sellers</p>
                     <h3 className="stat-value">{totalSellers}</h3>
-                    <p className="stat-description">+2 new sellers this month</p>
                   </div>
                 </div>
                 <div className="click-indicator">
@@ -1751,7 +1999,6 @@ function AdminDashboard() {
                   <div className="stat-content">
                     <p className="stat-label">Total Products</p>
                     <h3 className="stat-value">{totalProducts}</h3>
-                    <p className="stat-description">{pendingProducts} pending approval</p>
                   </div>
                 </div>
                 <div className="click-indicator">
@@ -1771,7 +2018,6 @@ function AdminDashboard() {
                   <div className="stat-content">
                     <p className="stat-label">Total Orders</p>
                     <h3 className="stat-value">{totalOrders}</h3>
-                    <p className="stat-description">+8% from last month</p>
                   </div>
                 </div>
                 <div className="click-indicator">
@@ -1787,7 +2033,6 @@ function AdminDashboard() {
                   <div className="stat-content">
                     <p className="stat-label">Growth Rate</p>
                     <h3 className="stat-value">12.5%</h3>
-                    <p className="stat-description">Excellent performance</p>
                   </div>
                 </div>
               </div>
@@ -1804,7 +2049,6 @@ function AdminDashboard() {
                   <div className="stat-content">
                     <p className="stat-label">Total Revenue</p>
                     <h3 className="stat-value">Rs. {totalRevenue.toLocaleString()}</h3>
-                    <p className="stat-description">+15% from last month</p>
                   </div>
                 </div>
                 <div className="click-indicator">
@@ -3078,6 +3322,59 @@ function AdminDashboard() {
           </div>
         )}
 
+        {/* Profile Tab */}
+        {activeTab === 'profile' && (
+          <div className="products-section" style={{marginTop: '40px'}}>
+            {/* Profile Card */}
+            <div className="profile-card">
+              {/* Profile Header */}
+              <div className="profile-header">
+                <div>
+                  <h2 className="profile-store-name">
+                    Administrator
+                  </h2>
+                  <span className="profile-verified-badge">
+                    Admin Account
+                  </span>
+                </div>
+              </div>
+
+              <form onSubmit={handleProfileUpdate}>
+                {/* Personal Information */}
+                <div className="profile-section">
+                  <h3 className="profile-section-title">
+                    <FaUserIcon /> Personal Information
+                  </h3>
+                  <div className="profile-form-grid">
+                    <div>
+                      <label className="profile-form-label">
+                        FULL NAME
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.fullName}
+                        disabled
+                        className="profile-form-input"
+                      />
+                    </div>
+                    <div>
+                      <label className="profile-form-label">
+                        EMAIL ADDRESS
+                      </label>
+                      <input
+                        type="email"
+                        value={profileData.email}
+                        disabled
+                        className="profile-form-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <div className="content-section">
@@ -3091,6 +3388,7 @@ function AdminDashboard() {
                       type="text" 
                       value={settings.siteName}
                       onChange={(e) => setSettings({...settings, siteName: e.target.value})}
+                      placeholder="Rebuy"
                     />
                   </div>
                   <div className="form-group">
@@ -3099,6 +3397,7 @@ function AdminDashboard() {
                       type="email" 
                       value={settings.siteEmail}
                       onChange={(e) => setSettings({...settings, siteEmail: e.target.value})}
+                      placeholder="support@rebuy.com"
                     />
                   </div>
                   <div className="form-group">
@@ -3107,15 +3406,20 @@ function AdminDashboard() {
                       type="text" 
                       value={settings.sitePhone}
                       onChange={(e) => setSettings({...settings, sitePhone: e.target.value})}
+                      placeholder="+977-1-XXXXXXX"
                     />
                   </div>
                   <div className="form-group">
                     <label>Currency</label>
-                    <input 
-                      type="text" 
+                    <select 
                       value={settings.currency}
                       onChange={(e) => setSettings({...settings, currency: e.target.value})}
-                    />
+                    >
+                      <option value="NPR">NPR - Nepalese Rupee</option>
+                      <option value="USD">USD - US Dollar</option>
+                      <option value="EUR">EUR - Euro</option>
+                      <option value="INR">INR - Indian Rupee</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -3129,6 +3433,7 @@ function AdminDashboard() {
                       type="number" 
                       value={settings.taxRate}
                       onChange={(e) => setSettings({...settings, taxRate: parseFloat(e.target.value)})}
+                      placeholder="13"
                     />
                   </div>
                   <div className="form-group">
@@ -3137,6 +3442,7 @@ function AdminDashboard() {
                       type="number" 
                       value={settings.shippingFee}
                       onChange={(e) => setSettings({...settings, shippingFee: parseFloat(e.target.value)})}
+                      placeholder="100"
                     />
                   </div>
                   <div className="form-group">
@@ -3145,6 +3451,7 @@ function AdminDashboard() {
                       type="number" 
                       value={settings.freeShippingThreshold}
                       onChange={(e) => setSettings({...settings, freeShippingThreshold: parseFloat(e.target.value)})}
+                      placeholder="5000"
                     />
                   </div>
                   <div className="form-group">
@@ -3153,6 +3460,29 @@ function AdminDashboard() {
                       type="number" 
                       value={settings.minOrderAmount}
                       onChange={(e) => setSettings({...settings, minOrderAmount: parseFloat(e.target.value)})}
+                      placeholder="1000"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Platform Commission Rate (%)</label>
+                    <input 
+                      type="number" 
+                      value={settings.commissionRate || 5}
+                      onChange={(e) => setSettings({...settings, commissionRate: parseFloat(e.target.value)})}
+                      placeholder="5"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Return Window (Days)</label>
+                    <input 
+                      type="number" 
+                      value={settings.returnWindow || 7}
+                      onChange={(e) => setSettings({...settings, returnWindow: parseInt(e.target.value)})}
+                      placeholder="7"
+                      min="0"
+                      max="30"
                     />
                   </div>
                 </div>
@@ -3204,23 +3534,10 @@ function AdminDashboard() {
 
               <div className="settings-section">
                 <h3>Payment Gateway Configuration</h3>
+                <p style={{fontSize: '13px', color: '#666', marginBottom: '20px'}}>
+                  Configure eSewa payment gateway. COD (Cash on Delivery) is always available and doesn't require configuration.
+                </p>
                 <div className="form-grid">
-                  <div className="form-group">
-                    <label>Payment Provider</label>
-                    <select 
-                      value={settings.paymentGateway?.provider || 'none'}
-                      onChange={(e) => setSettings({
-                        ...settings, 
-                        paymentGateway: {...settings.paymentGateway, provider: e.target.value}
-                      })}
-                    >
-                      <option value="none">None</option>
-                      <option value="stripe">Stripe</option>
-                      <option value="paypal">PayPal</option>
-                      <option value="esewa">eSewa</option>
-                      <option value="khalti">Khalti</option>
-                    </select>
-                  </div>
                   <div className="form-group">
                     <label>Merchant ID</label>
                     <input 
@@ -3230,17 +3547,7 @@ function AdminDashboard() {
                         ...settings, 
                         paymentGateway: {...settings.paymentGateway, merchantId: e.target.value}
                       })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>API Key</label>
-                    <input 
-                      type="password" 
-                      value={settings.paymentGateway?.apiKey || ''}
-                      onChange={(e) => setSettings({
-                        ...settings, 
-                        paymentGateway: {...settings.paymentGateway, apiKey: e.target.value}
-                      })}
+                      placeholder="EPAYTEST"
                     />
                   </div>
                   <div className="form-group">
@@ -3252,6 +3559,7 @@ function AdminDashboard() {
                         ...settings, 
                         paymentGateway: {...settings.paymentGateway, secretKey: e.target.value}
                       })}
+                      placeholder="••••••••••••"
                     />
                   </div>
                 </div>
@@ -3265,7 +3573,7 @@ function AdminDashboard() {
                         paymentGateway: {...settings.paymentGateway, isEnabled: e.target.checked}
                       })}
                     />
-                    Enable Payment Gateway
+                    Enable eSewa Payment Gateway
                   </label>
                 </div>
                 <div className="form-group-checkbox">
@@ -3278,7 +3586,7 @@ function AdminDashboard() {
                         paymentGateway: {...settings.paymentGateway, testMode: e.target.checked}
                       })}
                     />
-                    Test Mode
+                    Test Mode (Use test credentials)
                   </label>
                 </div>
               </div>
