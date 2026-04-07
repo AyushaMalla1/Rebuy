@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const { getEnhancedContext, forceRefreshCache } = require('../utils/chatbotContext');
+const ChatbotHistory = require('../models/ChatbotHistory');
 
 // Force refresh cache on module load
 forceRefreshCache().then(() => {
@@ -15,6 +16,23 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'sk-or-v1-876e8d6b8
 
 // Conversation history storage (in production, use Redis or database)
 const conversationHistory = new Map();
+
+// Helper function to save conversation to database
+async function saveChatbotHistory(user_id, role, message, reply, intent) {
+    try {
+        const conversation = new ChatbotHistory({
+            user_id: user_id || 'guest',
+            role: role || 'Guest',
+            message,
+            reply,
+            intent: intent || 'general_chat'
+        });
+        await conversation.save();
+        console.log('[Chatbot] Conversation saved to database');
+    } catch (error) {
+        console.error('[Chatbot] Failed to save conversation:', error);
+    }
+}
 
 // ─── Off-topic guard ────────────────────────────────────────────────────────
 // Keywords that are clearly unrelated to Rebuy / e-commerce / fashion
@@ -69,9 +87,12 @@ router.post('/', async (req, res) => {
         // ── Off-topic check ──────────────────────────────────────────────────
         if (isOffTopic(message)) {
             console.log(`[Chatbot] Off-topic message blocked: "${message}"`);
-            return res.json({
-                reply: "Sorry, I only give Rebuy related answers. You can ask me about products, orders, shipping, payments, returns, or anything related to the Rebuy platform! 😊"
-            });
+            const reply = "Sorry, I only give Rebuy related answers. You can ask me about products, orders, shipping, payments, returns, or anything related to the Rebuy platform! 😊";
+            
+            // Save off-topic conversation
+            await saveChatbotHistory(user_id, role, message, reply, 'general_chat');
+            
+            return res.json({ reply });
         }
         // ────────────────────────────────────────────────────────────────────
 
@@ -192,20 +213,33 @@ RESPONSE STYLE:
         }
 
         if (reply && reply.trim().length >= 15) {
+            // Save conversation to database
+            await saveChatbotHistory(user_id, role, message, reply, 'general_chat');
+            
             res.json({ reply: reply.trim() });
         } else {
             // All models failed — return a clean, friendly message
             console.error('[Chatbot] All models failed. Last error:', lastError?.response?.data || lastError?.message);
-            res.json({
-                reply: "I'm experiencing high traffic right now. Please try again in a moment! 😊"
-            });
+            const fallbackReply = "I'm experiencing high traffic right now. Please try again in a moment! 😊";
+            
+            // Save failed conversation
+            await saveChatbotHistory(user_id, role, message, fallbackReply, 'general_chat');
+            
+            res.json({ reply: fallbackReply });
         }
 
     } catch (error) {
         console.error('Chatbot route error:', error.message);
-        res.json({ 
-            reply: "I'm having a bit of trouble right now. Please try again in a moment! 😊"
-        });
+        const errorReply = "I'm having a bit of trouble right now. Please try again in a moment! 😊";
+        
+        // Try to save error conversation
+        try {
+            await saveChatbotHistory(req.body.user_id, req.body.role, req.body.message, errorReply, 'general_chat');
+        } catch (saveError) {
+            console.error('Failed to save error conversation:', saveError);
+        }
+        
+        res.json({ reply: errorReply });
     }
 });
 
