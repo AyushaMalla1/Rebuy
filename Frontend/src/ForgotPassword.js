@@ -13,6 +13,34 @@ function ForgotPassword() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [otpExpiry, setOtpExpiry] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState(600); // 10 minutes in seconds
+  const [canResend, setCanResend] = useState(false);
+
+  // Countdown timer effect
+  React.useEffect(() => {
+    if (step === 2 && otpExpiry) {
+      const timer = setInterval(() => {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.floor((otpExpiry - now) / 1000));
+        setTimeRemaining(remaining);
+        
+        if (remaining === 0) {
+          setCanResend(true);
+          clearInterval(timer);
+        }
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [step, otpExpiry]);
+
+  // Format time as MM:SS
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
@@ -27,6 +55,9 @@ function ForgotPassword() {
       
       if (response.data.success) {
         setMessage('OTP has been sent to your email. Please check your inbox.');
+        setOtpExpiry(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+        setTimeRemaining(600);
+        setCanResend(false);
         setStep(2); // Move to OTP verification step
       } else {
         setError(response.data.message || 'Failed to send OTP');
@@ -116,6 +147,10 @@ function ForgotPassword() {
       
       if (response.data.success) {
         setMessage('New OTP has been sent to your email.');
+        setOtpExpiry(Date.now() + 10 * 60 * 1000); // Reset 10 minutes timer
+        setTimeRemaining(600);
+        setCanResend(false);
+        setOtp(''); // Clear previous OTP
       } else {
         setError('Failed to resend OTP');
       }
@@ -171,6 +206,59 @@ function ForgotPassword() {
               {message && <div className="success-message">{message}</div>}
               {error && <div className="error-message">{error}</div>}
 
+              {/* Countdown Timer */}
+              {timeRemaining > 0 ? (
+                <div style={{
+                  background: '#e0f7fa',
+                  border: '2px solid #00bcd4',
+                  borderRadius: '10px',
+                  padding: '15px',
+                  marginBottom: '20px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px'
+                  }}>
+                    <span style={{fontSize: '20px'}}>⏰</span>
+                    <div>
+                      <div style={{
+                        fontSize: '24px',
+                        fontWeight: 'bold',
+                        color: timeRemaining < 60 ? '#F44336' : '#00bcd4',
+                        fontFamily: 'monospace'
+                      }}>
+                        {formatTime(timeRemaining)}
+                      </div>
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#666',
+                        marginTop: '2px'
+                      }}>
+                        Time remaining
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  background: '#FFEBEE',
+                  border: '2px solid #F44336',
+                  borderRadius: '10px',
+                  padding: '15px',
+                  marginBottom: '20px',
+                  textAlign: 'center',
+                  color: '#F44336'
+                }}>
+                  <strong>⚠️ OTP Expired</strong>
+                  <p style={{margin: '5px 0 0 0', fontSize: '14px'}}>
+                    Please request a new OTP
+                  </p>
+                </div>
+              )}
+
               <form onSubmit={handleOTPSubmit}>
                 <div className="form-group">
                   <label>OTP Code</label>
@@ -190,7 +278,11 @@ function ForgotPassword() {
                   />
                 </div>
 
-                <button type="submit" className="reset-btn" disabled={loading || otp.length !== 6}>
+                <button 
+                  type="submit" 
+                  className="reset-btn" 
+                  disabled={loading || otp.length !== 6 || timeRemaining === 0}
+                >
                   {loading ? 'Verifying...' : 'Verify OTP'}
                 </button>
               </form>
@@ -200,12 +292,12 @@ function ForgotPassword() {
                   Didn't receive the OTP?{' '}
                   <button 
                     onClick={handleResendOTP}
-                    disabled={loading}
+                    disabled={loading || (!canResend && timeRemaining > 540)} // Can resend after 1 minute
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#667eea',
-                      cursor: 'pointer',
+                      color: (loading || (!canResend && timeRemaining > 540)) ? '#ccc' : '#00bcd4',
+                      cursor: (loading || (!canResend && timeRemaining > 540)) ? 'not-allowed' : 'pointer',
                       textDecoration: 'underline',
                       fontSize: '14px',
                       fontWeight: '600'
@@ -214,15 +306,25 @@ function ForgotPassword() {
                     Resend OTP
                   </button>
                 </p>
+                {!canResend && timeRemaining > 540 && (
+                  <p style={{color: '#999', fontSize: '12px', margin: '5px 0 0 0'}}>
+                    You can resend OTP after 1 minute
+                  </p>
+                )}
               </div>
 
               <div className="back-to-login">
                 <button 
-                  onClick={() => setStep(1)}
+                  onClick={() => {
+                    setStep(1);
+                    setOtp('');
+                    setOtpExpiry(null);
+                    setTimeRemaining(600);
+                  }}
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#667eea',
+                    color: '#00bcd4',
                     cursor: 'pointer',
                     fontSize: '14px'
                   }}

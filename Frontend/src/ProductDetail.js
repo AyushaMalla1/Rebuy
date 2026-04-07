@@ -350,13 +350,27 @@ function ProductDetail() {
       return;
     }
     
-    // Add to cart silently (without showing modal)
-    const success = await addToCartSilently();
+    // Create a temporary "Buy Now" item (don't add to cart)
+    const buyNowItem = {
+      id: product._id || product.id,
+      name: product.name,
+      price: product.discountedPrice || product.price,
+      originalPrice: product.price,
+      image: product.images?.[0] || product.image || 'https://via.placeholder.com/300',
+      quantity: selectedQuantity,
+      seller: product.seller?._id || product.seller,
+      sellerName: product.sellerName || sellerInfo.name,
+      storeName: product.storeName || sellerInfo.storeName,
+      discount: typeof product.discount === 'object' ? product.discount.percentage : product.discount,
+      size: selectedSize,
+      condition: product.condition
+    };
     
-    if (success) {
-      // Navigate directly to checkout
-      navigate('/checkout');
-    }
+    // Store as "buyNow" item in localStorage (separate from cart)
+    localStorage.setItem('buyNowItem', JSON.stringify(buyNowItem));
+    
+    // Navigate to checkout with buyNow flag
+    navigate('/checkout?buyNow=true');
   };
 
   return (

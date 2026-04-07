@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Seller = require('../models/Seller');
 const { sendEmail } = require('../utils/emailService');
 const { logAudit } = require('../utils/auditLogger');
+const passport = require('../config/passport');
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -273,7 +274,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Otherwise, check User collection for customers
+    // Otherwise, check User collection for customers and admins
     const user = await User.findOne({ email });
     if (!user) {
       console.log('User not found:', email);
@@ -281,6 +282,21 @@ router.post('/login', async (req, res) => {
         success: false, 
         message: 'Invalid email or password' 
         });
+    }
+
+    // Check if user type matches the login type
+    if (userType === 'admin' && user.userType !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'This account is not an admin account. Please use the correct login type.'
+      });
+    }
+
+    if (userType === 'customer' && user.userType === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin accounts cannot login as customers. Please use Admin Login.'
+      });
     }
 
     // Check password
@@ -406,6 +422,11 @@ router.post('/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
 
+    console.log('=== OTP Verification Debug ===');
+    console.log('Email:', email);
+    console.log('OTP received:', otp);
+    console.log('OTP type:', typeof otp);
+
     if (!email || !otp) {
       return res.status(400).json({ 
         success: false,
@@ -421,14 +442,23 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     if (!user) {
+      console.log('User not found for email:', email);
       return res.status(404).json({ 
         success: false,
         message: 'User not found' 
       });
     }
 
+    console.log('User found:', user.email);
+    console.log('Stored OTP:', user.resetPasswordOTP);
+    console.log('Stored OTP type:', typeof user.resetPasswordOTP);
+    console.log('OTP Expiry:', user.resetPasswordOTPExpiry);
+    console.log('Current time:', new Date());
+    console.log('Is expired?', new Date() > user.resetPasswordOTPExpiry);
+
     // Check if OTP exists
     if (!user.resetPasswordOTP) {
+      console.log('No OTP found in database');
       return res.status(400).json({ 
         success: false,
         message: 'No OTP found. Please request a new one.' 
@@ -437,19 +467,31 @@ router.post('/verify-otp', async (req, res) => {
 
     // Check if OTP has expired
     if (new Date() > user.resetPasswordOTPExpiry) {
+      console.log('OTP has expired');
       return res.status(400).json({ 
         success: false,
         message: 'OTP has expired. Please request a new one.' 
       });
     }
 
-    // Verify OTP
-    if (user.resetPasswordOTP !== otp) {
+    // Verify OTP - compare as strings
+    const storedOTP = String(user.resetPasswordOTP);
+    const receivedOTP = String(otp);
+    
+    console.log('Comparing OTPs:');
+    console.log('Stored (string):', storedOTP);
+    console.log('Received (string):', receivedOTP);
+    console.log('Match?', storedOTP === receivedOTP);
+
+    if (storedOTP !== receivedOTP) {
+      console.log('OTP mismatch!');
       return res.status(400).json({ 
         success: false,
         message: 'Invalid OTP. Please try again.' 
       });
     }
+
+    console.log('✅ OTP verified successfully!');
 
     // OTP is valid
     res.json({ 
@@ -633,3 +675,48 @@ router.put('/change-password/:userId', async (req, res) => {
 });
 
 module.exports = router;
+
+
+// Google OAuth Routes
+router.get('/google',
+  passport.authenticate('google', { 
+    scope: ['profile', 'email'],
+    session: false
+  })
+);
+
+router.get('/google/callback',
+  passport.authenticate('google', { 
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=google_auth_failed`
+  }),
+  (req, res) => {
+    try {
+      // Generate JWT token
+      const token = generateToken(req.user._id);
+      
+      // Log audit
+      logAudit({
+        action: 'Google OAuth Login',
+        actionType: 'auth',
+        performedBy: req.user._id,
+        targetId: req.user._id,
+        targetModel: 'User',
+        description: 'User logged in via Google OAuth',
+        ipAddress: req.ip
+      }).catch(console.error);
+
+      // Redirect to frontend with token
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/google/success?token=${token}&user=${encodeURIComponent(JSON.stringify({
+        _id: req.user._id,
+        fullName: req.user.fullName,
+        email: req.user.email,
+        userType: req.user.userType,
+        profileImage: req.user.profileImage
+      }))}`);
+    } catch (error) {
+      console.error('Google OAuth callback error:', error);
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`);
+    }
+  }
+);

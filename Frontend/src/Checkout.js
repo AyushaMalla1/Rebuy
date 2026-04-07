@@ -33,10 +33,29 @@ function Checkout() {
   const [applyingPoints, setApplyingPoints] = useState(false);
 
   useEffect(() => {
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    // Check if this is a "Buy Now" checkout
+    const urlParams = new URLSearchParams(window.location.search);
+    const isBuyNow = urlParams.get('buyNow') === 'true';
+    
+    let items = [];
+    
+    if (isBuyNow) {
+      // Load single "Buy Now" item
+      const buyNowItem = JSON.parse(localStorage.getItem('buyNowItem') || 'null');
+      if (buyNowItem) {
+        items = [buyNowItem];
+      } else {
+        // If no buyNow item found, redirect to cart
+        navigate('/cart');
+        return;
+      }
+    } else {
+      // Load regular cart items
+      items = JSON.parse(localStorage.getItem('cart') || '[]');
+    }
 
     // Normalize cart items to ensure consistent structure
-    const normalizedCart = cart.map(item => {
+    const normalizedCart = items.map(item => {
       // Handle both frontend and backend cart item structures
       if (item.product && typeof item.product === 'object') {
         // Backend structure with nested product
@@ -532,6 +551,9 @@ function Checkout() {
 
       // Clear cart from localStorage
       localStorage.setItem('cart', JSON.stringify([]));
+      
+      // Clear buyNowItem from localStorage (if it exists)
+      localStorage.removeItem('buyNowItem');
 
       // Clear cart from backend database
       if (user && user._id) {

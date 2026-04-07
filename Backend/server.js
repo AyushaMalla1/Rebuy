@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const session = require('express-session');
+const passport = require('./config/passport');
 const { startStockAlertScheduler } = require('./utils/stockAlertScheduler');
 const { initializeWeeklyPayoutScheduler } = require('./utils/weeklyPayoutScheduler');
 require('dotenv').config();
@@ -19,6 +21,21 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
+
+// Session Configuration (for passport)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'rebuy-session-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Passport Initialization
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Rate Limiting
 const limiter = rateLimit({
@@ -50,6 +67,7 @@ const messageRoutes = require('./routes/messages');
 const notificationRoutes = require('./routes/notifications');
 const customerRoutes = require('./routes/customers');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const chatbotHistoryRoutes = require('./routes/chatbotHistory');
 const adminRoutes = require('./routes/admin');
 const paymentRoutes = require('./routes/payment');
 const payoutRoutes = require('./routes/payouts');
@@ -68,6 +86,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/chat', chatbotRoutes);
+app.use('/api/chatbot-history', chatbotHistoryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/payouts', payoutRoutes);
@@ -107,6 +126,40 @@ app.use((err, req, res, next) => {
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
+
+// Automated sweeper for abandoned eSewa orders to free up locked stock
+setInterval(async () => {
+  try {
+    const Order = require('./models/Order');
+    const Product = require('./models/Product');
+    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+    
+    // Find unverified eSewa orders older than 30 minutes
+    const abandonedOrders = await Order.find({
+      paymentMethod: 'esewa',
+      paymentStatus: 'Pending',
+      status: 'Processing',
+      orderDate: { $lt: thirtyMinsAgo }
+    });
+    
+    for (const order of abandonedOrders) {
+      order.status = 'Cancelled';
+      order.paymentStatus = 'Failed';
+      order.customerNotes = 'Auto-cancelled due to payment abandonment';
+      await order.save();
+      
+      // Restore the exact stock amounts
+      for (const item of order.items) {
+        await Product.findByIdAndUpdate(item.product, { 
+          $inc: { stock: item.quantity, sold: -item.quantity } 
+        });
+      }
+      console.log(`Swept and restored stock for abandoned order: ${order.orderId || order._id}`);
+    }
+  } catch (err) {
+    console.error('Abandoned order sweeper error:', err);
+  }
+}, 15 * 60 * 1000); // Check every 15 minutes
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

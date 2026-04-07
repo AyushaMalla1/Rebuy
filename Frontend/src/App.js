@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './LandingPage';
 import Signup from './Signup';
 import Login from './Login';
+import GoogleAuthSuccess from './GoogleAuthSuccess';
 import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import SellerDashboard from './SellerDashboard';
@@ -70,6 +71,7 @@ function App() {
       <Route path="/" element={<ProtectedLandingPage />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/auth/google/success" element={<GoogleAuthSuccess />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/profile" element={<BuyerProfile />} />

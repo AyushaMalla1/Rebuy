@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
+  googleId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
   fullName: {
     type: String,
     required: [true, 'Full name is required'],
@@ -17,7 +22,10 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: function() {
+      // Password not required if using Google OAuth
+      return !this.googleId;
+    },
     minlength: [8, 'Password must be at least 8 characters']
   },
   userType: {
