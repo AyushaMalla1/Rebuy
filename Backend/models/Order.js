@@ -120,7 +120,7 @@ const orderSchema = new mongoose.Schema({
   },
   platformCommissionRate: {
     type: Number,
-    default: 5 // 5% commission
+    default: 3 // 3% commission
   },
   platformCommission: {
     type: Number,

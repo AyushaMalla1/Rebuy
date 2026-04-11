@@ -49,7 +49,7 @@ const settingsSchema = new mongoose.Schema({
   },
   commissionRate: {
     type: Number,
-    default: 5,
+    default: 3,
     min: 0,
     max: 100
   },

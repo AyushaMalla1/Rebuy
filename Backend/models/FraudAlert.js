@@ -3,49 +3,88 @@ const mongoose = require('mongoose');
 const fraudAlertSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['suspicious_order', 'multiple_accounts', 'payment_fraud', 'fake_review'],
-    required: true
+    required: true,
+    enum: [
+      'suspicious_review_pattern',
+      'fake_positive_reviews',
+      'unusual_order_pattern',
+      'multiple_shipping_addresses',
+      'high_cancellation_rate',
+      'fake_stock',
+      'suspiciously_low_price',
+      'multiple_failed_payments',
+      'high_value_cod_new_account'
+    ]
   },
-  riskLevel: {
+  severity: {
     type: String,
-    enum: ['low', 'medium', 'high'],
+    required: true,
+    enum: ['low', 'medium', 'high']
+  },
+  title: {
+    type: String,
     required: true
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  orderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Order'
   },
   description: {
     type: String,
     required: true
   },
-  amount: {
-    type: Number
-  },
-  ipAddress: {
+  details: {
     type: String
   },
-  status: {
-    type: String,
-    enum: ['pending', 'investigating', 'resolved', 'blocked'],
-    default: 'pending'
-  },
-  resolvedBy: {
+  
+  // User/Seller Information
+  userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  resolvedAt: {
-    type: Date
+  userName: String,
+  userEmail: String,
+  
+  sellerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Seller'
   },
-  notes: {
-    type: String
-  }
+  sellerName: String,
+  storeName: String,
+  
+  productId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product'
+  },
+  productName: String,
+  
+  // Alert Status
+  status: {
+    type: String,
+    enum: ['pending', 'reviewed', 'resolved', 'dismissed'],
+    default: 'pending'
+  },
+  
+  // Admin Actions
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  },
+  reviewedAt: Date,
+  adminNotes: String,
+  actionTaken: String, // e.g., "User blocked", "Seller suspended", "False positive"
+  
+  // Metadata
+  detectedAt: {
+    type: Date,
+    default: Date.now
+  },
+  resolvedAt: Date
 }, {
   timestamps: true
 });
+
+// Indexes for efficient querying
+fraudAlertSchema.index({ status: 1, severity: 1 });
+fraudAlertSchema.index({ type: 1 });
+fraudAlertSchema.index({ userId: 1 });
+fraudAlertSchema.index({ sellerId: 1 });
+fraudAlertSchema.index({ detectedAt: -1 });
 
 module.exports = mongoose.model('FraudAlert', fraudAlertSchema);

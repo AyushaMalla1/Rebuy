@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema({
   },
   userType: {
     type: String,
-    enum: ['customer', 'buyer', 'seller', 'admin'],
+    enum: ['customer', 'buyer'],
     default: 'customer'
   },
   // Customer/Buyer specific fields

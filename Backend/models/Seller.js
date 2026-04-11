@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const sellerSchema = new mongoose.Schema({
+  googleId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
   fullName: {
     type: String,
     required: [true, 'Full name is required'],
@@ -17,16 +22,25 @@ const sellerSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: function() {
+      // Password not required if using Google OAuth
+      return !this.googleId;
+    },
     minlength: [8, 'Password must be at least 8 characters']
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required']
+    required: function() {
+      // Phone not required initially for Google OAuth users
+      return !this.googleId;
+    }
   },
   storeName: {
     type: String,
-    required: [true, 'Store name is required'],
+    required: function() {
+      // Store name not required initially for Google OAuth users
+      return !this.googleId;
+    },
     trim: true
   },
   storeDescription: {
@@ -39,11 +53,17 @@ const sellerSchema = new mongoose.Schema({
   },
   address: {
     type: String,
-    required: [true, 'Address is required']
+    required: function() {
+      // Address not required initially for Google OAuth users
+      return !this.googleId;
+    }
   },
   city: {
     type: String,
-    required: [true, 'City is required']
+    required: function() {
+      // City not required initially for Google OAuth users
+      return !this.googleId;
+    }
   },
   status: {
     type: String,

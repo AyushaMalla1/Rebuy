@@ -7,7 +7,7 @@ const auditLogSchema = new mongoose.Schema({
   },
   actionType: {
     type: String,
-    enum: ['user', 'product', 'order', 'seller', 'system'],
+    enum: ['user', 'product', 'order', 'seller', 'system', 'auth', 'payment'],
     required: true
   },
   performedBy: {
