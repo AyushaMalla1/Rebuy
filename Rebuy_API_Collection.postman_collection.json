@@ -1,0 +1,465 @@
+{
+  "info": {
+    "name": "Rebuy E-Commerce API",
+    "description": "Complete API collection for Rebuy e-commerce platform testing",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Customer Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test Customer\",\n  \"email\": \"customer@test.com\",\n  \"password\": \"Test@123456\",\n  \"confirmPassword\": \"Test@123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/signup",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "signup"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has token\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.token).to.exist;",
+                  "    pm.environment.set(\"customer_token\", jsonData.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customer Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@test.com\",\n  \"password\": \"Test@123456\",\n  \"userType\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Login successful\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.environment.set(\"customer_token\", jsonData.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"aayushamalla077@gmail.com\",\n  \"password\": \"Admin@123456\",\n  \"userType\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Admin login successful\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.user.userType).to.eql(\"admin\");",
+                  "    pm.environment.set(\"admin_token\", jsonData.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Seller Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test Seller\",\n  \"email\": \"seller@test.com\",\n  \"password\": \"Test@123456\",\n  \"confirmPassword\": \"Test@123456\",\n  \"userType\": \"seller\",\n  \"phone\": \"9876543210\",\n  \"storeName\": \"Test Store\",\n  \"storeDescription\": \"A test store\",\n  \"address\": \"Test Address\",\n  \"city\": \"Kathmandu\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/signup",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "signup"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Seller created\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"seller_token\", jsonData.token);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"New Admin\",\n  \"email\": \"newadmin@test.com\",\n  \"password\": \"Admin@123456\",\n  \"adminSecret\": \"rebuy-admin-secret-2026\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/create-admin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "create-admin"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Products retrieved\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.products).to.be.an('array');",
+                  "    if (jsonData.products.length > 0) {",
+                  "        pm.environment.set(\"product_id\", jsonData.products[0]._id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Search Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/search?query=jacket",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "search"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "jacket"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Product (Seller)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{seller_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Product\",\n  \"description\": \"This is a test product\",\n  \"price\": 1500,\n  \"category\": \"Men\",\n  \"subcategory\": \"Jacket\",\n  \"condition\": \"Like New\",\n  \"stockQuantity\": 10,\n  \"images\": [\"https://example.com/image1.jpg\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Product created\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"product_id\", jsonData.product._id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"product\": \"{{product_id}}\",\n      \"quantity\": 1,\n      \"price\": 1500\n    }\n  ],\n  \"shippingAddress\": {\n    \"fullName\": \"Test Customer\",\n    \"phone\": \"9876543210\",\n    \"address\": \"Test Address\",\n    \"city\": \"Kathmandu\",\n    \"postalCode\": \"44600\"\n  },\n  \"paymentMethod\": \"COD\",\n  \"totalAmount\": 1500\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order created\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"order_id\", jsonData.order._id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Customer Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/customer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "customer"]
+            }
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "{{order_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get Platform Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "users"]
+            }
+          }
+        },
+        {
+          "name": "Get All Sellers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/sellers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "sellers"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Add to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{product_id}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/cart",
+              "host": ["{{base_url}}"],
+              "path": ["api", "cart"]
+            }
+          }
+        },
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cart",
+              "host": ["{{base_url}}"],
+              "path": ["api", "cart"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000"
+    }
+  ]
+}
