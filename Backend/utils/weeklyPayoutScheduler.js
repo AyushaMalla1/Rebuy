@@ -62,7 +62,7 @@ async function generateWeeklyPayouts() {
           );
           
           const sellerSubtotal = sellerItems.reduce((sum, item) => sum + item.subtotal, 0);
-          const commission = Math.round((sellerSubtotal * (order.platformCommissionRate || 5)) / 100);
+          const commission = Math.round((sellerSubtotal * (order.platformCommissionRate || 3)) / 100);
           const sellerPayout = sellerSubtotal - commission;
 
           sellerPendingAmount += sellerPayout;

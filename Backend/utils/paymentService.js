@@ -6,9 +6,9 @@ const ESEWA_CONFIG = {
   merchantId: process.env.ESEWA_MERCHANT_ID || 'EPAYTEST',
   secretKey: process.env.ESEWA_SECRET_KEY || '8gBm/:&EnhH.1/q',
   paymentUrl: process.env.ESEWA_PAYMENT_URL || 'https://rc-epay.esewa.com.np/api/epay/main/v2/form',
-  // Success/failure URLs should point to backend routes that handle the callback
-  successUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/payment/esewa/success`,
-  failureUrl: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/payment/esewa/failure`
+  // Success/failure URLs should point to frontend routes that handle the callback directly
+  successUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment-success`,
+  failureUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment-failed`
 };
 
 // Generate random transaction UUID

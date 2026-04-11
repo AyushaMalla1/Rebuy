@@ -1,349 +1,509 @@
-const FraudAlert = require('../models/FraudAlert');
 const Order = require('../models/Order');
-const User = require('../models/User');
 const Review = require('../models/Review');
+const User = require('../models/User');
+const Seller = require('../models/Seller');
+const Product = require('../models/Product');
+const FraudAlert = require('../models/FraudAlert');
 
-// Detect suspicious orders
-async function detectSuspiciousOrders() {
+/**
+ * Fraud Detection Service
+ * Analyzes patterns and behaviors to identify suspicious activities
+ * Saves alerts to database for tracking and review
+ */
+
+// Detect suspicious review patterns
+async function detectSuspiciousReviews() {
   const alerts = [];
-  const timeWindow = 10 * 60 * 1000; // 10 minutes
-  const now = new Date();
-  const recentTime = new Date(now - timeWindow);
-
+  
   try {
-    // Find orders in last 10 minutes grouped by user
-    const recentOrders = await Order.find({
-      createdAt: { $gte: recentTime }
-    }).populate('userId');
-
-    // Group by user
-    const ordersByUser = {};
-    recentOrders.forEach(order => {
-      const userId = order.userId?._id?.toString();
-      if (userId) {
-        if (!ordersByUser[userId]) {
-          ordersByUser[userId] = [];
-        }
-        ordersByUser[userId].push(order);
-      }
-    });
-
-    // Check for multiple high-value orders
-    for (const [userId, orders] of Object.entries(ordersByUser)) {
-      if (orders.length >= 3) {
-        const totalAmount = orders.reduce((sum, o) => sum + (o.total || 0), 0);
-        
-        // Check if alert already exists
-        const existingAlert = await FraudAlert.findOne({
-          userId,
-          type: 'suspicious_order',
-          status: { $in: ['pending', 'investigating'] }
-        });
-
-        if (!existingAlert && totalAmount > 10000) {
-          alerts.push({
-            type: 'suspicious_order',
-            riskLevel: totalAmount > 30000 ? 'high' : 'medium',
-            userId,
-            description: `${orders.length} orders placed within 10 minutes, total: Rs. ${totalAmount}`,
-            amount: totalAmount,
-            status: 'pending'
-          });
-        }
-      }
-    }
-
-    // Check for same item in multiple separate orders within 10 minutes
-    const ordersByUserProduct = {};
-    recentOrders.forEach(order => {
-      const userId = order.userId?._id?.toString();
-      if (userId && order.items) {
-        order.items.forEach(item => {
-          const productId = item.productId?.toString();
-          if (productId) {
-            const key = `${userId}_${productId}`;
-            if (!ordersByUserProduct[key]) {
-              ordersByUserProduct[key] = {
-                userId,
-                productId,
-                productName: item.name,
-                orders: []
-              };
-            }
-            ordersByUserProduct[key].orders.push({
-              orderId: order._id,
-              quantity: item.quantity,
-              time: order.createdAt
-            });
-          }
-        });
-      }
-    });
-
-    // Alert if same product appears in 5+ separate orders
-    for (const [key, data] of Object.entries(ordersByUserProduct)) {
-      if (data.orders.length >= 5) {
-        const existingAlert = await FraudAlert.findOne({
-          userId: data.userId,
-          type: 'suspicious_order',
-          description: { $regex: `same item.*${data.orders.length}.*separate orders` },
-          status: { $in: ['pending', 'investigating'] }
-        });
-
-        if (!existingAlert) {
-          const totalQty = data.orders.reduce((sum, o) => sum + (o.quantity || 1), 0);
-          alerts.push({
-            type: 'suspicious_order',
-            riskLevel: data.orders.length >= 8 ? 'high' : 'medium',
-            userId: data.userId,
-            description: `Customer placed ${data.orders.length} separate orders for same item "${data.productName}" within 10 minutes (total qty: ${totalQty})`,
-            status: 'pending'
-          });
-        }
-      }
-    }
-
-    // Check for orders with mismatched addresses
-    const ordersWithAddresses = await Order.find({
-      createdAt: { $gte: new Date(now - 24 * 60 * 60 * 1000) } // Last 24 hours
-    });
-
-    for (const order of ordersWithAddresses) {
-      if (order.shippingAddress && order.billingAddress) {
-        const shippingCity = order.shippingAddress.city?.toLowerCase();
-        const billingCity = order.billingAddress?.city?.toLowerCase();
-        
-        if (shippingCity && billingCity && shippingCity !== billingCity) {
-          const existingAlert = await FraudAlert.findOne({
-            orderId: order._id,
-            type: 'suspicious_order'
-          });
-
-          if (!existingAlert) {
-            alerts.push({
-              type: 'suspicious_order',
-              riskLevel: 'low',
-              userId: order.userId,
-              orderId: order._id,
-              description: `Shipping city (${order.shippingAddress.city}) differs from billing city`,
-              amount: order.total,
-              status: 'pending'
-            });
-          }
-        }
-      }
-    }
-
-  } catch (error) {
-    console.error('Error detecting suspicious orders:', error);
-  }
-
-  return alerts;
-}
-
-// Detect multiple accounts
-async function detectMultipleAccounts() {
-  const alerts = [];
-
-  try {
-    // Find users with same email domain (excluding common ones)
-    const users = await User.find({ userType: { $ne: 'admin' } });
+    // 1. Multiple reviews from same IP/device (simulated by checking same customer multiple reviews in short time)
+    const recentReviews = await Review.find({
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
+    }).populate('customer', 'fullName email').populate('product', 'name seller');
     
-    // Group by phone number
-    const phoneGroups = {};
-    users.forEach(user => {
-      if (user.phone) {
-        if (!phoneGroups[user.phone]) {
-          phoneGroups[user.phone] = [];
+    // Group by customer
+    const reviewsByCustomer = {};
+    recentReviews.forEach(review => {
+      const customerId = review.customer?._id?.toString();
+      if (customerId) {
+        if (!reviewsByCustomer[customerId]) {
+          reviewsByCustomer[customerId] = [];
         }
-        phoneGroups[user.phone].push(user);
+        reviewsByCustomer[customerId].push(review);
       }
     });
-
-    // Check for multiple accounts with same phone
-    for (const [phone, userList] of Object.entries(phoneGroups)) {
-      if (userList.length >= 3) {
-        const existingAlert = await FraudAlert.findOne({
-          description: { $regex: phone },
-          type: 'multiple_accounts',
-          status: { $in: ['pending', 'investigating'] }
+    
+    // Check for customers with multiple reviews in short time
+    Object.entries(reviewsByCustomer).forEach(([customerId, reviews]) => {
+      if (reviews.length >= 5) {
+        alerts.push({
+          type: 'suspicious_review_pattern',
+          severity: 'high',
+          title: 'Multiple Reviews in Short Time',
+          description: `Customer ${reviews[0].customer?.fullName} posted ${reviews.length} reviews in 24 hours`,
+          userId: customerId,
+          userName: reviews[0].customer?.fullName,
+          userEmail: reviews[0].customer?.email,
+          details: `${reviews.length} reviews posted`,
+          timestamp: new Date()
         });
-
-        if (!existingAlert) {
-          alerts.push({
-            type: 'multiple_accounts',
-            riskLevel: userList.length >= 5 ? 'high' : 'medium',
-            userId: userList[0]._id,
-            description: `${userList.length} accounts detected with same phone number: ${phone}`,
-            status: 'pending'
-          });
-        }
+      }
+    });
+    
+    // 2. Detect fake positive reviews (all 5 stars from new accounts)
+    const newAccounts = await User.find({
+      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
+    });
+    
+    for (const user of newAccounts) {
+      const userReviews = await Review.find({ customer: user._id });
+      if (userReviews.length >= 3 && userReviews.every(r => r.rating === 5)) {
+        alerts.push({
+          type: 'fake_positive_reviews',
+          severity: 'medium',
+          title: 'Suspicious All 5-Star Reviews',
+          description: `New user ${user.fullName} posted ${userReviews.length} reviews, all 5 stars`,
+          userId: user._id,
+          userName: user.fullName,
+          userEmail: user.email,
+          details: `${userReviews.length} reviews, all rated 5 stars`,
+          timestamp: new Date()
+        });
       }
     }
-
+    
   } catch (error) {
-    console.error('Error detecting multiple accounts:', error);
+    console.error('Error detecting suspicious reviews:', error);
   }
-
+  
   return alerts;
 }
 
-// Detect fake reviews
-async function detectFakeReviews() {
+// Detect unusual order patterns
+async function detectUnusualOrders() {
   const alerts = [];
-  const timeWindow = 30 * 60 * 1000; // 30 minutes
-
+  
   try {
-    const recentTime = new Date(Date.now() - timeWindow);
-    const users = await User.find({ userType: { $ne: 'admin' } });
-
-    for (const user of users) {
-      const recentReviews = await Review.find({
-        userId: user._id,
-        createdAt: { $gte: recentTime }
-      });
-
-      // Check for too many reviews in short time
-      if (recentReviews.length >= 5) {
-        const existingAlert = await FraudAlert.findOne({
-          userId: user._id,
-          type: 'fake_review',
-          status: { $in: ['pending', 'investigating'] }
+    // 1. Multiple high-value orders from same customer in short time
+    const recentOrders = await Order.find({
+      orderDate: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    }).populate('customer', 'fullName email');
+    
+    const ordersByCustomer = {};
+    recentOrders.forEach(order => {
+      const customerId = order.customer?._id?.toString();
+      if (customerId) {
+        if (!ordersByCustomer[customerId]) {
+          ordersByCustomer[customerId] = [];
+        }
+        ordersByCustomer[customerId].push(order);
+      }
+    });
+    
+    Object.entries(ordersByCustomer).forEach(([customerId, orders]) => {
+      const totalValue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+      
+      if (orders.length >= 5 || totalValue >= 50000) {
+        alerts.push({
+          type: 'unusual_order_pattern',
+          severity: orders.length >= 10 ? 'high' : 'medium',
+          title: 'Unusual Order Activity',
+          description: `Customer ${orders[0].customer?.fullName} placed ${orders.length} orders worth Rs. ${totalValue.toLocaleString()} in 24 hours`,
+          userId: customerId,
+          userName: orders[0].customer?.fullName,
+          userEmail: orders[0].customer?.email,
+          details: `${orders.length} orders, Total: Rs. ${totalValue.toLocaleString()}`,
+          timestamp: new Date()
         });
-
-        if (!existingAlert) {
-          alerts.push({
-            type: 'fake_review',
-            riskLevel: recentReviews.length >= 10 ? 'high' : 'medium',
-            userId: user._id,
-            description: `User posted ${recentReviews.length} reviews within 30 minutes`,
-            status: 'pending'
-          });
+      }
+    });
+    
+    // 2. Orders with mismatched shipping addresses
+    const ordersWithMultipleAddresses = await Order.aggregate([
+      {
+        $match: {
+          orderDate: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        }
+      },
+      {
+        $group: {
+          _id: '$customer',
+          addresses: { $addToSet: '$shippingAddress.city' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $match: {
+          $expr: { $gte: [{ $size: '$addresses' }, 3] }
         }
       }
+    ]);
+    
+    for (const item of ordersWithMultipleAddresses) {
+      const user = await User.findById(item._id);
+      if (user) {
+        alerts.push({
+          type: 'multiple_shipping_addresses',
+          severity: 'medium',
+          title: 'Multiple Shipping Addresses',
+          description: `Customer ${user.fullName} used ${item.addresses.length} different shipping addresses`,
+          userId: user._id,
+          userName: user.fullName,
+          userEmail: user.email,
+          details: `${item.count} orders to ${item.addresses.length} different cities`,
+          timestamp: new Date()
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error detecting unusual orders:', error);
+  }
+  
+  return alerts;
+}
 
-      // Check for all 5-star or all 1-star reviews
-      const allReviews = await Review.find({ userId: user._id }).limit(20);
-      if (allReviews.length >= 10) {
-        const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+// Detect seller fraud
+async function detectSellerFraud() {
+  const alerts = [];
+  
+  try {
+    // 1. Sellers with abnormally high cancellation rates
+    const sellers = await Seller.find({ approvalStatus: 'approved' });
+    
+    for (const seller of sellers) {
+      const sellerOrders = await Order.find({ seller: seller._id });
+      const cancelledOrders = sellerOrders.filter(o => o.status === 'Cancelled');
+      
+      if (sellerOrders.length >= 10) {
+        const cancellationRate = (cancelledOrders.length / sellerOrders.length) * 100;
         
-        if (avgRating === 5 || avgRating === 1) {
-          const existingAlert = await FraudAlert.findOne({
-            userId: user._id,
-            type: 'fake_review',
-            description: { $regex: 'suspicious rating pattern' }
+        if (cancellationRate >= 30) {
+          alerts.push({
+            type: 'high_cancellation_rate',
+            severity: 'high',
+            title: 'High Order Cancellation Rate',
+            description: `Seller ${seller.storeName} has ${cancellationRate.toFixed(1)}% cancellation rate`,
+            sellerId: seller._id,
+            sellerName: seller.fullName,
+            storeName: seller.storeName,
+            details: `${cancelledOrders.length} of ${sellerOrders.length} orders cancelled`,
+            timestamp: new Date()
           });
-
-          if (!existingAlert) {
-            alerts.push({
-              type: 'fake_review',
-              riskLevel: 'medium',
-              userId: user._id,
-              description: `Suspicious rating pattern: All reviews are ${avgRating}-star (${allReviews.length} reviews)`,
-              status: 'pending'
-            });
-          }
         }
       }
     }
-
+    
+    // 2. Sellers with fake stock (products always out of stock after order)
+    const products = await Product.find({ status: 'Active' });
+    
+    for (const product of products) {
+      const productOrders = await Order.find({
+        'items.product': product._id,
+        status: 'Cancelled',
+        orderDate: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+      });
+      
+      if (productOrders.length >= 3) {
+        const seller = await Seller.findById(product.seller);
+        if (seller) {
+          alerts.push({
+            type: 'fake_stock',
+            severity: 'medium',
+            title: 'Potential Fake Stock Listing',
+            description: `Product "${product.name}" has been cancelled ${productOrders.length} times`,
+            sellerId: seller._id,
+            sellerName: seller.fullName,
+            storeName: seller.storeName,
+            productId: product._id,
+            productName: product.name,
+            details: `${productOrders.length} cancelled orders in 30 days`,
+            timestamp: new Date()
+          });
+        }
+      }
+    }
+    
+    // 3. Sellers with suspiciously low prices
+    const avgPriceByCategory = await Product.aggregate([
+      { $match: { status: 'Active' } },
+      {
+        $group: {
+          _id: '$category',
+          avgPrice: { $avg: '$price' }
+        }
+      }
+    ]);
+    
+    const categoryAvgMap = {};
+    avgPriceByCategory.forEach(item => {
+      categoryAvgMap[item._id] = item.avgPrice;
+    });
+    
+    for (const product of products) {
+      const avgPrice = categoryAvgMap[product.category];
+      if (avgPrice && product.price < avgPrice * 0.3) { // 70% below average
+        const seller = await Seller.findById(product.seller);
+        if (seller) {
+          alerts.push({
+            type: 'suspiciously_low_price',
+            severity: 'low',
+            title: 'Suspiciously Low Price',
+            description: `Product "${product.name}" priced at Rs. ${product.price} (70% below category average)`,
+            sellerId: seller._id,
+            sellerName: seller.fullName,
+            storeName: seller.storeName,
+            productId: product._id,
+            productName: product.name,
+            details: `Price: Rs. ${product.price}, Category avg: Rs. ${avgPrice.toFixed(0)}`,
+            timestamp: new Date()
+          });
+        }
+      }
+    }
+    
   } catch (error) {
-    console.error('Error detecting fake reviews:', error);
+    console.error('Error detecting seller fraud:', error);
   }
-
+  
   return alerts;
 }
 
 // Detect payment fraud
 async function detectPaymentFraud() {
   const alerts = [];
-
+  
   try {
-    // Find failed payment orders
-    const failedOrders = await Order.find({
-      paymentStatus: 'failed',
-      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-    });
-
-    // Group by user
-    const failuresByUser = {};
-    failedOrders.forEach(order => {
-      const userId = order.userId?.toString();
-      if (userId) {
-        if (!failuresByUser[userId]) {
-          failuresByUser[userId] = [];
+    // 1. Failed payment attempts
+    const recentOrders = await Order.find({
+      orderDate: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      paymentStatus: 'Failed'
+    }).populate('customer', 'fullName email');
+    
+    const failedByCustomer = {};
+    recentOrders.forEach(order => {
+      const customerId = order.customer?._id?.toString();
+      if (customerId) {
+        if (!failedByCustomer[customerId]) {
+          failedByCustomer[customerId] = [];
         }
-        failuresByUser[userId].push(order);
+        failedByCustomer[customerId].push(order);
       }
     });
-
-    // Check for multiple payment failures
-    for (const [userId, orders] of Object.entries(failuresByUser)) {
+    
+    Object.entries(failedByCustomer).forEach(([customerId, orders]) => {
       if (orders.length >= 3) {
-        const existingAlert = await FraudAlert.findOne({
-          userId,
-          type: 'payment_fraud',
-          status: { $in: ['pending', 'investigating'] }
+        alerts.push({
+          type: 'multiple_failed_payments',
+          severity: 'medium',
+          title: 'Multiple Failed Payment Attempts',
+          description: `Customer ${orders[0].customer?.fullName} had ${orders.length} failed payment attempts`,
+          userId: customerId,
+          userName: orders[0].customer?.fullName,
+          userEmail: orders[0].customer?.email,
+          details: `${orders.length} failed payments in 24 hours`,
+          timestamp: new Date()
         });
-
-        if (!existingAlert) {
-          const totalAmount = orders.reduce((sum, o) => sum + (o.total || 0), 0);
-          alerts.push({
-            type: 'payment_fraud',
-            riskLevel: orders.length >= 5 ? 'high' : 'medium',
-            userId,
-            description: `${orders.length} failed payment attempts in 24 hours, possible stolen card`,
-            amount: totalAmount,
-            status: 'pending'
-          });
-        }
+      }
+    });
+    
+    // 2. COD orders with high value from new accounts
+    const newUsers = await User.find({
+      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+    });
+    
+    for (const user of newUsers) {
+      const codOrders = await Order.find({
+        customer: user._id,
+        paymentMethod: 'COD',
+        total: { $gte: 10000 }
+      });
+      
+      if (codOrders.length >= 2) {
+        const totalValue = codOrders.reduce((sum, o) => sum + o.total, 0);
+        alerts.push({
+          type: 'high_value_cod_new_account',
+          severity: 'high',
+          title: 'High-Value COD from New Account',
+          description: `New user ${user.fullName} placed ${codOrders.length} COD orders worth Rs. ${totalValue.toLocaleString()}`,
+          userId: user._id,
+          userName: user.fullName,
+          userEmail: user.email,
+          details: `${codOrders.length} COD orders, Total: Rs. ${totalValue.toLocaleString()}`,
+          timestamp: new Date()
+        });
       }
     }
-
+    
   } catch (error) {
     console.error('Error detecting payment fraud:', error);
   }
-
+  
   return alerts;
 }
 
 // Main fraud detection function
-async function runFraudDetection() {
-  console.log('🔍 Running fraud detection...');
-  
-  const [
-    suspiciousOrders,
-    multipleAccounts,
-    fakeReviews,
-    paymentFraud
-  ] = await Promise.all([
-    detectSuspiciousOrders(),
-    detectMultipleAccounts(),
-    detectFakeReviews(),
-    detectPaymentFraud()
-  ]);
-
-  const allAlerts = [
-    ...suspiciousOrders,
-    ...multipleAccounts,
-    ...fakeReviews,
-    ...paymentFraud
-  ];
-
-  if (allAlerts.length > 0) {
-    await FraudAlert.insertMany(allAlerts);
-    console.log(`✅ Created ${allAlerts.length} fraud alerts`);
-  } else {
-    console.log('✅ No suspicious activity detected');
+async function detectAllFraud() {
+  try {
+    const [reviewAlerts, orderAlerts, sellerAlerts, paymentAlerts] = await Promise.all([
+      detectSuspiciousReviews(),
+      detectUnusualOrders(),
+      detectSellerFraud(),
+      detectPaymentFraud()
+    ]);
+    
+    const allAlerts = [
+      ...reviewAlerts,
+      ...orderAlerts,
+      ...sellerAlerts,
+      ...paymentAlerts
+    ];
+    
+    // Sort by severity and timestamp
+    allAlerts.sort((a, b) => {
+      const severityOrder = { high: 0, medium: 1, low: 2 };
+      if (severityOrder[a.severity] !== severityOrder[b.severity]) {
+        return severityOrder[a.severity] - severityOrder[b.severity];
+      }
+      return new Date(b.timestamp) - new Date(a.timestamp);
+    });
+    
+    // Save new alerts to database
+    for (const alert of allAlerts) {
+      try {
+        // Check if similar alert already exists (within last 24 hours)
+        const existingAlert = await FraudAlert.findOne({
+          type: alert.type,
+          userId: alert.userId,
+          sellerId: alert.sellerId,
+          status: { $in: ['pending', 'reviewed'] },
+          detectedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+        });
+        
+        if (!existingAlert) {
+          // Create new alert
+          await FraudAlert.create({
+            type: alert.type,
+            severity: alert.severity,
+            title: alert.title,
+            description: alert.description,
+            details: alert.details,
+            userId: alert.userId,
+            userName: alert.userName,
+            userEmail: alert.userEmail,
+            sellerId: alert.sellerId,
+            sellerName: alert.sellerName,
+            storeName: alert.storeName,
+            productId: alert.productId,
+            productName: alert.productName,
+            detectedAt: alert.timestamp,
+            status: 'pending'
+          });
+        }
+      } catch (saveError) {
+        console.error('Error saving fraud alert:', saveError);
+      }
+    }
+    
+    return allAlerts;
+  } catch (error) {
+    console.error('Error in fraud detection:', error);
+    return [];
   }
+}
 
-  return allAlerts;
+// Get fraud alerts from database
+async function getFraudAlertsFromDB(filter = {}) {
+  try {
+    const query = {};
+    
+    if (filter.status) {
+      query.status = filter.status;
+    }
+    
+    if (filter.severity) {
+      query.severity = filter.severity;
+    }
+    
+    if (filter.type) {
+      query.type = filter.type;
+    }
+    
+    const alerts = await FraudAlert.find(query)
+      .populate('userId', 'fullName email')
+      .populate('sellerId', 'fullName storeName')
+      .populate('productId', 'name')
+      .sort({ detectedAt: -1 })
+      .limit(100);
+    
+    return alerts;
+  } catch (error) {
+    console.error('Error fetching fraud alerts from DB:', error);
+    return [];
+  }
+}
+
+// Update fraud alert status
+async function updateFraudAlert(alertId, updates) {
+  try {
+    const alert = await FraudAlert.findByIdAndUpdate(
+      alertId,
+      {
+        ...updates,
+        reviewedAt: updates.status === 'reviewed' ? new Date() : undefined,
+        resolvedAt: updates.status === 'resolved' ? new Date() : undefined
+      },
+      { new: true }
+    );
+    
+    return alert;
+  } catch (error) {
+    console.error('Error updating fraud alert:', error);
+    return null;
+  }
+}
+
+// Get fraud statistics
+async function getFraudStats() {
+  try {
+    const [total, high, medium, low, pending, byType] = await Promise.all([
+      FraudAlert.countDocuments({ status: 'pending' }),
+      FraudAlert.countDocuments({ status: 'pending', severity: 'high' }),
+      FraudAlert.countDocuments({ status: 'pending', severity: 'medium' }),
+      FraudAlert.countDocuments({ status: 'pending', severity: 'low' }),
+      FraudAlert.countDocuments({ status: 'pending' }),
+      FraudAlert.aggregate([
+        { $match: { status: 'pending' } },
+        { $group: { _id: '$type', count: { $sum: 1 } } }
+      ])
+    ]);
+    
+    const byTypeObj = {};
+    byType.forEach(item => {
+      byTypeObj[item._id] = item.count;
+    });
+    
+    return {
+      total,
+      high,
+      medium,
+      low,
+      pending,
+      byType: byTypeObj
+    };
+  } catch (error) {
+    console.error('Error getting fraud stats:', error);
+    return { total: 0, high: 0, medium: 0, low: 0, pending: 0, byType: {} };
+  }
 }
 
 module.exports = {
-  runFraudDetection,
-  detectSuspiciousOrders,
-  detectMultipleAccounts,
-  detectFakeReviews,
-  detectPaymentFraud
+  detectAllFraud,
+  detectSuspiciousReviews,
+  detectUnusualOrders,
+  detectSellerFraud,
+  detectPaymentFraud,
+  getFraudAlertsFromDB,
+  updateFraudAlert,
+  getFraudStats
 };

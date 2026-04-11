@@ -5,6 +5,12 @@ const { sendLowStockAlert, sendOutOfStockAlert } = require('./emailService');
 // Check stock levels and send alerts to sellers
 async function checkStockLevels() {
   try {
+    // Check if stock alerts are disabled
+    if (process.env.DISABLE_STOCK_ALERTS === 'true') {
+      console.log('[Stock Alert] Stock alerts are disabled in .env');
+      return;
+    }
+
     console.log('[Stock Alert] Running daily stock check...');
     
     // Get all sellers
@@ -28,13 +34,21 @@ async function checkStockLevels() {
       // Send low stock alert if any
       if (lowStockProducts.length > 0) {
         console.log(`[Stock Alert] Sending low stock alert to ${seller.email} for ${lowStockProducts.length} products`);
-        await sendLowStockAlert(seller, lowStockProducts.map(p => p.toObject()));
+        try {
+          await sendLowStockAlert(seller, lowStockProducts.map(p => p.toObject()));
+        } catch (emailError) {
+          console.error(`[Stock Alert] Failed to send email to ${seller.email}:`, emailError.message);
+        }
       }
       
       // Send out of stock alert if any
       if (outOfStockProducts.length > 0) {
         console.log(`[Stock Alert] Sending out of stock alert to ${seller.email} for ${outOfStockProducts.length} products`);
-        await sendOutOfStockAlert(seller, outOfStockProducts.map(p => p.toObject()));
+        try {
+          await sendOutOfStockAlert(seller, outOfStockProducts.map(p => p.toObject()));
+        } catch (emailError) {
+          console.error(`[Stock Alert] Failed to send email to ${seller.email}:`, emailError.message);
+        }
       }
     }
     
@@ -46,13 +60,26 @@ async function checkStockLevels() {
 
 // Schedule daily stock check (runs every 24 hours at 9 AM)
 function startStockAlertScheduler() {
-  // Run immediately on startup
-  checkStockLevels();
+  // Calculate time until next 9 AM
+  const now = new Date();
+  const next9AM = new Date();
+  next9AM.setHours(9, 0, 0, 0);
   
-  // Then run every 24 hours
-  setInterval(checkStockLevels, 24 * 60 * 60 * 1000);
+  // If it's already past 9 AM today, schedule for tomorrow
+  if (now.getHours() >= 9) {
+    next9AM.setDate(next9AM.getDate() + 1);
+  }
   
-  console.log('[Stock Alert] Scheduler started - will run daily at 9 AM');
+  const timeUntil9AM = next9AM - now;
+  
+  console.log(`[Stock Alert] Scheduler started - next check at ${next9AM.toLocaleString()}`);
+  
+  // Run at 9 AM
+  setTimeout(() => {
+    checkStockLevels();
+    // Then run every 24 hours
+    setInterval(checkStockLevels, 24 * 60 * 60 * 1000);
+  }, timeUntil9AM);
 }
 
 module.exports = {
