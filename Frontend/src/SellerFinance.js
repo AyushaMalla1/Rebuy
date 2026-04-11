@@ -420,7 +420,7 @@ function SellerFinance() {
                   </div>
                   <div className="order-amount">
                     <span className="amount">Rs. {order.amount.toLocaleString()}</span>
-                    <span className="commission">-Rs. {order.commission} (5%)</span>
+                    <span className="commission">-Rs. {order.commission} (3%)</span>
                   </div>
                 </div>
               ))}

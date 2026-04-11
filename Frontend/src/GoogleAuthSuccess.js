@@ -19,7 +19,9 @@ function GoogleAuthSuccess() {
 
         // Redirect based on user type
         if (user.userType === 'admin') {
-          navigate('/admin');
+          navigate('/admin/dashboard');
+        } else if (user.userType === 'seller') {
+          navigate('/seller/dashboard');
         } else {
           navigate('/');
         }

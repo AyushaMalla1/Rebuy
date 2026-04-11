@@ -188,6 +188,9 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   position: relative;
 }
+.seller-container .card.clickable-card {
+  cursor: pointer;
+}
 .seller-container .card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
@@ -1432,8 +1435,10 @@
 }
 .seller-container .product-actions {
   display: flex;
+  flex-direction: row;
   gap: 8px;
   position: relative;
+  align-items: center;
 }
 .seller-container .product-action-btn {
   padding: 8px 12px;
@@ -7463,8 +7468,8 @@
 
 .revenue-stat-card {
   background: white;
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 16px;
   border: 1px solid #e5e7eb;
   position: relative;
   overflow: hidden;
@@ -7472,29 +7477,23 @@
 }
 
 .revenue-stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: #00bcd4;
+  display: none;
 }
 
 .revenue-stat-card.orders-card::before {
-  background: #3b82f6;
+  display: none;
 }
 
 .revenue-stat-card.avg-card::before {
-  background: #f59e0b;
+  display: none;
 }
 
 .revenue-stat-card.fees-card::before {
-  background: #ef4444;
+  display: none;
 }
 
 .revenue-stat-card.net-card::before {
-  background: #10b981;
+  display: none;
 }
 
 .revenue-stat-card.clickable {
@@ -7571,10 +7570,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  font-size: 18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 16px;
 }
 
 .revenue-stat-icon.orders {
@@ -7598,15 +7597,15 @@
 }
 
 .revenue-stat-value {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   color: #111827;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0;
   line-height: 1.2;
 }
 
 .revenue-stat-subtitle {
-  font-size: 13px;
+  font-size: 11px;
   color: #6b7280;
   margin: 0;
 }

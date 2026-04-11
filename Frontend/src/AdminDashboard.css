@@ -339,7 +339,7 @@
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 20px 24px;
   transition: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   text-align: left;
@@ -352,13 +352,13 @@
 .stat-card-content {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16px;
 }
 
 .stat-icon-wrapper {
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -391,7 +391,7 @@
 }
 
 .stat-icon {
-  font-size: 14px;
+  font-size: 24px;
 }
 
 .stat-content {
@@ -403,10 +403,10 @@
 }
 
 .stat-label {
-  font-size: 6px;
+  font-size: 11px;
   color: #9ca3af;
   margin: 0;
-  font-weight: 200;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   text-align: left;
@@ -414,25 +414,25 @@
 }
 
 .stat-value {
-  font-size: 10px;
+  font-size: 24px;
   color: #111827;
   margin: 0;
-  font-weight: 200;
+  font-weight: 700;
   line-height: 1.1;
   text-align: left;
 }
 
 .stat-card h3 {
-  font-size: 8px;
+  font-size: 24px;
   color: #111827;
   margin: 0;
-  font-weight: 400;
+  font-weight: 700;
   line-height: 1.1;
   text-align: left;
 }
 
 .stat-description {
-  font-size: 9px;
+  font-size: 13px;
   color: #6b7280;
   margin: 0;
   font-weight: 500;
@@ -441,7 +441,7 @@
 }
 
 .stat-card p {
-  font-size: 9px;
+  font-size: 13px;
   color: #6b7280;
   margin: 0;
   font-weight: 500;
@@ -3636,4 +3636,231 @@
   margin: 0;
   color: #64748b;
   font-size: 14px;
+}
+
+/* Fraud Detection Styles */
+.fraud-detection-header {
+  margin-bottom: 20px;
+}
+
+.fraud-stats-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.fraud-stat-card {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.fraud-stat-card svg {
+  font-size: 24px;
+}
+
+.fraud-stat-card.high svg {
+  color: #ef4444;
+}
+
+.fraud-stat-card.medium svg {
+  color: #f59e0b;
+}
+
+.fraud-stat-card.low svg {
+  color: #3b82f6;
+}
+
+.fraud-stat-card.total svg {
+  color: #64748b;
+}
+
+.fraud-stat-card h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+  color: #1e293b;
+}
+
+.fraud-stat-card p {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0;
+}
+
+.fraud-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.fraud-alert-card {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.fraud-alert-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.fraud-alert-icon {
+  font-size: 20px;
+  color: #64748b;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.fraud-alert-card.severity-high .fraud-alert-icon {
+  color: #ef4444;
+}
+
+.fraud-alert-card.severity-medium .fraud-alert-icon {
+  color: #f59e0b;
+}
+
+.fraud-alert-card.severity-low .fraud-alert-icon {
+  color: #3b82f6;
+}
+
+.fraud-alert-info {
+  flex: 1;
+}
+
+.fraud-alert-info h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.fraud-alert-description {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.fraud-severity-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.fraud-severity-badge.high {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.fraud-severity-badge.medium {
+  background: #fffbeb;
+  color: #f59e0b;
+}
+
+.fraud-severity-badge.low {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+
+.fraud-alert-details {
+  background: #f8fafc;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.fraud-detail-row {
+  display: flex;
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.fraud-detail-row:last-child {
+  padding-bottom: 0;
+}
+
+.fraud-detail-label {
+  font-weight: 600;
+  color: #475569;
+  min-width: 100px;
+}
+
+.fraud-detail-value {
+  color: #1e293b;
+  flex: 1;
+}
+
+.fraud-alert-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fraud-alert-actions .action-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.fraud-alert-actions .action-btn.view {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+
+.fraud-alert-actions .action-btn.view:hover {
+  background: #dbeafe;
+}
+
+.fraud-alert-actions .action-btn.block,
+.fraud-alert-actions .action-btn.suspend {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.fraud-alert-actions .action-btn.block:hover,
+.fraud-alert-actions .action-btn.suspend:hover {
+  background: #fee2e2;
+}
+
+.fraud-alert-actions .action-btn.dismiss {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.fraud-alert-actions .action-btn.dismiss:hover {
+  background: #e2e8f0;
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

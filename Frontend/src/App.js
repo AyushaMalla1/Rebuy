@@ -17,6 +17,7 @@ import About from './About';
 import Contact from './Contact';
 import Sustainability from './Sustainability';
 import FAQ from './FAQ';
+import TermsConditions from './TermsConditions';
 import OrderStatus from './OrderStatus';
 import PaymentOptions from './PaymentOptions';
 import PaymentSuccess from './PaymentSuccess';
@@ -32,6 +33,7 @@ import MensPants from './components/MensPants';
 import WomensBlazer from './components/WomensBlazer';
 import WomensSkirt from './components/WomensSkirt';
 import WomensTop from './components/WomensTop';
+import BlogArticle from './BlogArticle';
 
 // Protected Landing Page - redirects admin/seller to their dashboards
 function ProtectedLandingPage() {
@@ -88,6 +90,7 @@ function App() {
       <Route path="/contact" element={<Contact />} />
       <Route path="/sustainability" element={<Sustainability />} />
       <Route path="/faq" element={<FAQ />} />
+      <Route path="/terms" element={<TermsConditions />} />
       <Route path="/order-status" element={<OrderStatus />} />
       <Route path="/payment-options" element={<PaymentOptions />} />
       <Route path="/payment-success" element={<PaymentSuccess />} />
@@ -101,6 +104,7 @@ function App() {
       <Route path="/womens-blazer" element={<WomensBlazer />} />
       <Route path="/womens-skirt" element={<WomensSkirt />} />
       <Route path="/womens-top" element={<WomensTop />} />
+      <Route path="/blog/:slug" element={<BlogArticle />} />
     </Routes>
   );
 }

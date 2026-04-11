@@ -51,7 +51,6 @@ function AdminDashboard() {
   const [suspendedSellers, setSuspendedSellers] = useState([]);
   const [rejectedSellers, setRejectedSellers] = useState([]);
   const [suspiciousActivities, setSuspiciousActivities] = useState([]);
-  const [fraudAlerts, setFraudAlerts] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [loyaltyRecords, setLoyaltyRecords] = useState([]);
@@ -99,16 +98,51 @@ function AdminDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
-  const [profileData, setProfileData] = useState({
-    fullName: 'Administrator',
-    email: 'admin@rebuy.com',
-    phone: '',
-    city: '',
-    address: '',
-    country: 'Nepal'
+  
+  // Fraud Detection State
+  const [fraudAlerts, setFraudAlerts] = useState([]);
+  const [fraudStats, setFraudStats] = useState({
+    total: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    byType: {}
   });
+  const [loadingFraud, setLoadingFraud] = useState(false);
+  const [fraudFilter, setFraudFilter] = useState('all'); // all, high, medium, low
+  
+  // Get user data from localStorage
+  const getUserData = () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return {
+          fullName: user.fullName || 'Administrator',
+          email: user.email || 'admin@rebuy.com',
+          phone: user.phone || '',
+          city: user.city || '',
+          address: user.address || '',
+          country: 'Nepal',
+          profileImage: user.profileImage || 'https://i.pravatar.cc/100'
+        };
+      }
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
+    return {
+      fullName: 'Administrator',
+      email: 'admin@rebuy.com',
+      phone: '',
+      city: '',
+      address: '',
+      country: 'Nepal'
+    };
+  };
+
+  const [profileData, setProfileData] = useState(getUserData());
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [profileImage, setProfileImage] = useState('https://i.pravatar.cc/100');
+  const [profileImage, setProfileImage] = useState(getUserData().profileImage || 'https://i.pravatar.cc/100');
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
@@ -136,7 +170,7 @@ function AdminDashboard() {
     activeSellers: 0,
     totalCustomers: 0,
     averageOrderValue: 0,
-    commissionRate: 5,
+    commissionRate: 3,
     platformCommission: 0,
     topCategory: "Men's Collection",
     revenueGrowth: 0
@@ -154,6 +188,13 @@ function AdminDashboard() {
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Load fraud alerts when fraud detection tab is active
+  React.useEffect(() => {
+    if (activeTab === 'fraud-detection') {
+      fetchFraudDetection();
+    }
+  }, [activeTab]);
 
   const fetchAnalyticsData = async () => {
     try {
@@ -236,7 +277,7 @@ function AdminDashboard() {
 
       console.log('Fetching admin data from backend...');
 
-      const [statsRes, usersRes, pendingSellersRes, approvedSellersRes, suspendedSellersRes, rejectedSellersRes, productsRes, ordersRes, fraudRes, auditRes, announcementsRes, loyaltyRes, settingsRes, profileRes] = await Promise.all([
+      const [statsRes, usersRes, pendingSellersRes, approvedSellersRes, suspendedSellersRes, rejectedSellersRes, productsRes, ordersRes, auditRes, announcementsRes, loyaltyRes, settingsRes, profileRes] = await Promise.all([
         fetch('http://localhost:5000/api/admin/stats', { headers }).catch(err => {
           console.error('Stats fetch error:', err);
           return { ok: false, status: 500 };
@@ -267,10 +308,6 @@ function AdminDashboard() {
         }),
         fetch('http://localhost:5000/api/admin/orders', { headers }).catch(err => {
           console.error('Orders fetch error:', err);
-          return { ok: false, status: 500 };
-        }),
-        fetch('http://localhost:5000/api/admin/fraud-alerts', { headers }).catch(err => {
-          console.error('Fraud alerts fetch error:', err);
           return { ok: false, status: 500 };
         }),
         fetch('http://localhost:5000/api/admin/audit-logs', { headers }).catch(err => {
@@ -304,7 +341,6 @@ function AdminDashboard() {
         rejectedSellers: rejectedSellersRes.status,
         products: productsRes.status,
         orders: ordersRes.status,
-        fraud: fraudRes.status,
         audit: auditRes.status,
         announcements: announcementsRes.status,
         loyalty: loyaltyRes.status,
@@ -329,14 +365,13 @@ function AdminDashboard() {
       const rejectedSellersData = await rejectedSellersRes.json().catch(() => ({ success: false }));
       const productsData = await productsRes.json().catch(() => ({ success: false }));
       const ordersData = await ordersRes.json().catch(() => ({ success: false }));
-      const fraudData = await fraudRes.json().catch(() => ({ success: false }));
       const auditData = await auditRes.json().catch(() => ({ success: false }));
       const announcementsData = await announcementsRes.json().catch(() => ({ success: false }));
       const loyaltyData = await loyaltyRes.json().catch(() => ({ success: false }));
       const settingsData = await settingsRes.json().catch(() => ({ success: false }));
       const profileDataRes = await profileRes.json().catch(() => ({ success: false }));
 
-      console.log('Parsed data:', { stats, usersData, pendingSellersData, approvedSellersData, suspendedSellersData, rejectedSellersData, productsData, ordersData, fraudData, auditData, announcementsData, loyaltyData, settingsData });
+      console.log('Parsed data:', { stats, usersData, pendingSellersData, approvedSellersData, suspendedSellersData, rejectedSellersData, productsData, ordersData, auditData, announcementsData, loyaltyData, settingsData });
 
       if (stats.success) setAdminStats(stats.stats);
       if (usersData.success) {
@@ -422,9 +457,6 @@ function AdminDashboard() {
           status: o.status || 'Processing',
           date: new Date(o.orderDate || o.createdAt).toLocaleDateString()
         })));
-      }
-      if (fraudData.success) {
-        setFraudAlerts(fraudData.alerts || []);
       }
       if (auditData.success) {
         setAuditLogs(auditData.logs || []);
@@ -737,56 +769,6 @@ function AdminDashboard() {
       } catch (err) { 
         console.error(err);
         alert('Error reactivating seller');
-      }
-    }
-  };
-
-  const handleInvestigateFraud = async (alertId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/admin/fraud-alerts/${alertId}`, {
-        method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'investigating' })
-      });
-      
-      if (response.ok) {
-        alert('Fraud alert marked as investigating');
-        fetchAdminData();
-      } else {
-        alert('Failed to update fraud alert');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Error updating fraud alert');
-    }
-  };
-
-  const handleBlockFraudUser = async (alertId) => {
-    if (window.confirm('Block this user and mark alert as resolved?')) {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:5000/api/admin/fraud-alerts/${alertId}`, {
-          method: 'PATCH',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ status: 'blocked' })
-        });
-        
-        if (response.ok) {
-          alert('User blocked and alert resolved');
-          fetchAdminData();
-        } else {
-          alert('Failed to block user');
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Error blocking user');
       }
     }
   };
@@ -1413,7 +1395,7 @@ function AdminDashboard() {
     monthlyGrowth: salesStats.revenueGrowth || 0,
     topSellingCategory: salesStats.topCategory || "Men's Collection",
     averageOrderValue: salesStats.averageOrderValue || (adminStats.totalOrders > 0 ? (adminStats.totalRevenue / adminStats.totalOrders).toFixed(0) : 0),
-    commissionRate: salesStats.commissionRate || 5,
+    commissionRate: salesStats.commissionRate || 3,
     platformCommission: salesStats.platformCommission || 0
   };
 
@@ -1470,6 +1452,112 @@ function AdminDashboard() {
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Fraud Detection functions
+  const fetchFraudDetection = async () => {
+    setLoadingFraud(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/admin/fraud-detection', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setFraudAlerts(data.alerts || []);
+        setFraudStats(data.stats || { total: 0, high: 0, medium: 0, low: 0, byType: {} });
+      } else {
+        console.error('Fraud detection failed:', data.message);
+      }
+    } catch (error) {
+      console.error('Error fetching fraud detection:', error);
+    } finally {
+      setLoadingFraud(false);
+    }
+  };
+
+  const runFraudScan = async () => {
+    setLoadingFraud(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/admin/fraud-detection/scan', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(data.message);
+        // Refresh alerts after scan
+        fetchFraudDetection();
+      } else {
+        alert('Scan failed: ' + data.message);
+      }
+    } catch (error) {
+      console.error('Error running fraud scan:', error);
+      alert('Error running fraud scan');
+    } finally {
+      setLoadingFraud(false);
+    }
+  };
+
+  const dismissFraudAlert = async (alertId) => {
+    if (!window.confirm('Dismiss this fraud alert?')) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/admin/fraud-detection/${alertId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'dismissed' })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Alert dismissed');
+        fetchFraudDetection();
+      }
+    } catch (error) {
+      console.error('Error dismissing alert:', error);
+    }
+  };
+
+  const resolveFraudAlert = async (alertId, actionTaken) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/admin/fraud-detection/${alertId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          status: 'resolved',
+          actionTaken 
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Alert resolved');
+        fetchFraudDetection();
+      }
+    } catch (error) {
+      console.error('Error resolving alert:', error);
     }
   };
 
@@ -1621,16 +1709,17 @@ function AdminDashboard() {
             <FiBarChart2 /> Sales & Reports
           </button>
           <button 
-            className={activeTab === 'fraud' ? 'active' : ''} 
-            onClick={() => setActiveTab('fraud')}
-          >
-            <FiShield /> Fraud Detection
-          </button>
-          <button 
             className={activeTab === 'audit' ? 'active' : ''} 
             onClick={() => setActiveTab('audit')}
           >
             <FiClock /> Audit Log
+          </button>
+
+          <button 
+            className={activeTab === 'fraud-detection' ? 'active' : ''} 
+            onClick={() => setActiveTab('fraud-detection')}
+          >
+            <FiShield /> Fraud Detection
           </button>
 
           <button 
@@ -1674,8 +1763,8 @@ function AdminDashboard() {
               {activeTab === 'products' && 'Product Monitoring'}
               {activeTab === 'orders' && 'Orders Management'}
               {activeTab === 'sales' && 'Sales & Reports'}
-              {activeTab === 'fraud' && 'Fraud Detection'}
               {activeTab === 'audit' && 'Audit Log'}
+              {activeTab === 'fraud-detection' && 'Fraud Detection'}
               {activeTab === 'announcements' && 'Announcements'}
               {activeTab === 'loyalty' && 'Loyalty Points'}
               {activeTab === 'profile' && 'Admin Profile'}
@@ -1689,8 +1778,8 @@ function AdminDashboard() {
               {activeTab === 'products' && 'Monitor and approve product listings'}
               {activeTab === 'orders' && 'Track and manage customer orders'}
               {activeTab === 'sales' && 'View sales analytics and reports'}
-              {activeTab === 'fraud' && 'Monitor suspicious activities'}
               {activeTab === 'audit' && 'View system activity logs'}
+              {activeTab === 'fraud-detection' && 'Detect and prevent fraudulent activities'}
               {activeTab === 'announcements' && 'Manage platform announcements'}
               {activeTab === 'loyalty' && 'Manage loyalty points program'}
               {activeTab === 'profile' && 'Manage your admin account'}
@@ -1921,7 +2010,7 @@ function AdminDashboard() {
                 <FiShield />
               </div>
               <div className="admin-details">
-                <p className="admin-name">Administrator</p>
+                <p className="admin-name">{profileData.fullName}</p>
                 <p className="admin-role">Admin</p>
               </div>
             </div>
@@ -2949,101 +3038,6 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* Fraud Detection Tab */}
-        {activeTab === 'fraud' && (
-          <div className="content-section">
-            <div className="section-header" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2>Fraud Detection</h2>
-                <p>Automated monitoring of suspicious activities</p>
-              </div>
-              <button 
-                className="primary-btn"
-                onClick={async () => {
-                  if (window.confirm('Run fraud detection scan on all data?')) {
-                    try {
-                      const token = localStorage.getItem('token');
-                      const response = await fetch('http://localhost:5000/api/admin/fraud-detection/run', {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` }
-                      });
-                      const data = await response.json();
-                      if (data.success) {
-                        alert(data.message);
-                        fetchAdminData();
-                      }
-                    } catch (err) {
-                      console.error(err);
-                      alert('Error running fraud detection');
-                    }
-                  }
-                }}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-              >
-                <FiSearch /> Run Scan
-              </button>
-            </div>
-            <div className="fraud-alerts">
-              {fraudAlerts.map(alert => (
-                <div key={alert._id} className={`fraud-card risk-${alert.riskLevel}`}>
-                  <div className="fraud-header">
-                    <div className="fraud-icon">
-                      <FiAlertCircle />
-                    </div>
-                    <div className="fraud-info">
-                      <h3>{alert.type.replace(/_/g, ' ').toUpperCase()}</h3>
-                      <p>{alert.description}</p>
-                    </div>
-                    <span className={`risk-badge ${alert.riskLevel}`}>
-                      {alert.riskLevel} Risk
-                    </span>
-                  </div>
-
-                  <div className="fraud-details">
-                    <div className="fraud-detail-item">
-                      <FiClock />
-                      <span>{new Date(alert.createdAt).toLocaleString()}</span>
-                    </div>
-                    <div className="fraud-detail-item">
-                      <FiActivity />
-                      <span>Status: {alert.status}</span>
-                    </div>
-                    {alert.amount && (
-                      <div className="fraud-detail-item">
-                        <MdAttachMoney />
-                        <span>Rs. {alert.amount.toLocaleString()}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="fraud-actions">
-                    <button 
-                      className="investigate-btn"
-                      onClick={() => handleInvestigateFraud(alert._id)}
-                    >
-                      <FiEye /> Investigate
-                    </button>
-                    <button 
-                      className="block-btn"
-                      onClick={() => handleBlockFraudUser(alert._id)}
-                    >
-                      <FiXCircle /> Block User
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {fraudAlerts.length === 0 && (
-              <div className="empty-state-card">
-                <FiShield size={64} />
-                <h3>No Suspicious Activities</h3>
-                <p>All transactions are secure</p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Audit Log Tab */}
         {activeTab === 'audit' && (
           <div className="content-section">
@@ -3114,6 +3108,176 @@ function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Fraud Detection Tab */}
+        {activeTab === 'fraud-detection' && (
+          <div className="content-section">
+            <div className="fraud-detection-header">
+              <button 
+                className="export-btn" 
+                onClick={runFraudScan}
+                disabled={loadingFraud}
+              >
+                <FiShield /> {loadingFraud ? 'Scanning...' : 'Run Fraud Scan'}
+              </button>
+              
+              <div className="fraud-stats-summary">
+                <div className="fraud-stat-card high">
+                  <FiAlertCircle />
+                  <div>
+                    <h3>{fraudStats.high}</h3>
+                    <p>High Risk</p>
+                  </div>
+                </div>
+                <div className="fraud-stat-card medium">
+                  <FiAlertCircle />
+                  <div>
+                    <h3>{fraudStats.medium}</h3>
+                    <p>Medium Risk</p>
+                  </div>
+                </div>
+                <div className="fraud-stat-card low">
+                  <FiAlertCircle />
+                  <div>
+                    <h3>{fraudStats.low}</h3>
+                    <p>Low Risk</p>
+                  </div>
+                </div>
+                <div className="fraud-stat-card total">
+                  <FiShield />
+                  <div>
+                    <h3>{fraudStats.pending || fraudStats.total}</h3>
+                    <p>Pending Review</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {loadingFraud ? (
+              <div className="loading-message">
+                <FiShield className="loading-icon" />
+                <p>Loading fraud alerts...</p>
+              </div>
+            ) : fraudAlerts.length === 0 ? (
+              <div className="empty-state">
+                <FiShield size={48} />
+                <h3>No Fraud Alerts</h3>
+                <p>Click "Run Fraud Scan" to analyze the system for suspicious activities</p>
+              </div>
+            ) : (
+              <div className="fraud-alerts-list">
+                {fraudAlerts
+                  .filter(alert => fraudFilter === 'all' || alert.severity === fraudFilter)
+                  .map((alert) => (
+                    <div key={alert._id} className={`fraud-alert-card severity-${alert.severity}`}>
+                      <div className="fraud-alert-header">
+                        <div className="fraud-alert-icon">
+                          <FiAlertCircle />
+                        </div>
+                        <div className="fraud-alert-info">
+                          <h3>{alert.title}</h3>
+                          <p className="fraud-alert-description">{alert.description}</p>
+                        </div>
+                        <div className={`fraud-severity-badge ${alert.severity}`}>
+                          {alert.severity.toUpperCase()}
+                        </div>
+                      </div>
+                      
+                      <div className="fraud-alert-details">
+                        <div className="fraud-detail-row">
+                          <span className="fraud-detail-label">Type:</span>
+                          <span className="fraud-detail-value">{alert.type.replace(/_/g, ' ').toUpperCase()}</span>
+                        </div>
+                        
+                        {alert.userName && (
+                          <div className="fraud-detail-row">
+                            <span className="fraud-detail-label">User:</span>
+                            <span className="fraud-detail-value">{alert.userName} ({alert.userEmail})</span>
+                          </div>
+                        )}
+                        
+                        {alert.sellerName && (
+                          <div className="fraud-detail-row">
+                            <span className="fraud-detail-label">Seller:</span>
+                            <span className="fraud-detail-value">{alert.sellerName} - {alert.storeName}</span>
+                          </div>
+                        )}
+                        
+                        {alert.productName && (
+                          <div className="fraud-detail-row">
+                            <span className="fraud-detail-label">Product:</span>
+                            <span className="fraud-detail-value">{alert.productName}</span>
+                          </div>
+                        )}
+                        
+                        <div className="fraud-detail-row">
+                          <span className="fraud-detail-label">Details:</span>
+                          <span className="fraud-detail-value">{alert.details}</span>
+                        </div>
+                        
+                        <div className="fraud-detail-row">
+                          <span className="fraud-detail-label">Status:</span>
+                          <span className="fraud-detail-value">{alert.status.toUpperCase()}</span>
+                        </div>
+                        
+                        <div className="fraud-detail-row">
+                          <span className="fraud-detail-label">Detected:</span>
+                          <span className="fraud-detail-value">{new Date(alert.detectedAt).toLocaleString()}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="fraud-alert-actions">
+                        {alert.userId && (
+                          <>
+                            <button 
+                              className="action-btn view"
+                              onClick={() => handleViewUser(alert.userId)}
+                            >
+                              <FiEye /> View User
+                            </button>
+                            <button 
+                              className="action-btn block"
+                              onClick={() => {
+                                handleBlockUser(alert.userId);
+                                resolveFraudAlert(alert._id, 'User blocked');
+                              }}
+                            >
+                              <FiXCircle /> Block User
+                            </button>
+                          </>
+                        )}
+                        {alert.sellerId && (
+                          <>
+                            <button 
+                              className="action-btn view"
+                              onClick={() => handleViewSeller(alert.sellerId)}
+                            >
+                              <FiEye /> View Seller
+                            </button>
+                            <button 
+                              className="action-btn suspend"
+                              onClick={() => {
+                                handleSuspendSeller(alert.sellerId);
+                                resolveFraudAlert(alert._id, 'Seller suspended');
+                              }}
+                            >
+                              <FiXCircle /> Suspend Seller
+                            </button>
+                          </>
+                        )}
+                        <button 
+                          className="action-btn dismiss"
+                          onClick={() => dismissFraudAlert(alert._id)}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  ))}
               </div>
             )}
           </div>
@@ -3331,7 +3495,7 @@ function AdminDashboard() {
               <div className="profile-header">
                 <div>
                   <h2 className="profile-store-name">
-                    Administrator
+                    {profileData.fullName}
                   </h2>
                   <span className="profile-verified-badge">
                     Admin Account
@@ -3467,9 +3631,9 @@ function AdminDashboard() {
                     <label>Platform Commission Rate (%)</label>
                     <input 
                       type="number" 
-                      value={settings.commissionRate || 5}
+                      value={settings.commissionRate || 3}
                       onChange={(e) => setSettings({...settings, commissionRate: parseFloat(e.target.value)})}
-                      placeholder="5"
+                      placeholder="3"
                       min="0"
                       max="100"
                     />

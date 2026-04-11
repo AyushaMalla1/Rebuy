@@ -38,9 +38,9 @@ export const RevenueTrendChart = ({ data, title = "Revenue Trend (Last 7 Days)" 
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="day" />
             <YAxis />
-            <Tooltip />
+            <Tooltip formatter={(value) => [`Rs. ${value.toLocaleString()}`, 'Revenue']} />
             <Legend />
-            <Line type="monotone" dataKey="revenue" stroke="#00bcd4" strokeWidth={2} activeDot={{ r: 8 }} />
+            <Line type="monotone" dataKey="revenue" stroke="#00bcd4" strokeWidth={2} activeDot={{ r: 8 }} name="Revenue" />
           </LineChart>
         </ResponsiveContainer>
       ) : (
@@ -401,6 +401,181 @@ export const RevenueBreakdownChart = ({ data, title = "Revenue Breakdown" }) => 
       ) : (
         <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
           <p>No revenue breakdown data available</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+// Orders Bar Chart
+export const OrdersBarChart = ({ data, title = "Orders Trend" }) => {
+  const chartData = data && data.length > 0 ? data : [];
+
+  return (
+    <div className="chart-card">
+      <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
+      {data && data.length > 0 ? (
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="day" stroke="#666" />
+            <YAxis stroke="#666" />
+            <Tooltip 
+              contentStyle={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px' }}
+              cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
+              formatter={(value) => [`${value} orders`, 'Orders']}
+            />
+            <Bar dataKey="revenue" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Orders" />
+          </BarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+          <p>No orders data available</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Average Order Value Area Chart
+export const AvgOrderValueChart = ({ data, title = "Average Order Value Trend" }) => {
+  const chartData = data && data.length > 0 ? data : [];
+
+  return (
+    <div className="chart-card">
+      <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
+      {data && data.length > 0 ? (
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+            <defs>
+              <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="day" stroke="#666" />
+            <YAxis stroke="#666" />
+            <Tooltip 
+              contentStyle={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px' }}
+              formatter={(value) => [`Rs. ${value.toLocaleString()}`, 'Avg Order Value']}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="revenue" 
+              stroke="#f59e0b" 
+              strokeWidth={3}
+              fill="url(#colorAvg)"
+              fillOpacity={1}
+              dot={{ fill: '#f59e0b', r: 4 }}
+              activeDot={{ r: 6 }}
+              name="Avg Order Value"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+          <p>No average order value data available</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Platform Fees Donut Chart
+export const PlatformFeesChart = ({ data, title = "Platform Fees Breakdown" }) => {
+  // Calculate total fees and revenue
+  const totalRevenue = data && data.length > 0 
+    ? data.reduce((sum, item) => sum + (item.revenue || 0), 0) 
+    : 0;
+  
+  const platformFees = totalRevenue * 0.03; // 3% platform fee
+  const sellerRevenue = totalRevenue - platformFees;
+
+  const pieData = [
+    { name: 'Your Revenue', value: sellerRevenue, color: '#10b981' },
+    { name: 'Platform Fees (3%)', value: platformFees, color: '#ef4444' }
+  ];
+
+  return (
+    <div className="chart-card">
+      <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
+      {totalRevenue > 0 ? (
+        <ResponsiveContainer width="100%" height={280}>
+          <PieChart>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={100}
+              paddingAngle={5}
+              dataKey="value"
+            >
+              {pieData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip 
+              formatter={(value) => `Rs. ${value.toLocaleString()}`}
+              contentStyle={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px' }}
+            />
+            <Legend 
+              verticalAlign="bottom" 
+              height={36}
+              formatter={(value, entry) => `${value}: Rs. ${entry.payload.value.toLocaleString()}`}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+          <p>No fees data available</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Net Revenue Chart with Gradient
+export const NetRevenueChart = ({ data, title = "Net Revenue Trend" }) => {
+  const chartData = data && data.length > 0 ? data : [];
+
+  return (
+    <div className="chart-card">
+      <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
+      {data && data.length > 0 ? (
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+            <defs>
+              <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="day" stroke="#666" />
+            <YAxis stroke="#666" />
+            <Tooltip 
+              contentStyle={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px' }}
+              formatter={(value) => [`Rs. ${value.toLocaleString()}`, 'Net Revenue']}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="revenue" 
+              stroke="#10b981" 
+              strokeWidth={3}
+              fill="url(#colorNet)"
+              fillOpacity={1}
+              dot={{ fill: '#10b981', r: 4 }}
+              activeDot={{ r: 6 }}
+              name="Net Revenue"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+          <p>No net revenue data available</p>
         </div>
       )}
     </div>

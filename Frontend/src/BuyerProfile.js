@@ -653,7 +653,14 @@ function BuyerProfile() {
 
   const fetchCustomerProfile = async (userId) => {
     try {
+      console.log('fetchCustomerProfile called with userId:', userId);
+      console.log('userId type:', typeof userId);
+      console.log('userId length:', userId?.length);
+      
       const profile = await customerAPI.get(userId);
+      console.log('Fetched customer profile:', profile);
+      console.log('Profile profileImage:', profile.profileImage);
+      
       if (profile) {
         // Update user data with profile info
         setUserData({
@@ -673,6 +680,8 @@ function BuyerProfile() {
           profileImage: profile.profileImage || ''
         });
         setProfileImagePreview(profile.profileImage || '');
+        
+        console.log('Set profileImagePreview to:', profile.profileImage || 'empty');
         
         // Load addresses
         if (profile.addresses && profile.addresses.length > 0) {
@@ -726,27 +735,36 @@ function BuyerProfile() {
       if (response.ok) {
         const data = await response.json();
         console.log('Wishlist data received:', data);
+        console.log('Raw wishlist items:', data.wishlist?.items);
         
         // Format wishlist items - backend returns { success, wishlist: { items: [...] } }
         const wishlistItems = data.wishlist?.items || [];
         console.log('Wishlist items count:', wishlistItems.length);
         
         const formattedWishlist = wishlistItems
-          .filter(item => item.product && typeof item.product === 'object') // Only include items with populated products
+          .filter(item => {
+            const hasProduct = item.product && typeof item.product === 'object';
+            if (!hasProduct) {
+              console.warn('Skipping item without product:', item);
+            }
+            return hasProduct;
+          })
           .map(item => {
-            console.log('Processing wishlist item:', item);
+            console.log('Processing wishlist item:', item.product);
             return {
-              id: item.product._id || item.product,
+              id: item.product._id,
               name: item.product.name || 'Unknown Product',
               price: item.product.price || 0,
               image: (item.product.images && item.product.images[0]) || 'https://i.pinimg.com/736x/97/a1/91/97a191e1e99f977fa20a3d79836ac487.jpg',
-              seller: item.product.seller || item.seller,
+              seller: item.product.seller,
               sellerName: item.product.sellerName || 'Unknown Seller',
               storeName: item.product.storeName || 'Store',
-              stock: item.product.stock || 0
+              stock: item.product.stock || 0,
+              status: item.product.status
             };
           });
         
+        console.log('Formatted wishlist count:', formattedWishlist.length);
         console.log('Formatted wishlist:', formattedWishlist);
         setWishlist(formattedWishlist);
       } else {
@@ -794,7 +812,7 @@ function BuyerProfile() {
   // Calculate order counts by status
   const getOrderCounts = () => {
     return {
-      pending: orders.filter(o => o.status === 'Pending').length,
+      pending: orders.filter(o => o.paymentStatus === 'Pending').length, // Orders with pending payment (COD not yet delivered)
       processing: orders.filter(o => o.status === 'Processing').length,
       shipped: orders.filter(o => o.status === 'Shipped').length,
       delivered: orders.filter(o => o.status === 'Delivered').length
@@ -891,10 +909,19 @@ function BuyerProfile() {
       console.log('Uploading image for user:', user._id);
       const result = await customerAPI.uploadProfileImage(user._id, profileImage);
       
+      console.log('Upload result:', result);
+      console.log('Uploaded profileImage URL:', result.profileImage);
+      
+      // Update state
       setUserData(prev => ({ ...prev, profileImage: result.profileImage }));
       setEditData(prev => ({ ...prev, profileImage: result.profileImage }));
       setProfileImagePreview(result.profileImage);
       setProfileImage(null);
+      
+      // Update localStorage so the image persists across page refreshes
+      const updatedUser = { ...user, profileImage: result.profileImage };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('Updated localStorage with profileImage');
       
       showToast('Profile image updated successfully!', 'success');
     } catch (error) {
@@ -1622,7 +1649,7 @@ function BuyerProfile() {
                 
                 <div className="user">
                   <img 
-                    src={profileImagePreview || userData.profileImage || 'https://i.pravatar.cc/100'} 
+                    src={profileImagePreview || userData.profileImage || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userData.fullName || 'User') + '&background=0D8ABC&color=fff'} 
                     alt="Profile" 
                     className="user-avatar"
                   />
@@ -1702,11 +1729,11 @@ function BuyerProfile() {
               >
                 <div className="status-card-content">
                   <div className="status-icon-wrapper review">
-                    <FiStar className="status-icon" />
+                    <FiCheckCircle className="status-icon" />
                   </div>
                   <div className="status-card-info">
-                    <h3>To Review</h3>
-                    <p className="status-count">{getOrderCounts().delivered}</p>
+                    <h3>To Verify</h3>
+                    <p className="status-count">{orders.filter(o => o.status === 'Delivered' && !o.conditionVerified).length}</p>
                     <span className="status-desc">Completed</span>
                   </div>
                 </div>
@@ -1885,7 +1912,7 @@ function BuyerProfile() {
                 .filter(order => {
                   if (orderFilter === 'all') return true;
                   const status = order.status.toLowerCase();
-                  if (orderFilter === 'pending') return status === 'pending' || status === 'unpaid';
+                  if (orderFilter === 'pending') return order.paymentStatus === 'Pending'; // Filter by payment status for "To Pay"
                   if (orderFilter === 'processing') return status === 'processing' || status === 'confirmed';
                   if (orderFilter === 'shipped') return status === 'shipped' || status === 'in transit';
                   if (orderFilter === 'delivered') return status === 'delivered' || status === 'completed';
@@ -1955,7 +1982,7 @@ function BuyerProfile() {
                                 setShowReturnModal(true);
                               }}
                             >
-                              <FiRefreshCw /> Return Item
+                              <FiRefreshCw /> Return
                             </button>
                           )}
                           {(order.status === 'Pending' || order.status === 'pending' || order.status === 'Processing' || order.status === 'processing' || order.status === 'Confirmed') && idx === 0 && (
@@ -1963,7 +1990,7 @@ function BuyerProfile() {
                               className="cancel-btn-compact"
                               onClick={() => handleCancelOrder(order._id || order.id)}
                             >
-                              <FiX /> Cancel Order
+                              <FiX /> Cancel
                             </button>
                           )}
                         </div>
@@ -1978,7 +2005,7 @@ function BuyerProfile() {
             {orders.filter(order => {
               if (orderFilter === 'all') return true;
               const status = order.status.toLowerCase();
-              if (orderFilter === 'pending') return status === 'pending' || status === 'unpaid';
+              if (orderFilter === 'pending') return order.paymentStatus === 'Pending'; // Filter by payment status for "To Pay"
               if (orderFilter === 'processing') return status === 'processing' || status === 'confirmed';
               if (orderFilter === 'shipped') return status === 'shipped' || status === 'in transit';
               if (orderFilter === 'delivered') return status === 'delivered' || status === 'completed';
@@ -1996,7 +2023,10 @@ function BuyerProfile() {
               <div className="modal-overlay" onClick={() => setShowOrderDetails(false)}>
                 <div className="modal-content-compact" onClick={(e) => e.stopPropagation()}>
                   <div className="modal-header-compact">
-                    <h2>ITEM DETAILS</h2>
+                    <div>
+                      <h2>ITEM DETAILS</h2>
+                      <p style={{fontSize: '13px', color: '#666', margin: '4px 0 0 0'}}>Order ID: {selectedOrder.id || selectedOrder._id}</p>
+                    </div>
                     <button className="close-modal" onClick={() => setShowOrderDetails(false)}>
                       <FiX />
                     </button>
@@ -2055,7 +2085,9 @@ function BuyerProfile() {
                           </div>
                           <div className="payment-method">
                             {selectedOrder.paymentMethod === 'cod' 
-                              ? 'To Pay By Cash on delivery (COD)' 
+                              ? selectedOrder.paymentStatus === 'Paid' 
+                                ? 'Paid By Cash on Delivery (COD)' 
+                                : 'To Pay By Cash on Delivery (COD)'
                               : selectedOrder.paymentMethod === 'esewa'
                                 ? 'Paid By eSewa'
                                 : selectedOrder.paymentMethod === 'khalti'
@@ -2064,6 +2096,57 @@ function BuyerProfile() {
                             }
                           </div>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Order Tracking Timeline */}
+                    <div className="modal-section tracking-section">
+                      <h3>Order Tracking</h3>
+                      <div className="tracking-timeline">
+                        <div className={`tracking-step ${['Processing', 'Confirmed', 'Shipped', 'Delivered'].includes(selectedOrder.status) ? 'completed' : ''}`}>
+                          <div className="tracking-dot"></div>
+                          <div className="tracking-content">
+                            <h4>Order Placed</h4>
+                            <p>{selectedOrder.orderDate ? new Date(selectedOrder.orderDate).toLocaleString() : 'N/A'}</p>
+                          </div>
+                        </div>
+                        
+                        <div className={`tracking-step ${['Confirmed', 'Shipped', 'Delivered'].includes(selectedOrder.status) ? 'completed' : selectedOrder.status === 'Processing' ? 'active' : ''}`}>
+                          <div className="tracking-dot"></div>
+                          <div className="tracking-content">
+                            <h4>Processing</h4>
+                            <p>{selectedOrder.confirmedAt ? new Date(selectedOrder.confirmedAt).toLocaleString() : selectedOrder.status === 'Processing' ? 'In Progress' : 'Pending'}</p>
+                          </div>
+                        </div>
+                        
+                        <div className={`tracking-step ${['Shipped', 'Delivered'].includes(selectedOrder.status) ? 'completed' : selectedOrder.status === 'Confirmed' ? 'active' : ''}`}>
+                          <div className="tracking-dot"></div>
+                          <div className="tracking-content">
+                            <h4>Shipped</h4>
+                            <p>{selectedOrder.shippedAt ? new Date(selectedOrder.shippedAt).toLocaleString() : selectedOrder.status === 'Shipped' ? 'In Transit' : 'Pending'}</p>
+                            {selectedOrder.trackingNumber && (
+                              <p className="tracking-number">Tracking: {selectedOrder.trackingNumber}</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className={`tracking-step ${selectedOrder.status === 'Delivered' ? 'completed' : selectedOrder.status === 'Shipped' ? 'active' : ''}`}>
+                          <div className="tracking-dot"></div>
+                          <div className="tracking-content">
+                            <h4>Delivered</h4>
+                            <p>{selectedOrder.deliveredAt ? new Date(selectedOrder.deliveredAt).toLocaleString() : selectedOrder.estimatedDelivery ? `Est: ${new Date(selectedOrder.estimatedDelivery).toLocaleDateString()}` : 'Pending'}</p>
+                          </div>
+                        </div>
+
+                        {selectedOrder.status === 'Cancelled' && (
+                          <div className="tracking-step cancelled">
+                            <div className="tracking-dot"></div>
+                            <div className="tracking-content">
+                              <h4>Order Cancelled</h4>
+                              <p>{selectedOrder.cancelledAt ? new Date(selectedOrder.cancelledAt).toLocaleString() : 'N/A'}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2582,31 +2665,34 @@ function BuyerProfile() {
                   <h4>{editingAddress ? 'Edit Address' : 'Add New Address'}</h4>
                   <div className="form-grid">
                     <div className="form-field">
-                      <label>Full Name</label>
+                      <label>Full Name <span style={{color: 'red'}}>*</span></label>
                       <input
                         type="text"
                         name="fullName"
                         value={newAddress.fullName}
                         onChange={handleAddressChange}
                         placeholder="John Doe"
+                        required
                       />
                     </div>
                     <div className="form-field">
-                      <label>Phone Number</label>
+                      <label>Phone Number <span style={{color: 'red'}}>*</span></label>
                       <input
                         type="tel"
                         name="phone"
                         value={newAddress.phone}
                         onChange={handleAddressChange}
                         placeholder="+977 9812345678"
+                        required
                       />
                     </div>
                     <div className="form-field">
-                      <label>State/Province</label>
+                      <label>State/Province <span style={{color: 'red'}}>*</span></label>
                       <select
                         name="state"
                         value={newAddress.state}
                         onChange={handleAddressChange}
+                        required
                       >
                         <option value="">Select State</option>
                         {getProvinces().map(province => (
@@ -2615,12 +2701,13 @@ function BuyerProfile() {
                       </select>
                     </div>
                     <div className="form-field">
-                      <label>District</label>
+                      <label>District <span style={{color: 'red'}}>*</span></label>
                       <select
                         name="district"
                         value={newAddress.district}
                         onChange={handleAddressChange}
                         disabled={!newAddress.state}
+                        required
                       >
                         <option value="">Select District</option>
                         {newAddress.state && getDistrictsByProvince(newAddress.state).map(district => (
@@ -2629,12 +2716,13 @@ function BuyerProfile() {
                       </select>
                     </div>
                     <div className="form-field">
-                      <label>Municipality</label>
+                      <label>Municipality <span style={{color: 'red'}}>*</span></label>
                       <select
                         name="municipality"
                         value={newAddress.municipality}
                         onChange={handleAddressChange}
                         disabled={!newAddress.district}
+                        required
                       >
                         <option value="">Select Municipality</option>
                         {newAddress.state && newAddress.district && 
@@ -2645,12 +2733,13 @@ function BuyerProfile() {
                       </select>
                     </div>
                     <div className="form-field">
-                      <label>City/Area</label>
+                      <label>City/Area <span style={{color: 'red'}}>*</span></label>
                       <select
                         name="city"
                         value={newAddress.city}
                         onChange={handleAddressChange}
                         disabled={!newAddress.municipality}
+                        required
                       >
                         <option value="">Select Area</option>
                         {newAddress.state && newAddress.district && newAddress.municipality &&
@@ -2661,13 +2750,14 @@ function BuyerProfile() {
                       </select>
                     </div>
                     <div className="form-field full-width">
-                      <label>Nearest Landmark</label>
+                      <label>Nearest Landmark <span style={{color: 'red'}}>*</span></label>
                       <input
                         type="text"
                         name="landmark"
                         value={newAddress.landmark}
                         onChange={handleAddressChange}
                         placeholder="e.g., Near Ratna Park, Opposite City Mall"
+                        required
                       />
                     </div>
                     <div className="form-field">

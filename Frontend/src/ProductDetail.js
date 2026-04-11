@@ -73,7 +73,7 @@ function ProductDetail() {
               name: p.name,
               price: p.price,
               image: p.images?.[0] || 'https://via.placeholder.com/300',
-              rating: p.rating || 4.5
+              rating: p.averageRating || 0
             }));
           
           console.log('Similar products found:', similar.length);
@@ -410,10 +410,14 @@ function ProductDetail() {
             <div className="product-rating">
               <div className="stars">
                 {[...Array(5)].map((_, i) => (
-                  <FiStar key={i} className={i < Math.floor(product.rating || 4.5) ? 'star-filled' : 'star-empty'} />
+                  <FiStar key={i} className={i < Math.floor(product.averageRating || 0) ? 'star-filled' : 'star-empty'} />
                 ))}
               </div>
-              <span className="rating-text">{product.rating || '4.5'} ({product.reviews || 128} reviews)</span>
+              <span className="rating-text">
+                {product.averageRating && product.reviewCount > 0 
+                  ? `${product.averageRating.toFixed(1)} (${product.reviewCount} reviews)` 
+                  : 'No reviews yet'}
+              </span>
             </div>
             
             {product.bundleDeal && product.bundleDeal.enabled && (
@@ -584,7 +588,11 @@ function ProductDetail() {
                 <p className="seller-store-name">{sellerInfo.storeName}</p>
                 <div className="seller-rating">
                   <FiStar className="star-filled" />
-                  <span>{sellerInfo.rating} ({sellerInfo.totalReviews} reviews)</span>
+                  <span>
+                    {sellerInfo.totalReviews > 0 
+                      ? `${sellerInfo.rating} (${sellerInfo.totalReviews} reviews)` 
+                      : 'No reviews yet'}
+                  </span>
                 </div>
               </div>
             </div>

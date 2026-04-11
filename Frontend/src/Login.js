@@ -165,7 +165,7 @@ function Login() {
           </button>
         </form>
 
-        {/* Divider */}
+        {/* Divider - Show for all login types */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -177,10 +177,14 @@ function Login() {
           <div style={{flex: 1, height: '1px', background: '#e0e0e0'}}></div>
         </div>
 
-        {/* Google Sign In Button */}
+        {/* Google Sign In Button - Available for all user types */}
         <button
           type="button"
-          onClick={() => window.location.href = 'http://localhost:5000/api/auth/google'}
+          onClick={() => {
+            // Store the intended user type in sessionStorage before redirecting
+            sessionStorage.setItem('googleAuthUserType', activeTab);
+            window.location.href = `http://localhost:5000/api/auth/google?userType=${activeTab}`;
+          }}
           style={{
             width: '100%',
             padding: '14px',

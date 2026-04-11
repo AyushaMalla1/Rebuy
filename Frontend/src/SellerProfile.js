@@ -335,7 +335,7 @@ function SellerProfile() {
                     </div>
                     <div className="product-rating-modern">
                       <FiStar className="star-icon" />
-                      <span>{product.rating || 4.5}</span>
+                      <span>{product.averageRating ? product.averageRating.toFixed(1) : 'No rating'}</span>
                     </div>
                   </div>
                 </div>

@@ -492,13 +492,16 @@ function Checkout() {
       // Create order in backend first
       const response = await orderAPI.create(orderData);
 
+      console.log('Order API response:', response);
+
       if (!response || !response.order) {
-        throw new Error('Invalid response from server');
+        console.error('Invalid response:', response);
+        throw new Error(response?.message || 'Invalid response from server');
       }
 
       const orderId = response.order._id;
 
-      console.log('Order created successfully! Order ID:', orderId);
+      console.log('✅ Order created successfully! Order ID:', orderId);
       console.log('Full order details:', response.order);
 
       // Store order ID in localStorage for manual verification

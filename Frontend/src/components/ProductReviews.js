@@ -5,11 +5,30 @@ import { reviewAPI } from '../services/api';
 
 function ProductReviews({ productId }) {
   const [verifications, setVerifications] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showRatingForm, setShowRatingForm] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchVerifications();
+    fetchReviews();
   }, [productId]);
+
+  const fetchReviews = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/reviews/product/${productId}`);
+      const data = await response.json();
+      if (data.success) {
+        setReviews(data.reviews || []);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    }
+  };
 
   const fetchVerifications = async () => {
     try {
@@ -24,11 +43,78 @@ function ProductReviews({ productId }) {
     }
   };
 
+  const handleSubmitRating = async (e) => {
+    e.preventDefault();
+    
+    if (rating === 0) {
+      alert('Please select a rating');
+      return;
+    }
+
+    if (!comment.trim()) {
+      alert('Please write a review comment');
+      return;
+    }
+
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) {
+      alert('Please login to submit a rating');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/reviews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          productId: productId,
+          customerId: user._id,
+          rating,
+          title: `${rating} Star Review`,
+          comment: comment.trim()
+        })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert('Rating submitted successfully!');
+        setShowRatingForm(false);
+        setRating(0);
+        setComment('');
+        fetchVerifications(); // Refresh to show new rating
+        fetchReviews(); // Refresh reviews
+      } else {
+        alert(data.message || 'Failed to submit rating');
+      }
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      alert('Error submitting rating');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const renderStars = (rating) => {
     return [...Array(5)].map((_, i) => (
       <FiStar
         key={i}
         className={i < rating ? 'star-filled' : 'star-empty'}
+      />
+    ));
+  };
+
+  const renderInteractiveStars = () => {
+    return [...Array(5)].map((_, i) => (
+      <FiStar
+        key={i}
+        className={`star-interactive ${i < (hoverRating || rating) ? 'star-filled' : 'star-empty'}`}
+        onMouseEnter={() => setHoverRating(i + 1)}
+        onMouseLeave={() => setHoverRating(0)}
+        onClick={() => setRating(i + 1)}
       />
     ));
   };
@@ -40,7 +126,102 @@ function ProductReviews({ productId }) {
   return (
     <div className="product-reviews">
       <div className="reviews-header">
-        <h2>Condition Verifications</h2>
+        <h2>Customer Reviews & Ratings</h2>
+        <button 
+          className="write-review-btn"
+          onClick={() => setShowRatingForm(!showRatingForm)}
+        >
+          {showRatingForm ? 'Cancel' : 'Write a Review'}
+        </button>
+      </div>
+
+      {/* Rating Form */}
+      {showRatingForm && (
+        <div className="rating-form-container">
+          <h3>Rate this Product</h3>
+          <form onSubmit={handleSubmitRating} className="rating-form">
+            <div className="rating-stars-input">
+              <label>Your Rating:</label>
+              <div className="stars-input">
+                {renderInteractiveStars()}
+                <span className="rating-value">{rating > 0 ? `${rating} out of 5` : 'Select rating'}</span>
+              </div>
+            </div>
+            
+            <div className="rating-comment-input">
+              <label>Your Review (Required):</label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Share your experience with this product..."
+                rows="4"
+              />
+            </div>
+
+            <button 
+              type="submit" 
+              className="submit-rating-btn"
+              disabled={submitting || rating === 0}
+            >
+              {submitting ? 'Submitting...' : 'Submit Rating'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Customer Reviews Section */}
+      {reviews.length > 0 && (
+        <>
+          <div className="reviews-section-divider">
+            <h3>Customer Reviews</h3>
+            <span className="verification-count">{reviews.length} Review{reviews.length !== 1 ? 's' : ''}</span>
+          </div>
+
+          <div className="reviews-list">
+            {reviews.map(review => (
+              <div key={review._id} className="review-card">
+                <div className="review-header">
+                  <div className="reviewer-info">
+                    <strong>{review.customer?.fullName || 'Anonymous'}</strong>
+                    {review.verifiedPurchase && <span className="verified-badge">✓ Verified Purchase</span>}
+                  </div>
+                  <div className="review-rating">
+                    {renderStars(review.rating)}
+                  </div>
+                </div>
+
+                <h4 className="review-title">{review.title}</h4>
+                <p className="review-comment">{review.comment}</p>
+
+                {review.images && review.images.length > 0 && (
+                  <div className="review-images">
+                    {review.images.map((img, idx) => (
+                      <img 
+                        key={idx} 
+                        src={img} 
+                        alt={`Review ${idx + 1}`}
+                        className="review-image"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <div className="review-footer">
+                  <span className="review-date">
+                    {new Date(review.createdAt).toLocaleDateString()}
+                  </span>
+                  <button className="helpful-btn">
+                    <FiThumbsUp /> Helpful ({review.helpful || 0})
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="reviews-section-divider">
+        <h3>Condition Verifications</h3>
         <span className="verification-count">{verifications.length} Verified Purchase{verifications.length !== 1 ? 's' : ''}</span>
       </div>
 

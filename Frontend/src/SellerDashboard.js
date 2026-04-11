@@ -29,12 +29,14 @@ import {
   FaEnvelope,
   FaBoxOpen,
   FaInfoCircle,
-  FaClock
+  FaClock,
+  FaUpload,
+  FaDownload
 } from "react-icons/fa";
 import { HiTrendingUp } from "react-icons/hi";
 import { MdDashboard } from "react-icons/md";
 import { FiSend } from "react-icons/fi";
-import { RevenueTrendChart, TopProductsChart, CategoryPerformanceChart, StockLevelsChart } from "./components/Charts";
+import { RevenueTrendChart, TopProductsChart, CategoryPerformanceChart, StockLevelsChart, OrdersBarChart, AvgOrderValueChart, PlatformFeesChart, NetRevenueChart } from "./components/Charts";
 import SellerFinance from "./SellerFinance";
 import HelpCenter from "./components/HelpCenter";
 import Chatbot from "./components/Chatbot";
@@ -54,6 +56,9 @@ function SellerDashboard() {
     totalSold: 0
   });
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [uploadResults, setUploadResults] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -502,11 +507,11 @@ function SellerDashboard() {
           break;
         case 'fees':
           const revenue = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-          value = revenue * 0.05;
+          value = revenue * 0.03;
           break;
         case 'net':
           const gross = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-          value = gross * 0.95;
+          value = gross * 0.97;
           break;
         default:
           value = dayOrders.reduce((sum, order) => sum + (order.total || 0), 0);
@@ -780,6 +785,98 @@ function SellerDashboard() {
       fetchReturns(user._id);
     }
   }, [returnStatusFilter]);
+
+  // Handle CSV file selection
+  const handleCSVFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type === 'text/csv') {
+      setCsvFile(file);
+      setUploadResults(null);
+    } else {
+      alert('Please select a valid CSV file');
+    }
+  };
+
+  // Parse CSV and upload products
+  const handleBulkUpload = async () => {
+    if (!csvFile) {
+      alert('Please select a CSV file');
+      return;
+    }
+
+    try {
+      const text = await csvFile.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        alert('CSV file is empty or invalid');
+        return;
+      }
+
+      // Parse header
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      // Parse products
+      const products = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        const product = {};
+        
+        headers.forEach((header, index) => {
+          product[header] = values[index] || '';
+        });
+        
+        products.push(product);
+      }
+
+      // Upload to backend
+      const response = await fetch('http://localhost:5000/api/products/bulk-upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          products,
+          sellerId: sellerData._id
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        setUploadResults(data.results);
+        alert(`Upload complete! ${data.results.successful.length} products added, ${data.results.failed.length} failed.`);
+        
+        // Refresh products list
+        fetchProducts();
+        
+        // Clear file
+        setCsvFile(null);
+      } else {
+        alert(data.message || 'Failed to upload products');
+      }
+    } catch (error) {
+      console.error('Error uploading CSV:', error);
+      alert('Error uploading CSV file');
+    }
+  };
+
+  // Download CSV template
+  const downloadCSVTemplate = () => {
+    const template = `name,description,price,category,condition,size,brand,stock,images,story,paymentOptions,discountType,discountValue
+Example Product,Product description,1500,Men's Clothing,New,M,Nike,10,https://example.com/image1.jpg|https://example.com/image2.jpg,Product story,cod|online,percentage,10`;
+    
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'product_upload_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
@@ -1396,10 +1493,10 @@ function SellerDashboard() {
       order.status === 'Delivered' || order.status === 'Processing' || order.status === 'Shipped'
     );
 
-    const totalRevenue = completedOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + (order.subtotal || 0), 0);
     const totalOrders = completedOrders.length;
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const platformFees = totalRevenue * 0.05;
+    const platformFees = totalRevenue * 0.03;
     const netRevenue = totalRevenue - platformFees;
 
     const daysDiff = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
@@ -1412,7 +1509,7 @@ function SellerDashboard() {
              (order.status === 'Delivered' || order.status === 'Processing' || order.status === 'Shipped');
     });
 
-    const previousRevenue = previousOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+    const previousRevenue = previousOrders.reduce((sum, order) => sum + (order.subtotal || 0), 0);
     const growthRate = previousRevenue > 0 
       ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 
       : totalRevenue > 0 ? 100 : 0;
@@ -1463,7 +1560,7 @@ function SellerDashboard() {
              (order.status === 'Delivered' || order.status === 'Processing' || order.status === 'Shipped');
     });
 
-    const headers = ['Date', 'Order ID', 'Customer', 'Items', 'Gross Amount', 'Platform Fee (5%)', 'Net Amount', 'Status'];
+    const headers = ['Date', 'Order ID', 'Customer', 'Items', 'Gross Amount', 'Platform Fee (3%)', 'Net Amount', 'Status'];
     const csvRows = [headers.join(',')];
 
     csvRows.push('');
@@ -1481,7 +1578,7 @@ function SellerDashboard() {
 
     filteredByDate.forEach(order => {
       const grossAmount = order.total || 0;
-      const platformFee = grossAmount * 0.05;
+      const platformFee = grossAmount * 0.03;
       const netAmount = grossAmount - platformFee;
 
       const row = [
@@ -1505,6 +1602,66 @@ function SellerDashboard() {
     const rangeLabel = revenueDateRange === 'all' ? 'all_time' : `${revenueDateRange}_days`;
     link.setAttribute('href', url);
     link.setAttribute('download', `revenue_report_${rangeLabel}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export performance report
+  const handleExportPerformance = () => {
+    if (products.length === 0) {
+      alert('No performance data to export');
+      return;
+    }
+
+    const csvRows = [];
+    
+    csvRows.push('PERFORMANCE REPORT');
+    csvRows.push(`Generated on: ${new Date().toLocaleString()}`);
+    csvRows.push('');
+    
+    // Summary stats
+    csvRows.push('SUMMARY');
+    csvRows.push(`Total Products,${stats.totalProducts}`);
+    csvRows.push(`Total Stock,${stats.totalStock}`);
+    csvRows.push(`Total Revenue,Rs. ${stats.totalRevenue.toLocaleString()}`);
+    csvRows.push(`Total Sold,${stats.totalSold}`);
+    csvRows.push('');
+    
+    // Top selling products
+    csvRows.push('TOP SELLING PRODUCTS');
+    csvRows.push('Product Name,Sales,Stock,Price,Revenue');
+    chartData.topProducts.forEach(product => {
+      const fullProduct = products.find(p => p.name.includes(product.name.substring(0, 10)));
+      if (fullProduct) {
+        csvRows.push(`"${fullProduct.name}",${fullProduct.sold || 0},${fullProduct.stock},Rs. ${fullProduct.price},Rs. ${(fullProduct.price * (fullProduct.sold || 0)).toFixed(2)}`);
+      }
+    });
+    csvRows.push('');
+    
+    // Category performance
+    csvRows.push('CATEGORY PERFORMANCE');
+    csvRows.push('Category,Sales');
+    chartData.categories.forEach(cat => {
+      csvRows.push(`"${cat.name}",${cat.value}`);
+    });
+    csvRows.push('');
+    
+    // All products
+    csvRows.push('ALL PRODUCTS');
+    csvRows.push('Product Name,Category,Condition,Price,Stock,Sold,Revenue,Status');
+    products.forEach(product => {
+      csvRows.push(`"${product.name}","${product.category}","${product.condition}",Rs. ${product.price},${product.stock},${product.sold || 0},Rs. ${(product.price * (product.sold || 0)).toFixed(2)},"${product.status}"`);
+    });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `performance_report_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -1758,7 +1915,7 @@ function SellerDashboard() {
           <>
             {/* STATS */}
             <div className="stats-grid">
-              <div className="card">
+              <div className="card clickable-card" onClick={() => setActiveTab('products')}>
                 <div className="card-content">
                   <div className="icon blue">
                     <FaBox />
@@ -1769,7 +1926,7 @@ function SellerDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="card">
+              <div className="card clickable-card" onClick={() => setActiveTab('products')}>
                 <div className="card-content">
                   <div className="icon green">
                     <FaShoppingBag />
@@ -1780,7 +1937,7 @@ function SellerDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="card">
+              <div className="card clickable-card" onClick={() => setActiveTab('revenue')}>
                 <div className="card-content">
                   <div className="icon orange">
                     <FaDollarSign />
@@ -1792,15 +1949,15 @@ function SellerDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="card">
+              <div className="card clickable-card" onClick={() => setActiveTab('orders')}>
                 <div className="card-content">
                   <div className="icon purple">
                     <HiTrendingUp />
                   </div>
                   <div className="card-info">
                     <h4>TOTAL ORDERS</h4>
-                    <h2>{stats.totalSold || 0}</h2>
-                    <p>{stats.totalSold > 0 ? '' : 'No orders yet'}</p>
+                    <h2>{stats.totalOrders || 0}</h2>
+                    <p>{stats.totalOrders > 0 ? '' : 'No orders yet'}</p>
                   </div>
                 </div>
               </div>
@@ -1969,13 +2126,108 @@ function SellerDashboard() {
                 </svg>
               </div>
               
-              <button 
-                onClick={() => setShowAddProduct(!showAddProduct)}
-                className="add-product-btn"
-              >
-                <FaPlus /> Add Product
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  onClick={() => setShowAddProduct(!showAddProduct)}
+                  className="add-product-btn"
+                >
+                  <FaPlus /> Add Product
+                </button>
+                
+                <button 
+                  onClick={() => setShowBulkUpload(!showBulkUpload)}
+                  className="add-product-btn"
+                  style={{ background: '#10b981' }}
+                >
+                  <FaUpload /> Bulk Upload CSV
+                </button>
+              </div>
             </div>
+
+            {/* BULK UPLOAD SECTION */}
+            {showBulkUpload && (
+              <div className="product-form-container" style={{ marginBottom: '20px' }}>
+                <h3 className="product-form-title">Bulk Upload CSV</h3>
+                <div style={{ padding: '15px' }}>
+                  
+                  <button 
+                    onClick={downloadCSVTemplate}
+                    style={{
+                      padding: '6px 12px',
+                      background: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      marginBottom: '12px',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <FaDownload style={{ marginRight: '5px' }} />
+                    Template
+                  </button>
+                  
+                  <div style={{ marginBottom: '12px' }}>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleCSVFileSelect}
+                      style={{ fontSize: '13px' }}
+                    />
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={handleBulkUpload}
+                      disabled={!csvFile}
+                      style={{
+                        padding: '6px 12px',
+                        background: csvFile ? '#10b981' : '#ccc',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: csvFile ? 'pointer' : 'not-allowed',
+                        fontSize: '13px'
+                      }}
+                    >
+                      Upload
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowBulkUpload(false);
+                        setCsvFile(null);
+                        setUploadResults(null);
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        background: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '13px'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  
+                  {uploadResults && (
+                    <div style={{ marginTop: '12px', padding: '10px', background: '#f3f4f6', borderRadius: '4px', fontSize: '13px' }}>
+                      <p style={{ color: '#10b981', margin: 0 }}>
+                        ✓ {uploadResults.successful.length} uploaded
+                      </p>
+                      {uploadResults.failed.length > 0 && (
+                        <p style={{ color: '#ef4444', margin: '4px 0 0 0' }}>
+                          ✗ {uploadResults.failed.length} failed
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* ADD PRODUCT FORM */}
             {showAddProduct && (
@@ -3158,7 +3410,7 @@ function SellerDashboard() {
                     </div>
                   </div>
                   <h2 className="revenue-stat-value">Rs. {Math.round(revenueStats.platformFees).toLocaleString()}</h2>
-                  <p className="revenue-stat-subtitle">5% from revenue</p>
+                  <p className="revenue-stat-subtitle">3% from revenue</p>
                 </div>
 
                 <div 
@@ -3189,7 +3441,42 @@ function SellerDashboard() {
                     Click on any card above to view its trend
                   </p>
                 </div>
-                <RevenueTrendChart data={chartData.revenue} />
+                
+                {/* Different chart types based on selected metric */}
+                {selectedRevenueMetric === 'revenue' && (
+                  <RevenueTrendChart 
+                    data={chartData.revenue} 
+                    title={`Revenue Trend (Last ${revenueDateRange} Days)`}
+                  />
+                )}
+                
+                {selectedRevenueMetric === 'orders' && (
+                  <OrdersBarChart 
+                    data={chartData.revenue} 
+                    title={`Orders Trend (Last ${revenueDateRange} Days)`}
+                  />
+                )}
+                
+                {selectedRevenueMetric === 'avg' && (
+                  <AvgOrderValueChart 
+                    data={chartData.revenue} 
+                    title={`Average Order Value Trend (Last ${revenueDateRange} Days)`}
+                  />
+                )}
+                
+                {selectedRevenueMetric === 'fees' && (
+                  <PlatformFeesChart 
+                    data={chartData.revenue} 
+                    title={`Platform Fees Breakdown (Last ${revenueDateRange} Days)`}
+                  />
+                )}
+                
+                {selectedRevenueMetric === 'net' && (
+                  <NetRevenueChart 
+                    data={chartData.revenue} 
+                    title={`Net Revenue Trend (Last ${revenueDateRange} Days)`}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -3198,8 +3485,31 @@ function SellerDashboard() {
         {/* PERFORMANCE TAB */}
         {activeTab === 'performance' && (
           <div className="products-section">
+            <div className="performance-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
+              <div>
+                <h3 className="performance-title" style={{margin: 0}}></h3>
+              </div>
+              <button 
+                className="export-btn"
+                onClick={handleExportPerformance}
+                style={{
+                  background: '#00bcd4',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600'
+                }}
+              >
+                <FaChartBar /> Export Report
+              </button>
+            </div>
             <div className="performance-container">
-              <h3 className="performance-title"></h3>
               <TopProductsChart data={chartData.topProducts} />
               <CategoryPerformanceChart data={chartData.categories} />
             </div>
@@ -3403,7 +3713,7 @@ function SellerDashboard() {
                     <div className="profile-stat-card green">
                       <FaShoppingCart size={24} className="profile-stat-icon green" />
                       <p className="profile-stat-label">TOTAL ORDERS</p>
-                      <h3 className="profile-stat-value">{stats.totalSold || 0}</h3>
+                      <h3 className="profile-stat-value">{stats.totalOrders || 0}</h3>
                     </div>
                     <div className="profile-stat-card yellow">
                       <FaChartLine size={24} className="profile-stat-icon yellow" />
