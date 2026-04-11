@@ -75,14 +75,23 @@ router.get('/search', async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Execute query
+    // Execute query and populate seller to check approval status
     const products = await Product.find(query)
+      .populate('seller', 'status')
       .sort(sortOption)
       .skip(skip)
       .limit(parseInt(limit));
     
-    // Get total count for pagination
-    const total = await Product.countDocuments(query);
+    // Filter out products from unapproved sellers
+    const approvedProducts = products.filter(product => 
+      product.seller && product.seller.status === 'approved'
+    );
+    
+    // Get total count for pagination (need to count manually after filtering)
+    const allProducts = await Product.find(query).populate('seller', 'status');
+    const total = allProducts.filter(product => 
+      product.seller && product.seller.status === 'approved'
+    ).length;
     
     // Get available filters based on current search
     const categories = await Product.distinct('category', { status: 'Approved' });
@@ -92,7 +101,7 @@ router.get('/search', async (req, res) => {
     
     res.json({
       success: true,
-      products,
+      products: approvedProducts,
       pagination: {
         total,
         page: parseInt(page),
@@ -133,13 +142,19 @@ router.get('/suggestions', async (req, res) => {
       });
     }
     
-    // Get product suggestions with images
+    // Get product suggestions with images and check seller approval
     const productSuggestions = await Product.find({
       status: 'Approved',
       name: { $regex: q, $options: 'i' }
     })
+    .populate('seller', 'status')
     .select('name category images price')
-    .limit(5);
+    .limit(10); // Get more to account for filtering
+    
+    // Filter out products from unapproved sellers
+    const approvedProductSuggestions = productSuggestions
+      .filter(product => product.seller && product.seller.status === 'approved')
+      .slice(0, 5); // Limit to 5 after filtering
     
     // Get brand suggestions
     const brandSuggestions = await Product.distinct('brand', {
@@ -166,7 +181,7 @@ router.get('/suggestions', async (req, res) => {
     res.json({
       success: true,
       suggestions: {
-        products: productSuggestions.map(p => ({ 
+        products: approvedProductSuggestions.map(p => ({ 
           _id: p._id,
           name: p.name, 
           category: p.category, 
@@ -223,11 +238,18 @@ router.get('/', async (req, res) => {
     if (sort === 'popular') sortOption = { sold: -1 };
     if (sort === 'rating') sortOption = { rating: -1 };
     
+    // Get products and populate seller to check approval status
     const products = await Product.find(query)
+      .populate('seller', 'status')
       .sort(sortOption)
       .limit(parseInt(limit));
     
-    res.json(products);
+    // Filter out products from unapproved sellers
+    const approvedProducts = products.filter(product => 
+      product.seller && product.seller.status === 'approved'
+    );
+    
+    res.json(approvedProducts);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -369,6 +391,107 @@ router.post('/', async (req, res) => {
     }).catch(console.error);
 
     res.status(201).json({ message: 'Product created successfully', product });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Bulk upload products via CSV
+router.post('/bulk-upload', async (req, res) => {
+  try {
+    const { products, sellerId } = req.body;
+    
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ message: 'No products provided' });
+    }
+    
+    // Get seller info
+    const seller = await Seller.findById(sellerId);
+    if (!seller) {
+      return res.status(403).json({ message: 'Seller not found' });
+    }
+    
+    const results = {
+      successful: [],
+      failed: []
+    };
+    
+    for (const productData of products) {
+      try {
+        // Validate required fields
+        if (!productData.name || !productData.price || !productData.category) {
+          results.failed.push({
+            row: productData,
+            error: 'Missing required fields (name, price, category)'
+          });
+          continue;
+        }
+        
+        // Validate payment options
+        const paymentOptions = productData.paymentOptions || ['cod', 'online'];
+        if (!validatePaymentOptions(paymentOptions)) {
+          results.failed.push({
+            row: productData,
+            error: 'Invalid payment options'
+          });
+          continue;
+        }
+        
+        // Create product
+        const product = new Product({
+          name: productData.name,
+          description: productData.description || '',
+          price: parseFloat(productData.price),
+          category: productData.category,
+          condition: productData.condition || 'New',
+          size: productData.size || 'M',
+          brand: productData.brand || 'Unbranded',
+          stock: parseInt(productData.stock) || 1,
+          images: productData.images ? productData.images.split('|') : [],
+          seller: sellerId,
+          sellerName: seller.fullName,
+          storeName: seller.storeName,
+          story: productData.story || '',
+          paymentOptions: paymentOptions,
+          discount: productData.discount ? {
+            type: productData.discountType || 'percentage',
+            value: parseFloat(productData.discountValue) || 0
+          } : null
+        });
+        
+        await product.save();
+        results.successful.push(product);
+        
+      } catch (error) {
+        results.failed.push({
+          row: productData,
+          error: error.message
+        });
+      }
+    }
+    
+    // Update seller's total products count
+    if (results.successful.length > 0) {
+      seller.totalProducts = (seller.totalProducts || 0) + results.successful.length;
+      await seller.save();
+      
+      // Log audit
+      await logAudit({
+        action: 'Bulk Products Created',
+        actionType: 'product',
+        performedBy: sellerId,
+        targetId: sellerId,
+        targetModel: 'Seller',
+        description: `Seller bulk uploaded ${results.successful.length} products`,
+        ipAddress: req.ip
+      }).catch(console.error);
+    }
+    
+    res.status(201).json({
+      message: `Bulk upload completed. ${results.successful.length} products created, ${results.failed.length} failed.`,
+      results
+    });
+    
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

@@ -111,10 +111,10 @@ router.post('/verify', async (req, res) => {
     }
     
     if (result.success) {
-      order.paymentStatus = 'completed';
+      order.paymentStatus = 'Paid';
       order.paymentMethod = settings.paymentGateway.provider;
       order.transactionId = result.transactionId;
-      order.status = 'Processing';
+      order.status = 'Confirmed';
       await order.save();
       
       // Log audit
@@ -255,10 +255,20 @@ router.get('/esewa/failure', async (req, res) => {
       const order = await Order.findById(order_id);
       if (order) {
         order.paymentStatus = 'Failed';
+        order.status = 'Cancelled';
+        order.customerNotes = 'Auto-cancelled due to payment failure/cancellation';
         order.paymentDetails = {
           failedAt: new Date()
         };
         await order.save();
+        
+        // Restore product stock
+        const Product = require('../models/Product');
+        for (let item of order.items) {
+          await Product.findByIdAndUpdate(item.product, {
+            $inc: { stock: item.quantity, sold: -item.quantity }
+          });
+        }
         
         // Update payment record
         await Payment.findOneAndUpdate(
@@ -301,7 +311,17 @@ router.post('/esewa/verify-frontend', async (req, res) => {
         const failedOrder = await Order.findById(order_id);
         if (failedOrder) {
           failedOrder.paymentStatus = 'Failed';
+          failedOrder.status = 'Cancelled';
+          failedOrder.customerNotes = 'Auto-cancelled due to payment verification failure';
           await failedOrder.save();
+          
+          // Restore product stock
+          const Product = require('../models/Product');
+          for (let item of failedOrder.items) {
+            await Product.findByIdAndUpdate(item.product, {
+              $inc: { stock: item.quantity, sold: -item.quantity }
+            });
+          }
         }
       }
       return res.json({ success: false, message: result.message });
@@ -320,6 +340,46 @@ router.post('/esewa/verify-frontend', async (req, res) => {
         completedAt: new Date()
       };
       await order.save();
+
+      // Deduct stock for eSewa orders after payment confirmation
+      const Product = require('../models/Product');
+      const Seller = require('../models/Seller');
+      const { sendLowStockAlert, sendOutOfStockAlert, sendOrderConfirmation } = require('../utils/emailService');
+      
+      for (let item of order.items) {
+        const updatedProduct = await Product.findByIdAndUpdate(
+          item.product,
+          {
+            $inc: { stock: -item.quantity, sold: item.quantity }
+          },
+          { new: true }
+        );
+        
+        // Check if product needs stock alert
+        if (updatedProduct) {
+          const seller = await Seller.findById(updatedProduct.seller).select('email fullName storeName');
+          
+          if (seller) {
+            // Out of stock alert
+            if (updatedProduct.stock === 0) {
+              sendOutOfStockAlert(seller, [updatedProduct.toObject()]).catch(err =>
+                console.error('Failed to send out of stock alert:', err)
+              );
+            }
+            // Low stock alert (less than 5)
+            else if (updatedProduct.stock > 0 && updatedProduct.stock < 5) {
+              sendLowStockAlert(seller, [updatedProduct.toObject()]).catch(err =>
+                console.error('Failed to send low stock alert:', err)
+              );
+            }
+          }
+        }
+      }
+
+      // Send order confirmation email after payment is verified
+      sendOrderConfirmation(order).catch(err => 
+        console.error('Failed to send order confirmation email:', err)
+      );
 
       let payment = await Payment.findOne({ order: order_id, transactionUuid: result.transactionUuid });
       if (payment) {

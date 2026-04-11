@@ -7,6 +7,7 @@ const session = require('express-session');
 const passport = require('./config/passport');
 const { startStockAlertScheduler } = require('./utils/stockAlertScheduler');
 const { initializeWeeklyPayoutScheduler } = require('./utils/weeklyPayoutScheduler');
+const { initFraudDetectionScheduler } = require('./utils/fraudDetectionScheduler');
 require('dotenv').config();
 
 const app = express();
@@ -161,13 +162,23 @@ setInterval(async () => {
   }
 }, 15 * 60 * 1000); // Check every 15 minutes
 
+// Export app for testing
+module.exports = app;
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  
-  // Start stock alert scheduler
-  startStockAlertScheduler();
-  
-  // Start weekly payout scheduler (Every Friday at 9:00 AM)
-  initializeWeeklyPayoutScheduler();
-});
+
+// Only start server if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    
+    // Start stock alert scheduler
+    startStockAlertScheduler();
+    
+    // Start weekly payout scheduler (Every Friday at 9:00 AM)
+    initializeWeeklyPayoutScheduler();
+    
+    // Start automated fraud detection scheduler (Every 6 hours)
+    initFraudDetectionScheduler();
+  });
+}

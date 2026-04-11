@@ -54,10 +54,30 @@ router.post('/', async (req, res) => {
     const reviews = await Review.find({ product: productId, status: 'Approved' });
     const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
     
-    await Product.findByIdAndUpdate(productId, {
+    const product = await Product.findByIdAndUpdate(productId, {
       rating: avgRating,
-      reviews: reviews.length
+      reviews: reviews.length,
+      averageRating: avgRating,
+      reviewCount: reviews.length
     });
+
+    // Update seller rating (average of all their products' ratings)
+    if (product && product.seller) {
+      const Seller = require('../models/Seller');
+      const sellerProducts = await Product.find({ seller: product.seller });
+      const productsWithReviews = sellerProducts.filter(p => p.reviewCount > 0);
+      
+      if (productsWithReviews.length > 0) {
+        const totalRating = productsWithReviews.reduce((sum, p) => sum + (p.averageRating || 0), 0);
+        const sellerAvgRating = totalRating / productsWithReviews.length;
+        const totalReviews = productsWithReviews.reduce((sum, p) => sum + (p.reviewCount || 0), 0);
+        
+        await Seller.findByIdAndUpdate(product.seller, {
+          rating: sellerAvgRating,
+          totalReviews: totalReviews
+        });
+      }
+    }
 
     res.status(201).json({ success: true, review });
   } catch (error) {

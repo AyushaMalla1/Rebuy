@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Seller = require('../models/Seller');
+const Admin = require('../models/Admin');
 const { sendEmail } = require('../utils/emailService');
 const { logAudit } = require('../utils/auditLogger');
 const passport = require('../config/passport');
@@ -13,6 +14,90 @@ const generateToken = (userId) => {
     expiresIn: '30d'
   });
 };
+
+// Create Admin Account (One-time setup)
+router.post('/create-admin', async (req, res) => {
+  try {
+    const { fullName, email, password, adminSecret } = req.body;
+
+    // Validate admin secret key (set this in your .env file)
+    const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY || 'rebuy-admin-secret-2026';
+    
+    if (adminSecret !== ADMIN_SECRET) {
+      return res.status(403).json({
+        success: false,
+        message: 'Invalid admin secret key'
+      });
+    }
+
+    // Validation
+    if (!fullName || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields'
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters'
+      });
+    }
+
+    // Check if admin already exists
+    const existingAdmin = await Admin.findOne({ email });
+    if (existingAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered as admin'
+      });
+    }
+
+    // Create admin user
+    const admin = await Admin.create({
+      fullName,
+      email,
+      password,
+      isActive: true
+    });
+
+    console.log('✅ Admin account created:', email);
+
+    // Generate token
+    const token = generateToken(admin._id);
+
+    // Log audit
+    await logAudit({
+      action: 'Admin Account Created',
+      actionType: 'auth',
+      performedBy: admin._id,
+      targetId: admin._id,
+      targetModel: 'Admin',
+      description: 'New admin account created via API',
+      ipAddress: req.ip
+    }).catch(console.error);
+
+    res.status(201).json({
+      success: true,
+      message: 'Admin account created successfully',
+      token,
+      user: {
+        _id: admin._id,
+        id: admin._id,
+        fullName: admin.fullName,
+        email: admin.email,
+        userType: 'admin'
+      }
+    });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+});
 
 // Signup Route
 router.post('/signup', async (req, res) => {
@@ -153,6 +238,22 @@ router.post('/signup', async (req, res) => {
     const user = await User.create(userData);
     console.log('User created successfully:', user._id);
 
+    // Create Customer profile for the user
+    const Customer = require('../models/Customer');
+    const customer = await Customer.create({
+      user: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone || '',
+      addresses: [],
+      preferences: {
+        newsletter: true,
+        orderUpdates: true,
+        promotions: false
+      }
+    });
+    console.log('Customer profile created:', customer._id);
+
     // Send welcome email
     try {
       await sendEmail(user.email, 'welcome', user.fullName);
@@ -275,27 +376,69 @@ router.post('/login', async (req, res) => {
     }
 
     // Otherwise, check User collection for customers and admins
+    // If userType is admin, check Admin collection
+    if (userType === 'admin') {
+      const admin = await Admin.findOne({ email });
+      if (!admin) {
+        console.log('Admin not found:', email);
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid email or password' 
+        });
+      }
+
+      // Check password
+      const isPasswordValid = await admin.comparePassword(password);
+      console.log('Admin password valid:', isPasswordValid);
+      if (!isPasswordValid) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Invalid email or password' 
+        });
+      }
+
+      // Update last login
+      admin.lastLogin = new Date();
+      await admin.save();
+
+      // Generate token
+      const token = generateToken(admin._id);
+
+      // Log audit
+      await logAudit({
+        action: 'Admin Login',
+        actionType: 'auth',
+        performedBy: admin._id,
+        targetId: admin._id,
+        targetModel: 'Admin',
+        description: 'Admin logged in successfully',
+        ipAddress: req.ip
+      }).catch(console.error);
+
+      console.log('Admin login successful:', email);
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        token,
+        user: {
+          _id: admin._id,
+          id: admin._id,
+          fullName: admin.fullName,
+          email: admin.email,
+          userType: 'admin',
+          phone: admin.phone,
+          profileImage: admin.profileImage
+        }
+      });
+    }
+
+    // Check User collection for customers
     const user = await User.findOne({ email });
     if (!user) {
       console.log('User not found:', email);
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid email or password' 
-        });
-    }
-
-    // Check if user type matches the login type
-    if (userType === 'admin' && user.userType !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'This account is not an admin account. Please use the correct login type.'
-      });
-    }
-
-    if (userType === 'customer' && user.userType === 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Admin accounts cannot login as customers. Please use Admin Login.'
       });
     }
 
@@ -330,7 +473,7 @@ router.post('/login', async (req, res) => {
       id: user._id,
       fullName: user.fullName,
       email: user.email,
-      userType: user.userType,
+      userType: 'customer',
       phone: user.phone,
       address: user.address,
       city: user.city
@@ -368,6 +511,12 @@ router.post('/forgot-password', async (req, res) => {
     if (!user) {
       user = await Seller.findOne({ email });
       Model = Seller;
+    }
+
+    // If not found in Seller, check in Admin model
+    if (!user) {
+      user = await Admin.findOne({ email });
+      Model = Admin;
     }
 
     if (!user) {
@@ -434,11 +583,15 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Find user in User or Seller model
+    // Find user in User, Seller, or Admin model
     let user = await User.findOne({ email });
 
     if (!user) {
       user = await Seller.findOne({ email });
+    }
+
+    if (!user) {
+      user = await Admin.findOne({ email });
     }
 
     if (!user) {
@@ -535,13 +688,21 @@ router.post('/reset-password', async (req, res) => {
       });
     }
 
-    // Find user in User or Seller model
+    // Find user in User, Seller, or Admin model
     let user = await User.findOne({ email });
     let Model = User;
+    let modelName = 'User';
 
     if (!user) {
       user = await Seller.findOne({ email });
       Model = Seller;
+      modelName = 'Seller';
+    }
+
+    if (!user) {
+      user = await Admin.findOne({ email });
+      Model = Admin;
+      modelName = 'Admin';
     }
 
     if (!user) {
@@ -581,7 +742,7 @@ router.post('/reset-password', async (req, res) => {
       actionType: 'auth',
       performedBy: user._id,
       targetId: user._id,
-      targetModel: user.storeName ? 'Seller' : 'User',
+      targetModel: modelName,
       description: 'Password reset via OTP',
       ipAddress: req.ip
     }).catch(console.error);
@@ -679,6 +840,14 @@ module.exports = router;
 
 // Google OAuth Routes
 router.get('/google',
+  (req, res, next) => {
+    // Store userType in session for callback
+    const userType = req.query.userType || 'customer';
+    req.session = req.session || {};
+    req.session.userType = userType;
+    console.log('Google OAuth initiated for userType:', userType);
+    next();
+  },
   passport.authenticate('google', { 
     scope: ['profile', 'email'],
     session: false
@@ -692,28 +861,64 @@ router.get('/google/callback',
   }),
   (req, res) => {
     try {
+      // Check if authentication failed
+      if (!req.user) {
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=authentication_failed`);
+      }
+
       // Generate JWT token
       const token = generateToken(req.user._id);
       
+      // Determine user type and model
+      let userType = 'customer';
+      let modelName = 'User';
+      
+      if (req.user.storeName !== undefined) {
+        userType = 'seller';
+        modelName = 'Seller';
+      } else if (req.user.constructor.modelName === 'Admin') {
+        userType = 'admin';
+        modelName = 'Admin';
+      }
+
       // Log audit
       logAudit({
-        action: 'Google OAuth Login',
+        action: `Google OAuth Login (${userType})`,
         actionType: 'auth',
         performedBy: req.user._id,
         targetId: req.user._id,
-        targetModel: 'User',
-        description: 'User logged in via Google OAuth',
+        targetModel: modelName,
+        description: `${userType.charAt(0).toUpperCase() + userType.slice(1)} logged in via Google OAuth`,
         ipAddress: req.ip
       }).catch(console.error);
 
-      // Redirect to frontend with token
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/google/success?token=${token}&user=${encodeURIComponent(JSON.stringify({
+      // Build user response object
+      const userResponse = {
         _id: req.user._id,
         fullName: req.user.fullName,
         email: req.user.email,
-        userType: req.user.userType,
+        userType: userType,
         profileImage: req.user.profileImage
-      }))}`);
+      };
+
+      // Add type-specific fields
+      if (userType === 'seller') {
+        userResponse.phone = req.user.phone;
+        userResponse.storeName = req.user.storeName;
+        userResponse.storeDescription = req.user.storeDescription;
+        userResponse.address = req.user.address;
+        userResponse.city = req.user.city;
+        userResponse.status = req.user.status;
+      } else if (userType === 'customer') {
+        userResponse.phone = req.user.phone;
+        userResponse.address = req.user.address;
+        userResponse.city = req.user.city;
+      } else if (userType === 'admin') {
+        userResponse.phone = req.user.phone;
+      }
+
+      // Redirect to frontend with token
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/google/success?token=${token}&user=${encodeURIComponent(JSON.stringify(userResponse))}`);
     } catch (error) {
       console.error('Google OAuth callback error:', error);
       res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`);

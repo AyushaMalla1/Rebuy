@@ -71,8 +71,8 @@ router.post('/', async (req, res) => {
     // remain Pending until the gateway callback confirms payment.
     let paymentStatus = 'Pending';
 
-    // Calculate platform commission (5%) and seller payout
-    const platformCommissionRate = 5; // 5%
+    // Calculate platform commission (3%) and seller payout
+    const platformCommissionRate = 3; // 3%
     const platformCommission = Math.round((subtotal * platformCommissionRate) / 100);
     const sellerPayout = subtotal - platformCommission;
 
@@ -96,37 +96,41 @@ router.post('/', async (req, res) => {
       total,
       customerNotes: customerNotes || '',
       trackingNumber: `TRK${Date.now()}`,
-      estimatedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+      estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000) // 5 days from now
     });
 
     await order.save();
+    console.log('✅ Order created successfully:', order._id, 'Payment Method:', paymentMethod);
 
-    // Update product stock
-    for (let item of items) {
-      const updatedProduct = await Product.findByIdAndUpdate(
-        item.product,
-        {
-          $inc: { stock: -item.quantity, sold: item.quantity }
-        },
-        { new: true }
-      );
-      
-      // Check if product needs stock alert
-      if (updatedProduct) {
-        const seller = await Seller.findById(updatedProduct.seller).select('email fullName storeName');
+    // Update product stock ONLY for COD orders
+    // For online payments (esewa, khalti), stock will be deducted after payment verification
+    if (paymentMethod === 'cod') {
+      for (let item of items) {
+        const updatedProduct = await Product.findByIdAndUpdate(
+          item.product,
+          {
+            $inc: { stock: -item.quantity, sold: item.quantity }
+          },
+          { new: true }
+        );
         
-        if (seller) {
-          // Out of stock alert
-          if (updatedProduct.stock === 0) {
-            sendOutOfStockAlert(seller, [updatedProduct.toObject()]).catch(err =>
-              console.error('Failed to send out of stock alert:', err)
-            );
-          }
-          // Low stock alert (less than 5)
-          else if (updatedProduct.stock > 0 && updatedProduct.stock < 5) {
-            sendLowStockAlert(seller, [updatedProduct.toObject()]).catch(err =>
-              console.error('Failed to send low stock alert:', err)
-            );
+        // Check if product needs stock alert
+        if (updatedProduct) {
+          const seller = await Seller.findById(updatedProduct.seller).select('email fullName storeName');
+          
+          if (seller) {
+            // Out of stock alert
+            if (updatedProduct.stock === 0) {
+              sendOutOfStockAlert(seller, [updatedProduct.toObject()]).catch(err =>
+                console.error('Failed to send out of stock alert:', err)
+              );
+            }
+            // Low stock alert (less than 5)
+            else if (updatedProduct.stock > 0 && updatedProduct.stock < 5) {
+              sendLowStockAlert(seller, [updatedProduct.toObject()]).catch(err =>
+                console.error('Failed to send low stock alert:', err)
+              );
+            }
           }
         }
       }
@@ -181,10 +185,13 @@ router.post('/', async (req, res) => {
       metadata: { total, paymentMethod }
     }).catch(console.error);
 
-    // Send order confirmation email
-    sendOrderConfirmation(order).catch(err => 
-      console.error('Failed to send order confirmation email:', err)
-    );
+    // Send order confirmation email only for COD orders
+    // For online payments (esewa, khalti), email will be sent after payment verification
+    if (paymentMethod === 'cod') {
+      sendOrderConfirmation(order).catch(err => 
+        console.error('Failed to send order confirmation email:', err)
+      );
+    }
 
     res.status(201).json({ 
       message: 'Order placed successfully', 
@@ -200,7 +207,14 @@ router.post('/', async (req, res) => {
 // Get customer orders
 router.get('/customer/:customerId', async (req, res) => {
   try {
-    const orders = await Order.find({ customer: req.params.customerId })
+    const orders = await Order.find({ 
+      customer: req.params.customerId,
+      // Only exclude cancelled orders with failed payments
+      $or: [
+        { status: { $ne: 'Cancelled' } },
+        { status: 'Cancelled', paymentStatus: { $nin: ['Failed'] } }
+      ]
+    })
       .sort({ orderDate: -1 })
       .populate('items.product', 'name images');
     
@@ -242,7 +256,14 @@ router.patch('/:orderId/status', async (req, res) => {
     // Update timestamps based on status
     if (status === 'Confirmed') order.confirmedAt = Date.now();
     if (status === 'Shipped') order.shippedAt = Date.now();
-    if (status === 'Delivered') order.deliveredAt = Date.now();
+    if (status === 'Delivered') {
+      order.deliveredAt = Date.now();
+      
+      // For COD orders, mark payment as completed when delivered
+      if (order.paymentMethod === 'cod' && order.paymentStatus === 'Pending') {
+        order.paymentStatus = 'Paid';
+      }
+    }
     if (status === 'Cancelled') order.cancelledAt = Date.now();
     
     await order.save();

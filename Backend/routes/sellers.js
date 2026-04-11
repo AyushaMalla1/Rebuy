@@ -118,8 +118,43 @@ router.get('/:id/stats', async (req, res) => {
     const products = await Product.find({ seller: req.params.id });
     const totalProducts = products.length;
     const totalStock = products.reduce((sum, p) => sum + p.stock, 0);
-    const totalRevenue = products.reduce((sum, p) => sum + (p.price * p.sold), 0);
-    const totalSold = products.reduce((sum, p) => sum + p.sold, 0);
+    
+    // Calculate revenue and orders from actual orders (not cancelled/failed)
+    const Order = require('../models/Order');
+    
+    // Get all orders (including unpaid) - exclude only cancelled with failed payment
+    const allOrders = await Order.find({
+      $or: [
+        { status: { $ne: 'Cancelled' } },
+        { status: 'Cancelled', paymentStatus: { $nin: ['Failed'] } }
+      ]
+    });
+    
+    // Filter orders that have items from this seller
+    const orders = allOrders.filter(order => 
+      order.items.some(item => item.seller && item.seller.toString() === req.params.id)
+    );
+    
+    const totalOrders = orders.length;
+    
+    // Calculate revenue only from paid/COD orders
+    const paidOrders = orders.filter(order => 
+      order.paymentStatus === 'Paid' || 
+      order.paymentStatus === 'COD' || 
+      (order.paymentStatus === 'Pending' && order.paymentMethod === 'COD')
+    );
+    
+    let totalRevenue = 0;
+    let totalSold = 0;
+    
+    paidOrders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.seller && item.seller.toString() === req.params.id) {
+          totalRevenue += item.price * item.quantity;
+          totalSold += item.quantity;
+        }
+      });
+    });
     
     res.json({
       success: true,
@@ -128,6 +163,7 @@ router.get('/:id/stats', async (req, res) => {
         totalStock,
         totalRevenue,
         totalSold,
+        totalOrders,
         rating: seller.rating,
         status: seller.status
       }

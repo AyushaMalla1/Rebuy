@@ -37,7 +37,7 @@ router.get('/seller/:sellerId/summary', async (req, res) => {
           item.seller.toString() === req.params.sellerId
         );
         const sellerSubtotal = sellerItems.reduce((sum, item) => sum + item.subtotal, 0);
-        const commission = Math.round((sellerSubtotal * (order.platformCommissionRate || 5)) / 100);
+        const commission = Math.round((sellerSubtotal * (order.platformCommissionRate || 3)) / 100);
         const sellerPayout = sellerSubtotal - commission;
 
         pendingAmount += sellerPayout;
@@ -122,7 +122,7 @@ router.post('/seller/:sellerId/request', async (req, res) => {
           item.seller.toString() === req.params.sellerId
         );
         const sellerSubtotal = sellerItems.reduce((sum, item) => sum + item.subtotal, 0);
-        const commission = Math.round((sellerSubtotal * (order.platformCommissionRate || 5)) / 100);
+        const commission = Math.round((sellerSubtotal * (order.platformCommissionRate || 3)) / 100);
         const sellerPayout = sellerSubtotal - commission;
 
         totalAmount += sellerPayout;

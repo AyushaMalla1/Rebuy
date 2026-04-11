@@ -38,10 +38,10 @@ router.get('/seller/:sellerId/stats', async (req, res) => {
     const totalReturns = await Return.countDocuments({ seller: req.params.sellerId });
     const pendingReturns = await Return.countDocuments({ seller: req.params.sellerId, status: 'Pending' });
     const approvedReturns = await Return.countDocuments({ seller: req.params.sellerId, status: 'Approved' });
-    const completedReturns = await Return.countDocuments({ seller: req.params.sellerId, status: 'Completed' });
+    const completedReturns = await Return.countDocuments({ seller: req.params.sellerId, status: { $in: ['Completed', 'Refunded'] } });
 
     const totalRefundAmount = await Return.aggregate([
-      { $match: { seller: mongoose.Types.ObjectId(req.params.sellerId), status: { $in: ['Approved', 'Completed', 'Refunded'] } } },
+      { $match: { seller: new mongoose.Types.ObjectId(req.params.sellerId), status: { $in: ['Approved', 'Completed', 'Refunded'] } } },
       { $group: { _id: null, total: { $sum: '$refundAmount' } } }
     ]);
 

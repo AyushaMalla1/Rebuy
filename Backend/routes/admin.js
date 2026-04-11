@@ -304,7 +304,7 @@ router.patch('/users/:id/status', async (req, res) => {
     await logAudit({
       action: status === 'active' ? 'User Activated' : 'User Deactivated',
       actionType: 'user',
-      performedBy: req.user?.id || 'admin',
+      performedBy: req.user?.id || null,
       targetId: user._id,
       targetModel: 'User',
       description: `User ${user.username} status changed to ${status === 'active' ? 'active' : 'inactive'}`,
@@ -383,7 +383,7 @@ router.patch('/sellers/:id/status', async (req, res) => {
     await logAudit({
       action,
       actionType: 'seller',
-      performedBy: req.user?.id || 'admin',
+      performedBy: req.user?.id || null,
       targetId: seller._id,
       targetModel: 'Seller',
       description,
@@ -436,7 +436,7 @@ router.patch('/products/:id/status', async (req, res) => {
     await logAudit({
       action,
       actionType: 'product',
-      performedBy: req.user?.id || 'admin',
+      performedBy: req.user?.id || null,
       targetId: product._id,
       targetModel: 'Product',
       description,
@@ -468,7 +468,7 @@ router.delete('/products/:id', async (req, res) => {
     await logAudit({
       action: 'Product Deleted',
       actionType: 'product',
-      performedBy: req.user?.id || 'admin',
+      performedBy: req.user?.id || null,
       targetId: product._id,
       targetModel: 'Product',
       description: `Product "${product.name}" deleted from system`,
@@ -524,74 +524,6 @@ router.get('/analytics', async (req, res) => {
     });
   } catch (error) {
     console.error('Get analytics error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// Fraud Detection Routes
-const FraudAlert = require('../models/FraudAlert');
-const { runFraudDetection } = require('../utils/fraudDetection');
-
-// Run fraud detection manually
-router.post('/fraud-detection/run', async (req, res) => {
-  try {
-    const alerts = await runFraudDetection();
-    res.json({ 
-      success: true, 
-      message: `Fraud detection complete. ${alerts.length} alerts created.`,
-      alertsCreated: alerts.length
-    });
-  } catch (error) {
-    console.error('Run fraud detection error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-router.get('/fraud-alerts', async (req, res) => {
-  try {
-    const { status, riskLevel } = req.query;
-    const query = {};
-    
-    if (status && status !== 'all') {
-      query.status = status;
-    }
-    if (riskLevel && riskLevel !== 'all') {
-      query.riskLevel = riskLevel;
-    }
-    
-    const alerts = await FraudAlert.find(query)
-      .populate('userId', 'fullName email')
-      .populate('orderId')
-      .sort({ createdAt: -1 });
-      
-    res.json({ success: true, alerts });
-  } catch (error) {
-    console.error('Get fraud alerts error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-router.patch('/fraud-alerts/:id', async (req, res) => {
-  try {
-    const { status, notes } = req.body;
-    const alert = await FraudAlert.findByIdAndUpdate(
-      req.params.id,
-      { 
-        status,
-        notes,
-        resolvedBy: req.user?.id,
-        resolvedAt: status === 'resolved' ? new Date() : undefined
-      },
-      { new: true }
-    );
-    
-    if (!alert) {
-      return res.status(404).json({ success: false, message: 'Alert not found' });
-    }
-    
-    res.json({ success: true, alert });
-  } catch (error) {
-    console.error('Update fraud alert error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -887,8 +819,8 @@ router.get('/sales-reports', async (req, res) => {
     // Calculate average order value
     const averageOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
-    // Calculate platform commission (5% of total revenue from non-cancelled orders)
-    const commissionRate = 5; // 5% commission
+    // Calculate platform commission (3% of total revenue from non-cancelled orders)
+    const commissionRate = 3; // 3% commission
     const platformCommission = (totalRevenue * commissionRate) / 100;
 
     // Get top category by revenue
@@ -1262,6 +1194,122 @@ router.get('/analytics-data', async (req, res) => {
   } catch (error) {
     console.error('Analytics data error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Fraud Detection Endpoints
+const fraudDetection = require('../utils/fraudDetection');
+
+// Run fraud detection scan and save to database
+router.get('/fraud-detection/scan', async (req, res) => {
+  try {
+    console.log('🔍 Running fraud detection scan...');
+    const alerts = await fraudDetection.detectAllFraud();
+    
+    console.log(`✅ Fraud detection complete. Found ${alerts.length} new alerts`);
+    
+    // Get updated stats from database
+    const stats = await fraudDetection.getFraudStats();
+    
+    res.json({
+      success: true,
+      message: `Scan complete. Found ${alerts.length} new suspicious activities.`,
+      newAlerts: alerts.length,
+      stats
+    });
+  } catch (error) {
+    console.error('❌ Fraud detection error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error running fraud detection',
+      error: error.message 
+    });
+  }
+});
+
+// Get fraud alerts from database
+router.get('/fraud-detection', async (req, res) => {
+  try {
+    const { status, severity, type } = req.query;
+    
+    const filter = {};
+    if (status) filter.status = status;
+    if (severity) filter.severity = severity;
+    if (type) filter.type = type;
+    
+    const alerts = await fraudDetection.getFraudAlertsFromDB(filter);
+    const stats = await fraudDetection.getFraudStats();
+    
+    res.json({
+      success: true,
+      alerts,
+      stats
+    });
+  } catch (error) {
+    console.error('❌ Error fetching fraud alerts:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching fraud alerts',
+      error: error.message 
+    });
+  }
+});
+
+// Update fraud alert status
+router.patch('/fraud-detection/:alertId', async (req, res) => {
+  try {
+    const { alertId } = req.params;
+    const { status, adminNotes, actionTaken } = req.body;
+    
+    const updates = {};
+    if (status) updates.status = status;
+    if (adminNotes) updates.adminNotes = adminNotes;
+    if (actionTaken) updates.actionTaken = actionTaken;
+    if (req.user?.id) updates.reviewedBy = req.user.id;
+    
+    const alert = await fraudDetection.updateFraudAlert(alertId, updates);
+    
+    if (!alert) {
+      return res.status(404).json({
+        success: false,
+        message: 'Fraud alert not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Fraud alert updated successfully',
+      alert
+    });
+  } catch (error) {
+    console.error('❌ Error updating fraud alert:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating fraud alert',
+      error: error.message 
+    });
+  }
+});
+
+// Delete fraud alert
+router.delete('/fraud-detection/:alertId', async (req, res) => {
+  try {
+    const { alertId } = req.params;
+    const FraudAlert = require('../models/FraudAlert');
+    
+    await FraudAlert.findByIdAndDelete(alertId);
+    
+    res.json({
+      success: true,
+      message: 'Fraud alert deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Error deleting fraud alert:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error deleting fraud alert',
+      error: error.message 
+    });
   }
 });
 

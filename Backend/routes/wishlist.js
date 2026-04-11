@@ -6,15 +6,26 @@ const Wishlist = require('../models/Wishlist');
 router.get('/:customerId', async (req, res) => {
   try {
     let wishlist = await Wishlist.findOne({ customer: req.params.customerId })
-      .populate('items.product');
+      .populate({
+        path: 'items.product',
+        select: 'name price images seller sellerName storeName stock status'
+      });
 
     if (!wishlist) {
       wishlist = new Wishlist({ customer: req.params.customerId, items: [] });
       await wishlist.save();
     }
 
+    // Filter out items where product is null (deleted products)
+    if (wishlist.items) {
+      wishlist.items = wishlist.items.filter(item => item.product !== null);
+    }
+
+    console.log(`Wishlist for customer ${req.params.customerId}: ${wishlist.items.length} items`);
+
     res.json({ success: true, wishlist });
   } catch (error) {
+    console.error('Error fetching wishlist:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
