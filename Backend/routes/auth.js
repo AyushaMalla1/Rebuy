@@ -239,7 +239,7 @@ router.post('/signup', async (req, res) => {
     console.log('User created successfully:', user._id);
 
     // Create Customer profile for the user
-    const Customer = require('../models/Customer');
+    const Customer = require('../models/Addresses');
     const customer = await Customer.create({
       user: user._id,
       fullName: user.fullName,

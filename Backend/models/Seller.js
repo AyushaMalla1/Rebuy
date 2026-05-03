@@ -160,6 +160,15 @@ const sellerSchema = new mongoose.Schema({
       default: Date.now
     }
   },
+  // Verification Rating (separate from trust score)
+  totalVerifications: {
+    type: Number,
+    default: 0
+  },
+  badVerifications: {
+    type: Number,
+    default: 0
+  },
   // Admin Approval Data
   approvalData: {
     approvedBy: {

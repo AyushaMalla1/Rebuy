@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
-const Settings = require('../models/Settings');
+// Settings model removed - using environment variables for payment configuration
 const {
   initiateEsewaPayment,
   initiateKhaltiPayment,
@@ -22,10 +22,8 @@ router.post('/initiate', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
     
-    const settings = await Settings.findOne();
-    if (!settings || !settings.paymentGateway?.isEnabled) {
-      return res.status(400).json({ success: false, message: 'Payment gateway not configured' });
-    }
+    // Payment gateway is always enabled via environment variables
+    // Settings model removed - configuration now handled via .env
     
     const orderData = {
       orderId: order._id.toString(),
@@ -36,12 +34,15 @@ router.post('/initiate', async (req, res) => {
     
     let result;
     
-    switch (settings.paymentGateway.provider) {
+    // Default to eSewa payment (can be configured via environment variables)
+    const paymentProvider = process.env.PAYMENT_PROVIDER || 'esewa';
+    
+    switch (paymentProvider) {
       case 'esewa':
-        result = await initiateEsewaPayment(orderData, settings);
+        result = await initiateEsewaPayment(orderData, null);
         break;
       case 'khalti':
-        result = await initiateKhaltiPayment(orderData, settings);
+        result = await initiateKhaltiPayment(orderData, null);
         break;
       default:
         return res.status(400).json({ success: false, message: 'Invalid payment provider' });
@@ -55,7 +56,7 @@ router.post('/initiate', async (req, res) => {
           customer: order.customer._id || order.customer,
           transactionId: result.transactionUuid || `PENDING_${Date.now()}`,
           transactionUuid: result.transactionUuid,
-          paymentMethod: settings.paymentGateway.provider,
+          paymentMethod: paymentProvider,
           amount: order.total,
           status: 'pending',
           initiatedAt: new Date(),
@@ -92,19 +93,17 @@ router.post('/verify', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
     
-    const settings = await Settings.findOne();
-    if (!settings) {
-      return res.status(400).json({ success: false, message: 'Settings not found' });
-    }
+    // Payment verification using environment configuration
+    const paymentProvider = process.env.PAYMENT_PROVIDER || 'esewa';
     
     let result;
     
-    switch (settings.paymentGateway.provider) {
+    switch (paymentProvider) {
       case 'esewa':
-        result = await verifyEsewaPayment(params, settings);
+        result = await verifyEsewaPayment(params, null);
         break;
       case 'khalti':
-        result = await verifyKhaltiPayment(params.pidx, settings);
+        result = await verifyKhaltiPayment(params.pidx, null);
         break;
       default:
         return res.status(400).json({ success: false, message: 'Invalid payment provider' });
@@ -112,7 +111,7 @@ router.post('/verify', async (req, res) => {
     
     if (result.success) {
       order.paymentStatus = 'Paid';
-      order.paymentMethod = settings.paymentGateway.provider;
+      order.paymentMethod = paymentProvider;
       order.transactionId = result.transactionId;
       order.status = 'Confirmed';
       await order.save();
@@ -124,7 +123,7 @@ router.post('/verify', async (req, res) => {
         performedBy: order.customer,
         targetId: order._id,
         targetModel: 'Order',
-        description: `Payment verified via ${settings.paymentGateway.provider} for Order ${order.trackingNumber || order._id}`,
+        description: `Payment verified via ${paymentProvider} for Order ${order.trackingNumber || order._id}`,
         ipAddress: req.ip
       }).catch(console.error);
     }
@@ -155,9 +154,8 @@ router.get('/esewa/success', async (req, res) => {
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment-failed?message=No payment data received`);
     }
 
-    // Verify payment
-    const settings = await Settings.findOne();
-    const result = await verifyEsewaPayment({ data }, settings);
+    // Verify payment using environment configuration
+    const result = await verifyEsewaPayment({ data }, null);
 
     if (!result.success) {
       // Update payment record as failed
@@ -299,8 +297,7 @@ router.post('/esewa/verify-frontend', async (req, res) => {
       return res.json({ success: false, message: 'No payment data received from eSewa' });
     }
 
-    const settings = await Settings.findOne();
-    const result = await verifyEsewaPayment({ data }, settings);
+    const result = await verifyEsewaPayment({ data }, null);
 
     if (!result.success) {
       if (order_id) {

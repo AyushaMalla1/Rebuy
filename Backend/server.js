@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const passport = require('./config/passport');
 const { startStockAlertScheduler } = require('./utils/stockAlertScheduler');
-const { initializeWeeklyPayoutScheduler } = require('./utils/weeklyPayoutScheduler');
+// const { initializeWeeklyPayoutScheduler } = require('./utils/weeklyPayoutScheduler');
 const { initFraudDetectionScheduler } = require('./utils/fraudDetectionScheduler');
 require('dotenv').config();
 
@@ -175,8 +175,8 @@ if (process.env.NODE_ENV !== 'test') {
     // Start stock alert scheduler
     startStockAlertScheduler();
     
-    // Start weekly payout scheduler (Every Friday at 9:00 AM)
-    initializeWeeklyPayoutScheduler();
+    // Weekly payout scheduler disabled - use manual trigger in admin dashboard
+    // initializeWeeklyPayoutScheduler();
     
     // Start automated fraud detection scheduler (Every 6 hours)
     initFraudDetectionScheduler();

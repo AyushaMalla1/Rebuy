@@ -3,7 +3,14 @@ const router = express.Router();
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Seller = require('../models/Seller');
-const Customer = require('../models/Customer');
+
+/**
+ * MESSAGE ROUTES
+ * Handles messaging between users (customers) and sellers
+ * - Conversations are identified by conversationId (sorted userId1_userId2)
+ * - Messages support User and Seller models
+ * - Real-time read status tracking
+ */
 
 // Helper function to generate conversation ID
 const generateConversationId = (userId1, userId2) => {
@@ -39,17 +46,9 @@ router.get('/conversations/:userId', async (req, res) => {
         if (otherUserModel === 'Seller') {
           otherUser = await Seller.findById(otherUserId).select('storeName fullName profileImage email');
         } else {
-          // For Customer or User model, always check User collection
-          // Customer model references User, so the actual data is in User collection
+          // For User model, check User collection
           otherUser = await User.findById(otherUserId).select('fullName email profileImage');
-          
-          // If still not found, try Customer collection as last resort
-          if (!otherUser) {
-            otherUser = await Customer.findById(otherUserId).select('fullName profileImage email');
-          }
         }
-
-        console.log(`Fetching user ${otherUserId} with model ${otherUserModel}:`, otherUser);
 
         // Count unread messages in this conversation
         const unreadCount = await Message.countDocuments({
@@ -64,7 +63,7 @@ router.get('/conversations/:userId', async (req, res) => {
             _id: otherUserId,
             name: otherUser?.storeName || otherUser?.fullName || 'Customer',
             email: otherUser?.email || '',
-            profileImage: otherUser?.profileImage,
+            profileImage: otherUser?.profileImage || (otherUserModel === 'Seller' ? 'https://i.pravatar.cc/100' : ''),
             model: otherUserModel
           },
           lastMessage: {
@@ -95,50 +94,25 @@ router.get('/conversations/:userId', async (req, res) => {
   }
 });
 
-// Get messages for seller (for seller dashboard inbox)
-router.get('/seller/:sellerId', async (req, res) => {
+// Get unread message count for a user
+router.get('/unread-count/:userId', async (req, res) => {
   try {
-    const { sellerId } = req.params;
+    const { userId } = req.params;
 
-    // Find all messages where seller is the receiver
-    const messages = await Message.find({
-      receiverId: sellerId,
-      receiverModel: 'Seller'
-    })
-    .sort({ createdAt: -1 })
-    .limit(50);
-
-    // Populate sender info for each message
-    for (let msg of messages) {
-      if (msg.senderModel === 'Customer') {
-        const customer = await Customer.findById(msg.senderId).select('fullName profileImage email');
-        msg._doc.senderInfo = customer;
-      } else if (msg.senderModel === 'Seller') {
-        const seller = await Seller.findById(msg.senderId).select('storeName fullName profileImage');
-        msg._doc.senderInfo = seller;
-      } else {
-        const user = await User.findById(msg.senderId).select('fullName email');
-        msg._doc.senderInfo = user;
-      }
-    }
-
-    // Count unread messages
     const unreadCount = await Message.countDocuments({
-      receiverId: sellerId,
-      receiverModel: 'Seller',
+      receiverId: userId,
       read: false
     });
 
     res.json({
       success: true,
-      messages,
       unreadCount
     });
   } catch (error) {
-    console.error('Error fetching seller messages:', error);
+    console.error('Error fetching unread count:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch messages',
+      message: 'Failed to fetch unread count',
       error: error.message
     });
   }
@@ -160,14 +134,8 @@ router.get('/conversation/:conversationId', async (req, res) => {
         const seller = await Seller.findById(msg.senderId).select('storeName fullName profileImage');
         msg._doc.senderInfo = seller;
       } else {
-        // For Customer or User model, check User collection first
-        let user = await User.findById(msg.senderId).select('fullName profileImage email');
-        
-        // If not found, try Customer collection
-        if (!user) {
-          user = await Customer.findById(msg.senderId).select('fullName profileImage');
-        }
-        
+        // For User model, check User collection
+        const user = await User.findById(msg.senderId).select('fullName profileImage email');
         msg._doc.senderInfo = user;
       }
     }
@@ -232,16 +200,9 @@ router.post('/', async (req, res) => {
     if (senderModel === 'Seller') {
       senderInfo = await Seller.findById(senderId).select('storeName fullName profileImage');
     } else {
-      // For Customer or User model, always check User collection first
+      // For User model, check User collection
       senderInfo = await User.findById(senderId).select('fullName profileImage email');
-      
-      // If not found, try Customer collection
-      if (!senderInfo) {
-        senderInfo = await Customer.findById(senderId).select('fullName profileImage');
-      }
     }
-
-    console.log('Sender info populated:', senderInfo);
 
     newMessage._doc.senderInfo = senderInfo;
 

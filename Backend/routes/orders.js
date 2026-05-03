@@ -293,7 +293,7 @@ router.patch('/:orderId/status', async (req, res) => {
 // Post-purchase condition verification
 router.post('/:orderId/verify-condition', async (req, res) => {
   try {
-    const { matchesDescription, customerNotes, images } = req.body;
+    const { matchesDescription, customerNotes, images, rating } = req.body;
     const order = await Order.findById(req.params.orderId)
       .populate('customer', 'fullName email')
       .populate('items.product', 'name images')
@@ -310,6 +310,25 @@ router.post('/:orderId/verify-condition', async (req, res) => {
     // Check if already verified
     if (order.conditionVerification && order.conditionVerification.verified) {
       return res.status(400).json({ message: 'Order already verified' });
+    }
+    
+    // Validate rating
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating is required (1-5 stars)' });
+    }
+    
+    // Validate images - MINIMUM 2, MAXIMUM 5
+    if (!images || images.length < 2) {
+      return res.status(400).json({ message: 'At least 2 product images are required for verification' });
+    }
+    
+    if (images.length > 5) {
+      return res.status(400).json({ message: 'Maximum 5 images allowed' });
+    }
+    
+    // Validate notes - REQUIRED
+    if (!customerNotes || customerNotes.trim() === '') {
+      return res.status(400).json({ message: 'Notes about product condition are required' });
     }
     
     // Convert boolean to string if needed for backward compatibility
@@ -333,31 +352,55 @@ router.post('/:orderId/verify-condition', async (req, res) => {
     const ConditionVerification = require('../models/ConditionVerification');
     
     for (const item of order.items) {
-      // Skip if product or seller data is missing
-      if (!item.product || !item.seller) {
-        console.log('Skipping item - missing product or seller data');
+      // Get product and seller IDs - handle both populated and non-populated cases
+      const productId = item.product?._id || item.product;
+      const sellerId = item.seller?._id || item.seller;
+      
+      // Log for debugging
+      console.log('Processing verification for item:', {
+        productId,
+        sellerId,
+        productName: item.productName,
+        sellerName: item.sellerName
+      });
+      
+      // Skip only if product is completely missing
+      if (!productId) {
+        console.log('Skipping item - missing product ID');
         continue;
       }
 
-      const sellerId = item.seller._id || item.seller;
-      const sellerName = item.sellerName || (item.seller.fullName ? item.seller.fullName : 'Unknown Seller');
+      const sellerName = item.sellerName || (item.seller?.fullName) || 'Unknown Seller';
+      const productName = item.productName || (item.product?.name) || 'Unknown Product';
+      const productImage = item.productImage || (item.product?.images?.[0]) || '';
       
-      await ConditionVerification.create({
-        order: order._id,
-        orderId: order.orderId,
-        product: item.product._id || item.product,
-        productName: item.productName || (item.product.name ? item.product.name : 'Unknown Product'),
-        productImage: item.productImage || (item.product.images && item.product.images[0]) || '',
-        customer: order.customer._id || order.customer,
-        customerName: (order.customer && order.customer.fullName) || order.customerName || 'Unknown Customer',
-        customerEmail: (order.customer && order.customer.email) || order.customerEmail || '',
-        seller: sellerId,
-        sellerName: sellerName,
-        matchesDescription: matchesDescriptionValue,
-        customerNotes: customerNotes || '',
-        verificationImages: images || [],
-        disputeRaised: matchesDescriptionValue === 'no'
-      });
+      try {
+        const verification = await ConditionVerification.create({
+          order: order._id,
+          orderId: order.orderId,
+          product: productId,
+          productName: productName,
+          productImage: productImage,
+          customer: order.customer._id || order.customer,
+          customerName: (order.customer && order.customer.fullName) || order.customerName || 'Unknown Customer',
+          customerEmail: (order.customer && order.customer.email) || order.customerEmail || '',
+          seller: sellerId || null,
+          sellerName: sellerName,
+          matchesDescription: matchesDescriptionValue,
+          rating: rating,
+          customerNotes: customerNotes || '',
+          verificationImages: images || [],
+          disputeRaised: matchesDescriptionValue === 'no',
+          // Admin approval system - prevents seller bias
+          approvalStatus: 'pending',  // Starts as pending
+          isPublic: false  // Not public until admin approves
+        });
+        
+        console.log('✅ Condition verification created (pending admin approval) for product:', productName, 'ID:', verification._id);
+      } catch (createError) {
+        console.error('❌ Failed to create verification for product:', productName, 'Error:', createError.message);
+        // Continue with other items even if one fails
+      }
     }
     
     // Award bonus points for positive verification
@@ -376,6 +419,130 @@ router.post('/:orderId/verify-condition', async (req, res) => {
         });
         loyaltyAccount.updateTier();
         await loyaltyAccount.save();
+      }
+    }
+    
+    // AUTO-CREATE RETURN REQUEST if condition is BAD
+    let returnRequestId = null;
+    const createdVerifications = [];
+    
+    if (matchesDescriptionValue === 'no') {
+      try {
+        const Return = require('../models/Return');
+        
+        // Create return request for each item in the order
+        for (const item of order.items) {
+          const productId = item.product?._id || item.product;
+          const sellerId = item.seller?._id || item.seller;
+          
+          if (!productId || !sellerId) continue;
+          
+          const returnRequest = await Return.create({
+            orderId: order._id,
+            customer: order.customer._id || order.customer,
+            product: productId,
+            seller: sellerId,
+            reason: 'Product does not match description',
+            description: customerNotes || 'Customer reported product condition issue during verification',
+            images: images || [],
+            refundAmount: item.price * item.quantity,
+            status: 'Pending',
+            requestedAt: Date.now(),
+            linkedVerification: true, // Flag to indicate this return is linked to verification
+            verificationImages: images || []
+          });
+          
+          returnRequestId = returnRequest._id;
+          
+          // Find the verification for this product and link it
+          const ConditionVerification = require('../models/ConditionVerification');
+          const verification = await ConditionVerification.findOne({
+            order: order._id,
+            product: productId
+          }).sort({ createdAt: -1 });
+          
+          if (verification) {
+            verification.linkedReturn = returnRequest._id;
+            verification.returnCreated = true;
+            await verification.save();
+            createdVerifications.push(verification);
+          }
+          
+          console.log('✅ Auto-created return request for bad condition:', returnRequest._id);
+        }
+      } catch (returnError) {
+        console.error('❌ Failed to auto-create return request:', returnError.message);
+        // Continue even if return creation fails
+      }
+    }
+    
+    // UPDATE SELLER RATING based on verification
+    if (matchesDescriptionValue === 'no') {
+      try {
+        // Get unique sellers and update their ratings
+        const sellers = [...new Set(order.items
+          .filter(item => item.seller)
+          .map(item => (item.seller._id || item.seller).toString())
+          .filter(Boolean))];
+        
+        for (const sellerId of sellers) {
+          const seller = await Seller.findById(sellerId);
+          if (seller) {
+            // Decrease seller rating for bad verification
+            // Initialize rating if not exists
+            if (!seller.rating) seller.rating = 5.0;
+            if (!seller.totalVerifications) seller.totalVerifications = 0;
+            if (!seller.badVerifications) seller.badVerifications = 0;
+            
+            seller.badVerifications += 1;
+            seller.totalVerifications += 1;
+            
+            // Calculate new rating (weighted average)
+            // Bad verification reduces rating by 0.5 points
+            const goodVerifications = seller.totalVerifications - seller.badVerifications;
+            seller.rating = ((goodVerifications * 5.0) + (seller.badVerifications * 2.0)) / seller.totalVerifications;
+            
+            // Ensure rating stays between 1.0 and 5.0
+            seller.rating = Math.max(1.0, Math.min(5.0, seller.rating));
+            
+            await seller.save();
+            console.log(`✅ Updated seller ${seller.fullName} rating to ${seller.rating.toFixed(2)} (${seller.badVerifications}/${seller.totalVerifications} bad)`);
+          }
+        }
+      } catch (ratingError) {
+        console.error('❌ Failed to update seller rating:', ratingError.message);
+        // Continue even if rating update fails
+      }
+    } else if (matchesDescriptionValue === 'yes') {
+      try {
+        // Increase seller rating for good verification
+        const sellers = [...new Set(order.items
+          .filter(item => item.seller)
+          .map(item => (item.seller._id || item.seller).toString())
+          .filter(Boolean))];
+        
+        for (const sellerId of sellers) {
+          const seller = await Seller.findById(sellerId);
+          if (seller) {
+            // Initialize rating if not exists
+            if (!seller.rating) seller.rating = 5.0;
+            if (!seller.totalVerifications) seller.totalVerifications = 0;
+            if (!seller.badVerifications) seller.badVerifications = 0;
+            
+            seller.totalVerifications += 1;
+            
+            // Calculate new rating
+            const goodVerifications = seller.totalVerifications - seller.badVerifications;
+            seller.rating = ((goodVerifications * 5.0) + (seller.badVerifications * 2.0)) / seller.totalVerifications;
+            
+            seller.rating = Math.max(1.0, Math.min(5.0, seller.rating));
+            
+            await seller.save();
+            console.log(`✅ Updated seller ${seller.fullName} rating to ${seller.rating.toFixed(2)} (${seller.badVerifications}/${seller.totalVerifications} bad)`);
+          }
+        }
+      } catch (ratingError) {
+        console.error('❌ Failed to update seller rating:', ratingError.message);
       }
     }
     
@@ -521,15 +688,17 @@ router.get('/seller/:sellerId', async (req, res) => {
   }
 });
 
-// Get condition verifications for a specific product
+// Get condition verifications for a specific product (ONLY APPROVED/PUBLIC)
 router.get('/product/:productId/verifications', async (req, res) => {
   try {
     const { productId } = req.params;
     const ConditionVerification = require('../models/ConditionVerification');
     
-    // Find all verifications for this product
+    // Find ONLY approved and public verifications for this product
     const verifications = await ConditionVerification.find({
-      product: productId
+      product: productId,
+      approvalStatus: 'approved',  // Only approved by admin
+      isPublic: true  // Only public verifications
     })
     .populate('customer', 'fullName')
     .sort({ verifiedAt: -1 });
@@ -543,7 +712,8 @@ router.get('/product/:productId/verifications', async (req, res) => {
         verifiedAt: v.verifiedAt,
         matchesDescription: v.matchesDescription,
         customerFeedback: v.customerNotes,
-        verificationImages: v.verificationImages || []
+        verificationImages: v.verificationImages || [],
+        approvedAt: v.approvedAt
       }))
     });
   } catch (error) {

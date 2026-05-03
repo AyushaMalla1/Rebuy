@@ -3,16 +3,23 @@ const router = express.Router();
 const Notification = require('../models/Notification');
 const Seller = require('../models/Seller');
 
-// Get all notifications for a seller or admin
+/**
+ * NOTIFICATION ROUTES
+ * Unified notification system for all user types (customers, sellers, admins)
+ * - Single endpoint /:userId works for all user types
+ * - Supports both legacy sellerId and new recipient fields
+ * - Consistent response format with success flags
+ */
+
+// Get all notifications for a user (seller, customer, or admin)
 router.get('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { limit = 50, unreadOnly = false } = req.query;
 
-    // Query for both old sellerId and new recipient fields
     const query = {
       $or: [
-        { sellerId: userId },
+        { sellerId: userId }, // Legacy field for backward compatibility
         { recipient: userId }
       ]
     };
@@ -39,64 +46,66 @@ router.get('/:userId', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);
-    res.status(500).json({ success: false, message: 'Error fetching notifications' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching notifications',
+      error: error.message 
+    });
   }
 });
 
-// Get notifications for a customer
-router.get('/customer/:customerId', async (req, res) => {
+// Get unread notification count for a user
+router.get('/:userId/unread-count', async (req, res) => {
   try {
-    const { customerId } = req.params;
-    const { limit = 50, unreadOnly = false } = req.query;
-
-    const query = {
-      recipient: customerId,
-      recipientModel: 'User'
-    };
-    
-    if (unreadOnly === 'true') {
-      query.isRead = false;
-    }
-
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit));
+    const { userId } = req.params;
 
     const unreadCount = await Notification.countDocuments({
-      recipient: customerId,
-      recipientModel: 'User',
-      isRead: false
+      $or: [
+        { sellerId: userId, isRead: false },
+        { recipient: userId, isRead: false }
+      ]
     });
 
     res.json({
       success: true,
-      notifications,
       unreadCount
     });
   } catch (error) {
-    console.error('Error fetching customer notifications:', error);
-    res.status(500).json({ success: false, message: 'Error fetching notifications' });
+    console.error('Error fetching unread count:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching unread count',
+      error: error.message 
+    });
   }
 });
 
-// Mark all notifications as read for a customer
-router.patch('/customer/:customerId/read-all', async (req, res) => {
+// Mark all notifications as read for a user
+router.patch('/:userId/read-all', async (req, res) => {
   try {
-    const { customerId } = req.params;
+    const { userId } = req.params;
 
     await Notification.updateMany(
       {
-        recipient: customerId,
-        recipientModel: 'User',
-        isRead: false
+        $or: [
+          { sellerId: userId, isRead: false },
+          { recipient: userId, isRead: false }
+        ]
       },
       { isRead: true }
     );
 
-    res.json({ success: true, message: 'All notifications marked as read' });
+    res.json({ 
+      success: true, 
+      message: 'All notifications marked as read' 
+    });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
-    res.status(500).json({ success: false, message: 'Error updating notifications' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating notifications',
+      error: error.message 
+    });
   }
 });
 
@@ -112,35 +121,23 @@ router.patch('/:notificationId/read', async (req, res) => {
     );
 
     if (!notification) {
-      return res.status(404).json({ message: 'Notification not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Notification not found' 
+      });
     }
 
-    res.json(notification);
+    res.json({
+      success: true,
+      notification
+    });
   } catch (error) {
     console.error('Error marking notification as read:', error);
-    res.status(500).json({ message: 'Error updating notification' });
-  }
-});
-
-// Mark all notifications as read for a seller or admin
-router.patch('/user/:userId/read-all', async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    await Notification.updateMany(
-      {
-        $or: [
-          { sellerId: userId, isRead: false },
-          { recipient: userId, isRead: false }
-        ]
-      },
-      { isRead: true }
-    );
-
-    res.json({ message: 'All notifications marked as read' });
-  } catch (error) {
-    console.error('Error marking all notifications as read:', error);
-    res.status(500).json({ message: 'Error updating notifications' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error updating notification',
+      error: error.message 
+    });
   }
 });
 
@@ -152,37 +149,63 @@ router.delete('/:notificationId', async (req, res) => {
     const notification = await Notification.findByIdAndDelete(notificationId);
 
     if (!notification) {
-      return res.status(404).json({ message: 'Notification not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Notification not found' 
+      });
     }
 
-    res.json({ message: 'Notification deleted successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Notification deleted successfully' 
+    });
   } catch (error) {
     console.error('Error deleting notification:', error);
-    res.status(500).json({ message: 'Error deleting notification' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error deleting notification',
+      error: error.message 
+    });
   }
 });
 
 // Create a notification (for testing or internal use)
 router.post('/', async (req, res) => {
   try {
-    const { sellerId, type, title, message, severity, relatedId, relatedModel } = req.body;
+    const { recipient, recipientModel, type, title, message, severity, relatedId, relatedModel } = req.body;
+
+    // Validate required fields
+    if (!recipient || !type || !title || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: recipient, type, title, message'
+      });
+    }
 
     const notification = new Notification({
-      sellerId,
+      recipient,
+      recipientModel: recipientModel || 'User',
       type,
       title,
       message,
-      severity,
+      severity: severity || 'info',
       relatedId,
       relatedModel
     });
 
     await notification.save();
 
-    res.status(201).json(notification);
+    res.status(201).json({
+      success: true,
+      notification
+    });
   } catch (error) {
     console.error('Error creating notification:', error);
-    res.status(500).json({ message: 'Error creating notification' });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error creating notification',
+      error: error.message 
+    });
   }
 });
 

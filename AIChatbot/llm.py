@@ -88,8 +88,8 @@ Instructions:
 Your response:"""
     
     try:
-        # Generate response using Gemini
-        model = genai.GenerativeModel('gemini-pro')
+        # Generate response using Gemini (updated model name)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(prompt)
         reply = response.text
         
@@ -145,8 +145,8 @@ Instructions:
 Your response:"""
     
     try:
-        # Generate response using Gemini
-        model = genai.GenerativeModel('gemini-pro')
+        # Generate response using Gemini (updated model name)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content(prompt)
         reply = response.text
         

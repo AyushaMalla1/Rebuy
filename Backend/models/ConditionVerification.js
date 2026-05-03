@@ -34,7 +34,7 @@ const conditionVerificationSchema = new mongoose.Schema({
   seller: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false  // Changed to false to handle cases where seller data is missing
   },
   sellerName: String,
 
@@ -43,6 +43,12 @@ const conditionVerificationSchema = new mongoose.Schema({
     type: String,
     enum: ['yes', 'no'],
     required: true
+  },
+  rating: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 5
   },
   customerNotes: {
     type: String,
@@ -61,6 +67,23 @@ const conditionVerificationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+
+  // Admin Approval System (NEW - prevents seller bias)
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'  // All verifications start as pending
+  },
+  isPublic: {
+    type: Boolean,
+    default: false  // Only public after admin approval
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'  // Admin who approved
+  },
+  approvedAt: Date,
+  rejectionReason: String,
 
   // Admin Review (for negative verifications)
   adminReviewed: {
@@ -85,7 +108,18 @@ const conditionVerificationSchema = new mongoose.Schema({
     default: null
   },
   disputeResolution: String,
-  disputeResolvedAt: Date
+  disputeResolvedAt: Date,
+
+  // Link to Return Request (if bad condition triggers return)
+  linkedReturn: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Return',
+    default: null
+  },
+  returnCreated: {
+    type: Boolean,
+    default: false
+  }
 
 }, {
   timestamps: true

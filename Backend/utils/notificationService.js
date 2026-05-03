@@ -1,10 +1,21 @@
 const Notification = require('../models/Notification');
 
-// Helper function to create notifications
-const createNotification = async (sellerId, type, title, message, severity = 'info', relatedId = null, relatedModel = null) => {
+/**
+ * Create a notification for a user
+ * @param {String} recipientId - User/Seller/Admin ID
+ * @param {String} recipientModel - 'User' or 'Seller'
+ * @param {String} type - Notification type
+ * @param {String} title - Notification title
+ * @param {String} message - Notification message
+ * @param {String} severity - 'info', 'success', 'warning', 'error'
+ * @param {String} relatedId - Related document ID (optional)
+ * @param {String} relatedModel - Related model name (optional)
+ */
+const createNotification = async (recipientId, recipientModel, type, title, message, severity = 'info', relatedId = null, relatedModel = null) => {
   try {
     const notification = new Notification({
-      sellerId,
+      recipient: recipientId,
+      recipientModel,
       type,
       title,
       message,
@@ -92,8 +103,14 @@ const notificationTemplates = {
   })
 };
 
-// Send notification using template
-const sendNotification = async (sellerId, templateName, ...args) => {
+/**
+ * Send notification using predefined template
+ * @param {String} recipientId - User/Seller/Admin ID
+ * @param {String} recipientModel - 'User' or 'Seller'
+ * @param {String} templateName - Template name from notificationTemplates
+ * @param  {...any} args - Template arguments
+ */
+const sendNotification = async (recipientId, recipientModel, templateName, ...args) => {
   try {
     const template = notificationTemplates[templateName];
     if (!template) {
@@ -102,7 +119,8 @@ const sendNotification = async (sellerId, templateName, ...args) => {
 
     const notificationData = template(...args);
     return await createNotification(
-      sellerId,
+      recipientId,
+      recipientModel,
       notificationData.type,
       notificationData.title,
       notificationData.message,

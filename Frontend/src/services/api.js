@@ -301,11 +301,6 @@ export const customerAPI = {
   
   get2FAStatus: (userId) => apiCall(`/customers/${userId}/2fa-status`),
   
-  update2FA: (userId, enabled) => apiCall(`/customers/${userId}/2fa`, {
-    method: 'PATCH',
-    body: JSON.stringify({ enabled }),
-  }),
-  
   deactivateAccount: (userId) => apiCall(`/customers/${userId}/deactivate`, {
     method: 'PATCH',
   }),
@@ -340,7 +335,7 @@ export const messageAPI = {
   }),
 };
 
-export default {
+const apiExports = {
   auth: authAPI,
   products: productAPI,
   cart: cartAPI,
@@ -352,3 +347,5 @@ export default {
   customer: customerAPI,
   messages: messageAPI,
 };
+
+export default apiExports;

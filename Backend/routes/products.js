@@ -294,6 +294,66 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Get similar products by subcategory
+router.get('/:id/similar', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    
+    let similarProducts = [];
+    
+    // First, try to find products with same subcategory
+    if (product.subcategory) {
+      similarProducts = await Product.find({
+        _id: { $ne: product._id }, // Exclude current product
+        status: 'Approved',
+        category: product.category,
+        subcategory: product.subcategory
+      })
+      .populate('seller', 'status')
+      .sort({ createdAt: -1 })
+      .limit(4);
+      
+      // Filter out products from unapproved sellers
+      similarProducts = similarProducts.filter(p => 
+        p.seller && p.seller.status === 'approved'
+      );
+    }
+    
+    // If no subcategory matches found, fall back to category matching
+    if (similarProducts.length === 0) {
+      similarProducts = await Product.find({
+        _id: { $ne: product._id },
+        status: 'Approved',
+        category: product.category
+      })
+      .populate('seller', 'status')
+      .sort({ createdAt: -1 })
+      .limit(4);
+      
+      // Filter out products from unapproved sellers
+      similarProducts = similarProducts.filter(p => 
+        p.seller && p.seller.status === 'approved'
+      );
+    }
+    
+    res.json({
+      success: true,
+      products: similarProducts,
+      matchedBy: product.subcategory && similarProducts.length > 0 ? 'subcategory' : 'category'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+});
+
 // Create product (seller only)
 router.post('/', async (req, res) => {
   try {

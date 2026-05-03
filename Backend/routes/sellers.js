@@ -583,3 +583,29 @@ router.put('/:id/change-password', async (req, res) => {
 });
 
 module.exports = router;
+
+// Get seller's product verifications
+router.get('/:sellerId/verifications', async (req, res) => {
+  try {
+    const ConditionVerification = require('../models/ConditionVerification');
+    
+    const verifications = await ConditionVerification.find({ 
+      seller: req.params.sellerId 
+    })
+    .populate('customer', 'fullName email')
+    .populate('product', 'name images')
+    .populate('order', 'orderId')
+    .sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      verifications
+    });
+  } catch (error) {
+    console.error('Get seller verifications error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
+  }
+});

@@ -703,56 +703,57 @@ router.patch('/loyalty-points/:userId', async (req, res) => {
   }
 });
 
-// Settings Routes
-const Settings = require('../models/Settings');
+// Settings Routes - DISABLED (Settings model removed)
+// Settings functionality now handled via environment variables
+// const Settings = require('../models/Settings');
 
-router.get('/settings', async (req, res) => {
-  try {
-    let settings = await Settings.findOne();
-    
-    if (!settings) {
-      settings = new Settings();
-      await settings.save();
-    }
-    
-    res.json({ success: true, settings });
-  } catch (error) {
-    console.error('Get settings error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
+// router.get('/settings', async (req, res) => {
+//   try {
+//     let settings = await Settings.findOne();
+//     
+//     if (!settings) {
+//       settings = new Settings();
+//       await settings.save();
+//     }
+//     
+//     res.json({ success: true, settings });
+//   } catch (error) {
+//     console.error('Get settings error:', error);
+//     res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// });
 
-router.patch('/settings', async (req, res) => {
-  try {
-    let settings = await Settings.findOne();
-    
-    if (!settings) {
-      settings = new Settings(req.body);
-    } else {
-      Object.assign(settings, req.body);
-    }
-    
-    settings.updatedBy = req.user?.id;
-    await settings.save();
-    
-    // Log audit entry
-    await logAudit({
-      action: 'Settings Updated',
-      actionType: 'system',
-      performedBy: req.user?.id,
-      targetId: settings._id,
-      targetModel: 'Settings',
-      description: 'Admin updated platform settings',
-      ipAddress: req.ip,
-      metadata: req.body
-    });
-    
-    res.json({ success: true, settings });
-  } catch (error) {
-    console.error('Update settings error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
+// router.patch('/settings', async (req, res) => {
+//   try {
+//     let settings = await Settings.findOne();
+//     
+//     if (!settings) {
+//       settings = new Settings(req.body);
+//     } else {
+//       Object.assign(settings, req.body);
+//     }
+//     
+//     settings.updatedBy = req.user?.id;
+//     await settings.save();
+//     
+//     // Log audit entry
+//     await logAudit({
+//       action: 'Settings Updated',
+//       actionType: 'system',
+//       performedBy: req.user?.id,
+//       targetId: settings._id,
+//       targetModel: 'Settings',
+//       description: 'Admin updated platform settings',
+//       ipAddress: req.ip,
+//       metadata: req.body
+//     });
+//     
+//     res.json({ success: true, settings });
+//   } catch (error) {
+//     console.error('Update settings error:', error);
+//     res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// });
 
 // Admin Profile Routes
 router.get('/profile', async (req, res) => {
@@ -828,9 +829,14 @@ router.get('/sales-reports', async (req, res) => {
       { $match: { status: { $nin: ['Cancelled'] } } },
       { $unwind: '$items' },
       {
+        $addFields: {
+          'items.productId': { $toObjectId: '$items.product' }
+        }
+      },
+      {
         $lookup: {
           from: 'products',
-          localField: 'items.product',
+          localField: 'items.productId',
           foreignField: '_id',
           as: 'productInfo'
         }
@@ -896,8 +902,13 @@ router.get('/sales-reports', async (req, res) => {
     const topProducts = await Order.aggregate([
       { $unwind: '$items' },
       {
+        $addFields: {
+          'items.productId': { $toObjectId: '$items.product' }
+        }
+      },
+      {
         $group: {
-          _id: '$items.product',
+          _id: '$items.productId',
           sales: { $sum: '$items.quantity' }
         }
       },
@@ -1016,8 +1027,13 @@ router.get('/analytics-data', async (req, res) => {
     const topProducts = await Order.aggregate([
       { $unwind: '$items' },
       {
+        $addFields: {
+          'items.productId': { $toObjectId: '$items.product' }
+        }
+      },
+      {
         $group: {
-          _id: '$items.product',
+          _id: '$items.productId',
           sales: { $sum: '$items.quantity' }
         }
       },
@@ -1153,9 +1169,14 @@ router.get('/analytics-data', async (req, res) => {
       { $match: { status: { $nin: ['Cancelled'] } } },
       { $unwind: '$items' },
       {
+        $addFields: {
+          'items.productId': { $toObjectId: '$items.product' }
+        }
+      },
+      {
         $lookup: {
           from: 'products',
-          localField: 'items.product',
+          localField: 'items.productId',
           foreignField: '_id',
           as: 'productInfo'
         }
@@ -1314,3 +1335,155 @@ router.delete('/fraud-detection/:alertId', async (req, res) => {
 });
 
 module.exports = router;
+
+
+// ============================================================================
+// CONDITION VERIFICATION ADMIN APPROVAL ROUTES
+// ============================================================================
+
+// Get all pending verifications for admin review
+router.get('/verifications/pending', async (req, res) => {
+  try {
+    const ConditionVerification = require('../models/ConditionVerification');
+    
+    const pendingVerifications = await ConditionVerification.find({
+      approvalStatus: 'pending'
+    })
+      .populate('customer', 'fullName email')
+      .populate('seller', 'fullName storeName')
+      .populate('product', 'name images')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      verifications: pendingVerifications
+    });
+  } catch (error) {
+    console.error('Error fetching pending verifications:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get all verifications (pending + approved + rejected)
+router.get('/verifications/all', async (req, res) => {
+  try {
+    const ConditionVerification = require('../models/ConditionVerification');
+    
+    const allVerifications = await ConditionVerification.find()
+      .populate('customer', 'fullName email')
+      .populate('seller', 'fullName storeName')
+      .populate('product', 'name images')
+      .populate('approvedBy', 'fullName')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      verifications: allVerifications
+    });
+  } catch (error) {
+    console.error('Error fetching all verifications:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Approve a verification (makes it public)
+router.post('/verifications/:id/approve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminId, adminNotes } = req.body;
+    
+    const ConditionVerification = require('../models/ConditionVerification');
+    
+    const verification = await ConditionVerification.findById(id);
+    
+    if (!verification) {
+      return res.status(404).json({ success: false, message: 'Verification not found' });
+    }
+    
+    if (verification.approvalStatus !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Verification already processed' });
+    }
+    
+    // Approve and make public
+    verification.approvalStatus = 'approved';
+    verification.isPublic = true;
+    verification.approvedBy = adminId;
+    verification.approvedAt = new Date();
+    verification.adminReviewed = true;
+    verification.adminNotes = adminNotes || '';
+    verification.adminReviewedAt = new Date();
+    verification.adminReviewedBy = adminId;
+    
+    await verification.save();
+    
+    // Log audit
+    await logAudit({
+      action: 'VERIFICATION_APPROVED',
+      performedBy: adminId,
+      targetModel: 'ConditionVerification',
+      targetId: verification._id,
+      details: `Approved verification for order ${verification.orderId}`
+    });
+    
+    console.log('✅ Verification approved by admin:', id);
+    
+    res.json({
+      success: true,
+      message: 'Verification approved and made public',
+      verification
+    });
+  } catch (error) {
+    console.error('Error approving verification:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Reject a verification
+router.post('/verifications/:id/reject', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminId, rejectionReason } = req.body;
+    
+    const ConditionVerification = require('../models/ConditionVerification');
+    
+    const verification = await ConditionVerification.findById(id);
+    
+    if (!verification) {
+      return res.status(404).json({ success: false, message: 'Verification not found' });
+    }
+    
+    if (verification.approvalStatus !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Verification already processed' });
+    }
+    
+    // Reject (stays private)
+    verification.approvalStatus = 'rejected';
+    verification.isPublic = false;
+    verification.rejectionReason = rejectionReason || 'No reason provided';
+    verification.adminReviewed = true;
+    verification.adminReviewedAt = new Date();
+    verification.adminReviewedBy = adminId;
+    
+    await verification.save();
+    
+    // Log audit
+    await logAudit({
+      action: 'VERIFICATION_REJECTED',
+      performedBy: adminId,
+      targetModel: 'ConditionVerification',
+      targetId: verification._id,
+      details: `Rejected verification for order ${verification.orderId}. Reason: ${rejectionReason}`
+    });
+    
+    console.log('❌ Verification rejected by admin:', id);
+    
+    res.json({
+      success: true,
+      message: 'Verification rejected',
+      verification
+    });
+  } catch (error) {
+    console.error('Error rejecting verification:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});

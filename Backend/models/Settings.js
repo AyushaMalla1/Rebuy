@@ -1,102 +1,108 @@
 const mongoose = require('mongoose');
 
 const settingsSchema = new mongoose.Schema({
-  siteName: {
-    type: String,
-    default: 'Rebuy'
-  },
-  siteEmail: {
-    type: String
-  },
-  sitePhone: {
-    type: String
-  },
-  currency: {
-    type: String,
-    default: 'NPR'
-  },
-  taxRate: {
-    type: Number,
-    default: 13
-  },
-  shippingFee: {
-    type: Number,
-    default: 100
-  },
-  freeShippingThreshold: {
-    type: Number,
-    default: 5000
-  },
-  maintenanceMode: {
-    type: Boolean,
-    default: false
-  },
-  allowSellerRegistration: {
+  // Payment Settings
+  esewaEnabled: {
     type: Boolean,
     default: true
   },
-  requireProductApproval: {
+  khaltiEnabled: {
     type: Boolean,
     default: true
   },
-  minOrderAmount: {
-    type: Number,
-    default: 100
+  codEnabled: {
+    type: Boolean,
+    default: true
   },
-  maxOrderAmount: {
-    type: Number,
-    default: 100000
-  },
-  commissionRate: {
+  
+  // Platform Fees
+  platformFeePercentage: {
     type: Number,
     default: 3,
     min: 0,
     max: 100
   },
-  returnWindow: {
+  
+  // Email Settings
+  emailNotificationsEnabled: {
+    type: Boolean,
+    default: true
+  },
+  
+  // System Settings
+  maintenanceMode: {
+    type: Boolean,
+    default: false
+  },
+  maintenanceMessage: {
+    type: String,
+    default: 'System is under maintenance. Please check back later.'
+  },
+  
+  // Fraud Detection Settings
+  fraudDetectionEnabled: {
+    type: Boolean,
+    default: true
+  },
+  fraudScoreThreshold: {
+    type: Number,
+    default: 70,
+    min: 0,
+    max: 100
+  },
+  
+  // Stock Alert Settings
+  lowStockThreshold: {
+    type: Number,
+    default: 5,
+    min: 0
+  },
+  
+  // Return Policy
+  returnWindowDays: {
     type: Number,
     default: 7,
-    min: 0,
+    min: 1,
     max: 30
   },
+  
+  // Loyalty Points
   loyaltyPointsEnabled: {
     type: Boolean,
     default: true
   },
   pointsPerRupee: {
     type: Number,
-    default: 1
+    default: 1,
+    min: 0
   },
-  paymentGateway: {
-    provider: {
-      type: String,
-      enum: ['stripe', 'paypal', 'esewa', 'khalti', 'none'],
-      default: 'none'
-    },
-    apiKey: {
-      type: String
-    },
-    secretKey: {
-      type: String
-    },
-    merchantId: {
-      type: String
-    },
-    isEnabled: {
-      type: Boolean,
-      default: false
-    },
-    testMode: {
-      type: Boolean,
-      default: true
-    }
+  
+  // Seller Settings
+  autoApproveProducts: {
+    type: Boolean,
+    default: false
+  },
+  
+  // Last Updated
+  updatedAt: {
+    type: Date,
+    default: Date.now
   },
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'Admin'
   }
 }, {
   timestamps: true
 });
+
+// Ensure only one settings document exists
+settingsSchema.statics.getSettings = async function() {
+  let settings = await this.findOne();
+  if (!settings) {
+    settings = await this.create({});
+  }
+  return settings;
+};
 
 module.exports = mongoose.model('Settings', settingsSchema);

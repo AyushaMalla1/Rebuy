@@ -28,6 +28,7 @@ const returnSchema = new mongoose.Schema({
       'Defective/Damaged',
       'Wrong Item',
       'Not as Described',
+      'Product does not match description',
       'Size Issue',
       'Changed Mind',
       'Quality Issue',
@@ -39,6 +40,14 @@ const returnSchema = new mongoose.Schema({
     required: true
   },
   images: [{
+    type: String
+  }],
+  // Link to verification system
+  linkedVerification: {
+    type: Boolean,
+    default: false
+  },
+  verificationImages: [{
     type: String
   }],
   status: {

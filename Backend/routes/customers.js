@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const Customer = require('../models/Customer');
+const Customer = require('../models/Addresses');
 const User = require('../models/User');
 const LoyaltyPoints = require('../models/LoyaltyPoints');
 const { upload, cloudinary } = require('../config/cloudinary');
@@ -139,7 +139,7 @@ router.get('/profile', extractUserId, async (req, res) => {
 // Get customer profile by user ID
 router.get('/:userId', async (req, res) => {
   try {
-    let customer = await Customer.findOne({ user: req.params.userId }).populate('user', 'fullName email profileImage');
+    let customer = await Customer.findOne({ user: req.params.userId }).populate('user', 'fullName email profileImage phone');
     
     if (!customer) {
       console.log('Customer profile not found, creating one for user:', req.params.userId);
@@ -150,7 +150,7 @@ router.get('/:userId', async (req, res) => {
         return res.status(404).json({ message: 'User not found' });
       }
       
-      // Create customer profile with minimal data
+      // Create customer profile with user data
       try {
         customer = new Customer({
           user: user._id,
@@ -167,13 +167,13 @@ router.get('/:userId', async (req, res) => {
         await customer.save();
         
         // Populate user data
-        customer = await Customer.findById(customer._id).populate('user', 'fullName email profileImage');
+        customer = await Customer.findById(customer._id).populate('user', 'fullName email profileImage phone');
         console.log('Customer profile created successfully');
       } catch (createError) {
         console.error('Error creating customer profile:', createError);
         // If creation fails, return user data directly
         return res.json({
-          user: { _id: user._id, fullName: user.fullName, email: user.email, profileImage: user.profileImage },
+          user: { _id: user._id, fullName: user.fullName, email: user.email, profileImage: user.profileImage, phone: user.phone },
           fullName: user.fullName,
           email: user.email,
           phone: user.phone || '',
@@ -182,14 +182,46 @@ router.get('/:userId', async (req, res) => {
           preferences: { newsletter: true, orderUpdates: true, promotions: false }
         });
       }
+    } else {
+      // Sync fullName and phone from User model if they differ
+      const user = await User.findById(req.params.userId);
+      if (user) {
+        let needsUpdate = false;
+        
+        if (customer.fullName !== user.fullName) {
+          customer.fullName = user.fullName;
+          needsUpdate = true;
+        }
+        
+        if (customer.email !== user.email) {
+          customer.email = user.email;
+          needsUpdate = true;
+        }
+        
+        // Sync phone if user has it but customer doesn't
+        if (user.phone && !customer.phone) {
+          customer.phone = user.phone;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          await customer.save();
+          console.log('Customer profile synced with User data');
+        }
+      }
     }
     
     console.log('Customer user profileImage:', customer.user?.profileImage);
     
-    // Add profileImage from user to customer object
+    // Add profileImage and phone from user to customer object
     const customerData = customer.toObject();
-    if (customer.user && customer.user.profileImage) {
-      customerData.profileImage = customer.user.profileImage;
+    if (customer.user) {
+      if (customer.user.profileImage) {
+        customerData.profileImage = customer.user.profileImage;
+      }
+      if (customer.user.phone && !customerData.phone) {
+        customerData.phone = customer.user.phone;
+      }
     }
     
     console.log('Returning customerData with profileImage:', customerData.profileImage);
