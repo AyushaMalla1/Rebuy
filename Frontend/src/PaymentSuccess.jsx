@@ -30,9 +30,46 @@ function PaymentSuccess() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const clearCart = () => {
-    localStorage.setItem('cart', JSON.stringify([]));
-    window.dispatchEvent(new Event('cartUpdated'));
+  const clearCart = async () => {
+    try {
+      // Clear cart from localStorage
+      localStorage.removeItem('cart');
+      
+      // Clear buyNowItem from localStorage (if it exists)
+      localStorage.removeItem('buyNowItem');
+      
+      // Clear confirmed address from localStorage
+      localStorage.removeItem('confirmedCheckoutAddress');
+      
+      // Get ordered items from localStorage to remove them from backend cart
+      const checkoutItems = JSON.parse(localStorage.getItem('checkoutItems') || '[]');
+      
+      // Clear backend cart items that were ordered
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      if (user && user._id && checkoutItems.length > 0) {
+        try {
+          // Remove each ordered item from the cart
+          for (const item of checkoutItems) {
+            await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/cart/${user._id}/remove/${item.id}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error removing items from backend cart:', error);
+        }
+      }
+      
+      // Clear checkout items from localStorage
+      localStorage.removeItem('checkoutItems');
+      
+      // Dispatch event to update cart count in navbar
+      window.dispatchEvent(new Event('cartUpdated'));
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+    }
   };
 
   const fetchShortOrderId = async (id) => {

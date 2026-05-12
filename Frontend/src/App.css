@@ -1,5 +1,5 @@
 /* ========================================
-   GLOBAL STYLES - ESSENTIALS ONLY
+   GLOBAL STYLES - SIMPLE VERSION
    ======================================== */
 
 /* Reset */
@@ -9,22 +9,24 @@
   box-sizing: border-box;
 }
 
-html, body, #root {
-  margin: 0;
-  padding: 0;
-  width: 100%;
+html {
   overflow-x: hidden;
 }
 
 body {
-  margin: 0 !important;
-  padding: 0 !important;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #333;
   background-color: #fff;
+}
+
+#root {
+  overflow-x: hidden;
 }
 
 /* Accessibility */
@@ -46,4 +48,48 @@ select:focus-visible {
 img {
   max-width: 100%;
   height: auto;
+}
+
+/* ========================================
+   PREVENT HORIZONTAL SCROLL
+   ======================================== */
+
+/* Ensure ALL page containers don't overflow */
+.landing-page,
+.cart-page,
+.checkout-page,
+.buyer-profile,
+.seller-dashboard,
+.admin-dashboard,
+.payment-result-page,
+.product-detail-page,
+.about-page,
+.contact-page,
+.faq-page,
+.terms-page,
+.sustainability-page,
+.blog-article-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Prevent images and media from overflowing */
+img,
+video,
+iframe,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Fix for modals and dropdowns */
+.modal-overlay,
+.dropdown-menu,
+.notification-dropdown-menu,
+.profile-dropdown-menu {
+  max-width: 100%;
 }

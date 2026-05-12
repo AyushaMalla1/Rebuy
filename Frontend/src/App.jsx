@@ -34,6 +34,8 @@ import WomensBlazer from './components/WomensBlazer';
 import WomensSkirt from './components/WomensSkirt';
 import WomensTop from './components/WomensTop';
 import BlogArticle from './BlogArticle';
+import HelpCenter from './HelpCenter';
+import AdminSupport from './AdminSupport';
 
 // Scroll to top on route change
 function ScrollToTop() {
@@ -118,6 +120,9 @@ function App() {
         <Route path="/womens-skirt" element={<WomensSkirt />} />
         <Route path="/womens-top" element={<WomensTop />} />
         <Route path="/blog/:slug" element={<BlogArticle />} />
+        <Route path="/help-center" element={<HelpCenter />} />
+        <Route path="/support" element={<HelpCenter />} />
+        <Route path="/admin/support" element={<AdminSupport />} />
       </Routes>
     </>
   );

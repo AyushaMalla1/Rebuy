@@ -291,9 +291,11 @@ function Cart() {
   return (
     <div className="cart-page">
       <header className="cart-header">
-        <Link to="/" className="back-link">
-          <FiArrowLeft /> Continue Shopping
-        </Link>
+        <div className="breadcrumb">
+          <Link to="/" className="breadcrumb-link">Home</Link>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current">Cart</span>
+        </div>
         <h1>Shopping Cart</h1>
       </header>
 

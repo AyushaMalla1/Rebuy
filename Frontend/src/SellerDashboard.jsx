@@ -28,9 +28,7 @@ import {
   FaEnvelope,
   FaBoxOpen,
   FaInfoCircle,
-  FaClock,
-  FaUpload,
-  FaDownload
+  FaClock
 } from "react-icons/fa";
 import { HiTrendingUp } from "react-icons/hi";
 import { MdDashboard } from "react-icons/md";
@@ -55,9 +53,6 @@ function SellerDashboard() {
     totalSold: 0
   });
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [csvFile, setCsvFile] = useState(null);
-  const [uploadResults, setUploadResults] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -247,6 +242,11 @@ function SellerDashboard() {
   };
 
   const fetchProducts = async (sellerId) => {
+    if (!sellerId) {
+      console.error('Seller ID is undefined');
+      setLoading(false);
+      return;
+    }
     try {
       const response = await fetch(`${API_URL}/sellers/${sellerId}/products`);
       const data = await response.json();
@@ -261,6 +261,10 @@ function SellerDashboard() {
   };
 
   const fetchStats = async (sellerId) => {
+    if (!sellerId) {
+      console.error('Seller ID is undefined');
+      return;
+    }
     try {
       const response = await fetch(`${API_URL}/sellers/${sellerId}/stats`);
       const data = await response.json();
@@ -273,6 +277,11 @@ function SellerDashboard() {
   };
 
   const fetchOrders = async (sellerId) => {
+    if (!sellerId) {
+      console.error('Seller ID is undefined');
+      setLoadingOrders(false);
+      return;
+    }
     setLoadingOrders(true);
     try {
       const response = await fetch(`${API_URL}/orders/seller/${sellerId}`);
@@ -815,98 +824,6 @@ function SellerDashboard() {
       fetchVerifications(user._id);
     }
   }, [activeTab]);
-
-  // Handle CSV file selection
-  const handleCSVFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file && file.type === 'text/csv') {
-      setCsvFile(file);
-      setUploadResults(null);
-    } else {
-      alert('Please select a valid CSV file');
-    }
-  };
-
-  // Parse CSV and upload products
-  const handleBulkUpload = async () => {
-    if (!csvFile) {
-      alert('Please select a CSV file');
-      return;
-    }
-
-    try {
-      const text = await csvFile.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      
-      if (lines.length < 2) {
-        alert('CSV file is empty or invalid');
-        return;
-      }
-
-      // Parse header
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      
-      // Parse products
-      const products = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
-        const product = {};
-        
-        headers.forEach((header, index) => {
-          product[header] = values[index] || '';
-        });
-        
-        products.push(product);
-      }
-
-      // Upload to backend
-      const response = await fetch('http://localhost:5000/api/products/bulk-upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          products,
-          sellerId: sellerData._id
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (response.ok) {
-        setUploadResults(data.results);
-        alert(`Upload complete! ${data.results.successful.length} products added, ${data.results.failed.length} failed.`);
-        
-        // Refresh products list
-        fetchProducts();
-        
-        // Clear file
-        setCsvFile(null);
-      } else {
-        alert(data.message || 'Failed to upload products');
-      }
-    } catch (error) {
-      console.error('Error uploading CSV:', error);
-      alert('Error uploading CSV file');
-    }
-  };
-
-  // Download CSV template
-  const downloadCSVTemplate = () => {
-    const template = `name,description,price,category,condition,size,brand,stock,images,story,paymentOptions,discountType,discountValue
-Example Product,Product description,1500,Men's Clothing,New,M,Nike,10,https://example.com/image1.jpg|https://example.com/image2.jpg,Product story,cod|online,percentage,10`;
-    
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'product_upload_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
@@ -1778,6 +1695,13 @@ Example Product,Product description,1500,Men's Clothing,New,M,Nike,10,https://ex
           </div>
 
           <div 
+            className="menu-item support-menu-item"
+            onClick={() => navigate('/help-center')}
+          >
+            <FaQuestionCircle /> Help Center
+          </div>
+
+          <div 
             className="menu-item"
             onClick={() => setActiveTab('profile')}
           >
@@ -2169,101 +2093,10 @@ Example Product,Product description,1500,Men's Clothing,New,M,Nike,10,https://ex
                 >
                   <FaPlus /> Add Product
                 </button>
-                
-                <button 
-                  onClick={() => setShowBulkUpload(!showBulkUpload)}
-                  className="add-product-btn"
-                  style={{ background: '#10b981' }}
-                >
-                  <FaUpload /> Bulk Upload CSV
-                </button>
               </div>
             </div>
 
-            {/* BULK UPLOAD SECTION */}
-            {showBulkUpload && (
-              <div className="product-form-container" style={{ marginBottom: '20px' }}>
-                <h3 className="product-form-title">Bulk Upload CSV</h3>
-                <div style={{ padding: '15px' }}>
-                  
-                  <button 
-                    onClick={downloadCSVTemplate}
-                    style={{
-                      padding: '6px 12px',
-                      background: '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      marginBottom: '12px',
-                      fontSize: '13px'
-                    }}
-                  >
-                    <FaDownload style={{ marginRight: '5px' }} />
-                    Template
-                  </button>
-                  
-                  <div style={{ marginBottom: '12px' }}>
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleCSVFileSelect}
-                      style={{ fontSize: '13px' }}
-                    />
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={handleBulkUpload}
-                      disabled={!csvFile}
-                      style={{
-                        padding: '6px 12px',
-                        background: csvFile ? '#10b981' : '#ccc',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: csvFile ? 'pointer' : 'not-allowed',
-                        fontSize: '13px'
-                      }}
-                    >
-                      Upload
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setShowBulkUpload(false);
-                        setCsvFile(null);
-                        setUploadResults(null);
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        background: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '13px'
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  
-                  {uploadResults && (
-                    <div style={{ marginTop: '12px', padding: '10px', background: '#f3f4f6', borderRadius: '4px', fontSize: '13px' }}>
-                      <p style={{ color: '#10b981', margin: 0 }}>
-                        ✓ {uploadResults.successful.length} uploaded
-                      </p>
-                      {uploadResults.failed.length > 0 && (
-                        <p style={{ color: '#ef4444', margin: '4px 0 0 0' }}>
-                          ✗ {uploadResults.failed.length} failed
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* BULK UPLOAD SECTION - REMOVED */}
 
             {/* ADD PRODUCT FORM */}
             {showAddProduct && (

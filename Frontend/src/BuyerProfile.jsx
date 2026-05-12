@@ -111,6 +111,7 @@ function BuyerProfile() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
 
   // Fetch conversations from backend
   const fetchConversations = useCallback(async () => {
@@ -419,6 +420,37 @@ function BuyerProfile() {
     }
   };
 
+  // Toggle notification dropdown
+  const toggleNotificationDropdown = () => {
+    if (!showNotificationDropdown && userData._id) {
+      fetchNotifications();
+    }
+    setShowNotificationDropdown(!showNotificationDropdown);
+    setShowProfileDropdown(false);
+  };
+
+  // Mark all notifications as read
+  const markAllNotificationsAsRead = async () => {
+    const userDataLocal = localStorage.getItem('user');
+    if (!userDataLocal) return;
+
+    const user = JSON.parse(userDataLocal);
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${user._id}/mark-all-read`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
+        setUnreadNotifications(0);
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
   const handlePasswordSubmit = async () => {
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       showToast('Please fill in all fields', 'error');
@@ -671,13 +703,16 @@ function BuyerProfile() {
       if (showProfileDropdown && !event.target.closest('.profile-dropdown-container')) {
         setShowProfileDropdown(false);
       }
+      if (showNotificationDropdown && !event.target.closest('.notification-dropdown-container')) {
+        setShowNotificationDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showNotifications, showProfileDropdown]);
+  }, [showNotifications, showProfileDropdown, showNotificationDropdown]);
 
   // Fetch conversations when messages tab is active
   useEffect(() => {
@@ -1570,10 +1605,76 @@ function BuyerProfile() {
 
         <div className="header-right">
           <div className="header-icons">
-            {/* Notification Bell */}
-            <div className="notification-icon-wrapper" onClick={() => setActiveTab('notifications')}>
-              <FiBell />
-              {unreadNotifications > 0 && <span className="notification-badge">{unreadNotifications}</span>}
+            {/* Notification Dropdown */}
+            <div className="notification-dropdown-container">
+              <div 
+                className="notification-icon-wrapper" 
+                onClick={toggleNotificationDropdown}
+              >
+                <FiBell />
+                {unreadNotifications > 0 && <span className="notification-badge">{unreadNotifications}</span>}
+              </div>
+
+              {/* Notification Dropdown */}
+              {showNotificationDropdown && (
+                <div className="notification-dropdown-menu">
+                  <div className="notification-dropdown-header">
+                    <h3>Notifications</h3>
+                    {unreadNotifications > 0 && (
+                      <button onClick={markAllNotificationsAsRead} className="mark-all-read-btn">
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="notification-dropdown-body">
+                    {notifications.length === 0 ? (
+                      <div className="notification-empty">
+                        <FiBell size={40} />
+                        <p>No notifications yet</p>
+                      </div>
+                    ) : (
+                      notifications.map((notification) => (
+                        <div
+                          key={notification._id}
+                          className={`notification-item ${!notification.read ? 'unread' : ''}`}
+                          onClick={() => {
+                            if (!notification.read) {
+                              markAsRead(notification._id);
+                            }
+                            setShowNotificationDropdown(false);
+                            if (notification.type === 'order') {
+                              setActiveTab('orders');
+                            } else if (notification.type === 'message') {
+                              setActiveTab('messages');
+                            }
+                          }}
+                        >
+                          <div className="notification-icon">
+                            {notification.type === 'order' && <FiPackage />}
+                            {notification.type === 'message' && <FiMessageSquare />}
+                            {notification.type === 'announcement' && <FiBell />}
+                            {!['order', 'message', 'announcement'].includes(notification.type) && <FiBell />}
+                          </div>
+                          <div className="notification-content">
+                            <p className="notification-title">{notification.title}</p>
+                            <p className="notification-message">{notification.message}</p>
+                            <span className="notification-time">
+                              {new Date(notification.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          {!notification.read && <div className="notification-unread-dot"></div>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Cart Icon */}
@@ -1586,7 +1687,10 @@ function BuyerProfile() {
             <div className="profile-dropdown-container">
               <div 
                 className="profile-icon-wrapper" 
-                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                onClick={() => {
+                  setShowProfileDropdown(!showProfileDropdown);
+                  setShowNotificationDropdown(false);
+                }}
               >
                 {userData.profileImage ? (
                   <img 
@@ -3302,164 +3406,6 @@ function BuyerProfile() {
                   <p>View recent login history and active sessions</p>
                 </div>
                 <button className="setting-btn" onClick={handleViewLoginActivity}>View Activity</button>
-              </div>
-            </div>
-
-            <div className="settings-card">
-              <h3>Notifications</h3>
-              <div className="setting-item">
-                <div>
-                  <h4>Email Notifications</h4>
-                  <p>Receive updates about your orders and promotions</p>
-                </div>
-                <label className="toggle-switch">
-                  <input type="checkbox" defaultChecked />
-                  <span className="slider"></span>
-                </label>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>SMS Notifications</h4>
-                  <p>Get order updates via SMS</p>
-                </div>
-                <label className="toggle-switch">
-                  <input type="checkbox" />
-                  <span className="slider"></span>
-                </label>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Push Notifications</h4>
-                  <p>Receive push notifications on your device</p>
-                </div>
-                <label className="toggle-switch">
-                  <input type="checkbox" defaultChecked />
-                  <span className="slider"></span>
-                </label>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Order Status Updates</h4>
-                  <p>Get notified when your order status changes</p>
-                </div>
-                <label className="toggle-switch">
-                  <input type="checkbox" defaultChecked />
-                  <span className="slider"></span>
-                </label>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Promotional Emails</h4>
-                  <p>Receive special offers and discount codes</p>
-                </div>
-                <label className="toggle-switch">
-                  <input type="checkbox" defaultChecked />
-                  <span className="slider"></span>
-                </label>
-              </div>
-            </div>
-
-            <div className="settings-card">
-              <h3>Privacy & Data</h3>
-              <div className="setting-item">
-                <div>
-                  <h4>Profile Visibility</h4>
-                  <p>Control who can see your profile information</p>
-                </div>
-                <select className="setting-select">
-                  <option>Public</option>
-                  <option>Private</option>
-                  <option>Friends Only</option>
-                </select>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Purchase History Visibility</h4>
-                  <p>Show or hide your purchase history from others</p>
-                </div>
-                <label className="toggle-switch">
-                  <input type="checkbox" />
-                  <span className="slider"></span>
-                </label>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Data Sharing</h4>
-                  <p>Allow sharing data with partners for better experience</p>
-                </div>
-                <label className="toggle-switch">
-                  <input type="checkbox" />
-                  <span className="slider"></span>
-                </label>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Download My Data</h4>
-                  <p>Get a copy of all your account data</p>
-                </div>
-                <button className="setting-btn" onClick={handleDownloadData}>Download</button>
-              </div>
-            </div>
-
-            <div className="settings-card">
-              <h3>Payment & Billing</h3>
-              <div className="setting-item">
-                <div>
-                  <h4>Saved Payment Methods</h4>
-                  <p>Manage your saved cards and payment options</p>
-                </div>
-                <button className="setting-btn" onClick={handleManagePaymentMethods}>Manage</button>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Billing Address</h4>
-                  <p>Update your default billing address</p>
-                </div>
-                <button className="setting-btn" onClick={() => setActiveTab('settings')}>Edit</button>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Transaction History</h4>
-                  <p>View all your payment transactions</p>
-                </div>
-                <button className="setting-btn" onClick={handleViewTransactionHistory}>View</button>
-              </div>
-            </div>
-
-            <div className="settings-card">
-              <h3>Language & Region</h3>
-              <div className="setting-item">
-                <div>
-                  <h4>Language</h4>
-                  <p>Choose your preferred language</p>
-                </div>
-                <select className="setting-select">
-                  <option>English</option>
-                  <option>Nepali</option>
-                  <option>Hindi</option>
-                </select>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Currency</h4>
-                  <p>Select your preferred currency</p>
-                </div>
-                <select className="setting-select">
-                  <option>NPR (Rs.)</option>
-                  <option>USD ($)</option>
-                  <option>EUR (€)</option>
-                </select>
-              </div>
-              <div className="setting-item">
-                <div>
-                  <h4>Time Zone</h4>
-                  <p>Set your local time zone</p>
-                </div>
-                <select className="setting-select">
-                  <option>Asia/Kathmandu (GMT+5:45)</option>
-                  <option>Asia/Kolkata (GMT+5:30)</option>
-                  <option>UTC</option>
-                </select>
               </div>
             </div>
 

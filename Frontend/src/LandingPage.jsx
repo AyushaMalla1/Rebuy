@@ -21,6 +21,9 @@ function LandingPage() {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [searchBarRect, setSearchBarRect] = useState(null);
 
   // Fallback products for demo (if backend has no products)
   const demoProducts = [
@@ -103,6 +106,27 @@ function LandingPage() {
       window.removeEventListener('userUpdated', handleUserUpdate);
     };
   }, []);
+
+  // Update search bar position on resize/scroll
+  useEffect(() => {
+    const updateSearchBarPosition = () => {
+      if (showSuggestions) {
+        const searchInput = document.querySelector('.search-bar input');
+        if (searchInput) {
+          const rect = searchInput.getBoundingClientRect();
+          setSearchBarRect(rect);
+        }
+      }
+    };
+
+    window.addEventListener('resize', updateSearchBarPosition);
+    window.addEventListener('scroll', updateSearchBarPosition);
+
+    return () => {
+      window.removeEventListener('resize', updateSearchBarPosition);
+      window.removeEventListener('scroll', updateSearchBarPosition);
+    };
+  }, [showSuggestions]);
 
   const syncCartWithBackend = async (customerId) => {
     try {
@@ -329,7 +353,9 @@ function LandingPage() {
   };
 
   // Handle search input focus
-  const handleSearchFocus = () => {
+  const handleSearchFocus = (e) => {
+    const rect = e.target.getBoundingClientRect();
+    setSearchBarRect(rect);
     setShowSuggestions(true);
   };
 
@@ -411,6 +437,68 @@ function LandingPage() {
     }
   };
 
+  // Fetch all notifications for dropdown
+  const fetchAllNotifications = async (userId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${userId}`);
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setNotifications(data.notifications || []);
+      }
+    } catch (error) {
+      console.error('Error fetching all notifications:', error);
+    }
+  };
+
+  // Mark notification as read
+  const markAsRead = async (notificationId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+        method: 'PATCH'
+      });
+      
+      if (response.ok) {
+        // Update local state
+        setNotifications(prev => 
+          prev.map(notif => 
+            notif._id === notificationId ? { ...notif, read: true } : notif
+          )
+        );
+        setUnreadNotifications(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllAsRead = async () => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5000/api/notifications/${user._id}/mark-all-read`, {
+        method: 'PATCH'
+      });
+      
+      if (response.ok) {
+        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
+        setUnreadNotifications(0);
+      }
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
+
+  // Toggle notification dropdown
+  const toggleNotificationDropdown = () => {
+    if (!showNotificationDropdown && user) {
+      fetchAllNotifications(user._id);
+    }
+    setShowNotificationDropdown(!showNotificationDropdown);
+    setShowProfileDropdown(false);
+  };
+
   // Handle profile dropdown menu clicks
   const handleProfileMenuClick = (action) => {
     setShowProfileDropdown(false);
@@ -437,6 +525,9 @@ function LandingPage() {
       case 'loyalty':
         navigate('/profile', { state: { activeTab: 'loyalty' } });
         break;
+      case 'support':
+        navigate('/help-center');
+        break;
       case 'logout':
         handleLogout();
         break;
@@ -451,11 +542,14 @@ function LandingPage() {
       if (showProfileDropdown && !e.target.closest('.profile-dropdown-container')) {
         setShowProfileDropdown(false);
       }
+      if (showNotificationDropdown && !e.target.closest('.notification-dropdown-container')) {
+        setShowNotificationDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showProfileDropdown]);
+  }, [showProfileDropdown, showNotificationDropdown]);
 
   return (
     <div className="landing-page">
@@ -522,8 +616,17 @@ function LandingPage() {
           </form>
           
           {/* Search Suggestions Dropdown */}
-          {showSuggestions && (
-            <div className="landing-search-suggestions">
+          {showSuggestions && searchBarRect && (
+            <div 
+              className="landing-search-suggestions"
+              style={{
+                position: 'fixed',
+                top: `${searchBarRect.bottom + 5}px`,
+                left: `${searchBarRect.left}px`,
+                width: `${searchBarRect.width}px`,
+                zIndex: 10002
+              }}
+            >
               {/* Recent Searches - Show when no query */}
               {!searchQuery && (
                 <>
@@ -689,6 +792,24 @@ function LandingPage() {
                   ))}
                 </div>
               )}
+
+              {/* No Results Message */}
+              {searchQuery && 
+                !searchSuggestions.products?.length &&
+                !searchSuggestions.collections?.length &&
+                !searchSuggestions.sellers?.length && (
+                <div className="suggestions-section">
+                  <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999' }}>
+                    <FiSearch size={40} style={{ marginBottom: '12px', opacity: 0.3 }} />
+                    <p style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '500', color: '#666' }}>
+                      No results found for "{searchQuery}"
+                    </p>
+                    <p style={{ margin: 0, fontSize: '13px' }}>
+                      Try searching with different keywords
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -711,9 +832,73 @@ function LandingPage() {
           <div className="header-icons">
             {/* Notification Bell - Only for logged-in customers */}
             {user && user.userType === 'customer' && (
-              <div className="notification-icon-wrapper" onClick={() => navigate('/profile', { state: { activeTab: 'notifications' } })}>
-                <FiBell />
-                {unreadNotifications > 0 && <span className="notification-badge">{unreadNotifications}</span>}
+              <div className="notification-dropdown-container">
+                <div 
+                  className="notification-icon-wrapper" 
+                  onClick={toggleNotificationDropdown}
+                >
+                  <FiBell />
+                  {unreadNotifications > 0 && <span className="notification-badge">{unreadNotifications}</span>}
+                </div>
+
+                {/* Notification Dropdown */}
+                {showNotificationDropdown && (
+                  <div className="notification-dropdown-menu">
+                    <div className="notification-dropdown-header">
+                      <h3>Notifications</h3>
+                      {unreadNotifications > 0 && (
+                        <button onClick={markAllAsRead} className="mark-all-read-btn">
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="notification-dropdown-body">
+                      {notifications.length === 0 ? (
+                        <div className="notification-empty">
+                          <FiBell size={40} />
+                          <p>No notifications yet</p>
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <div
+                            key={notification._id}
+                            className={`notification-item ${!notification.read ? 'unread' : ''}`}
+                            onClick={() => {
+                              if (!notification.read) {
+                                markAsRead(notification._id);
+                              }
+                              if (notification.link) {
+                                navigate(notification.link);
+                                setShowNotificationDropdown(false);
+                              }
+                            }}
+                          >
+                            <div className="notification-icon">
+                              {notification.type === 'order' && <FiPackage />}
+                              {notification.type === 'message' && <FiMessageSquare />}
+                              {notification.type === 'announcement' && <FiBell />}
+                              {!['order', 'message', 'announcement'].includes(notification.type) && <FiBell />}
+                            </div>
+                            <div className="notification-content">
+                              <p className="notification-title">{notification.title}</p>
+                              <p className="notification-message">{notification.message}</p>
+                              <span className="notification-time">
+                                {new Date(notification.createdAt).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                            {!notification.read && <div className="notification-unread-dot"></div>}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -728,7 +913,10 @@ function LandingPage() {
               <div className="profile-dropdown-container">
                 <div 
                   className="profile-icon-wrapper" 
-                  onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                  onClick={() => {
+                    setShowProfileDropdown(!showProfileDropdown);
+                    setShowNotificationDropdown(false);
+                  }}
                 >
                   {user.profileImage ? (
                     <img 
@@ -771,6 +959,10 @@ function LandingPage() {
                     <div className="profile-dropdown-item" onClick={() => handleProfileMenuClick('loyalty')}>
                       <FiGift />
                       <span>Loyalty Points & Rewards</span>
+                    </div>
+                    <div className="profile-dropdown-item" onClick={() => handleProfileMenuClick('support')}>
+                      <FiMessageSquare />
+                      <span>Help Center & Support</span>
                     </div>
                     <div className="profile-dropdown-divider"></div>
                     <div className="profile-dropdown-item logout-item" onClick={() => handleProfileMenuClick('logout')}>

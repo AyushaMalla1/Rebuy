@@ -74,6 +74,7 @@ const paymentRoutes = require('./routes/payment');
 const payoutRoutes = require('./routes/payouts');
 const returnRoutes = require('./routes/returns');
 const announcementRoutes = require('./routes/announcements');
+const supportRoutes = require('./routes/support');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -93,6 +94,7 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/returns', returnRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/support', supportRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

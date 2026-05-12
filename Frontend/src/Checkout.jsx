@@ -452,6 +452,9 @@ function Checkout() {
         return;
       }
 
+      // Save checkout items to localStorage for later removal from cart
+      localStorage.setItem('checkoutItems', JSON.stringify(cartItems));
+
       // Prepare order data for backend with new address format
       const orderData = {
         customerId: user._id,
@@ -545,25 +548,31 @@ function Checkout() {
       });
       localStorage.setItem('orders', JSON.stringify(orders));
 
-      // Clear cart from localStorage
-      localStorage.setItem('cart', JSON.stringify([]));
-      
       // Clear buyNowItem from localStorage (if it exists)
       localStorage.removeItem('buyNowItem');
 
-      // Clear cart from backend database
+      // Remove ordered items from backend cart
       if (user && user._id) {
         try {
-          const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/cart/${user._id}/clear`, {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
+          // Remove each ordered item from the cart
+          for (const item of cartItems) {
+            await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/cart/${user._id}/remove/${item.id}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+          }
         } catch (error) {
-          console.error('Error clearing backend cart:', error);
+          console.error('Error removing items from backend cart:', error);
         }
       }
+
+      // Clear cart from localStorage (this was the checkout cart)
+      localStorage.removeItem('cart');
+      
+      // Clear confirmed address from localStorage
+      localStorage.removeItem('confirmedCheckoutAddress');
 
       // Reload loyalty points to reflect the deduction
       if (pointsToRedeem > 0) {

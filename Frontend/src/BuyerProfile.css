@@ -6036,3 +6036,47 @@ input:checked + .slider:before {
     padding: 10px 14px;
   }
 }
+
+
+/* ========================================
+   FIX HORIZONTAL SCROLL ISSUES
+   ======================================== */
+
+/* Ensure buyer profile doesn't overflow */
+.buyer-profile {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden !important;
+  position: relative;
+}
+
+/* Fix notification dropdown on small screens */
+@media (max-width: 480px) {
+  .notification-dropdown-menu {
+    position: fixed !important;
+    top: 60px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-height: calc(100vh - 80px);
+  }
+}
+
+/* Ensure all sections respect viewport width */
+.profile-header,
+.profile-content,
+.profile-sidebar,
+.profile-main {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix modals overflow */
+.modal-overlay {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.modal-content {
+  max-width: calc(100% - 40px);
+}

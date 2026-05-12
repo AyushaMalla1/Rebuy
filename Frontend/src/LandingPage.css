@@ -7,8 +7,17 @@
 .landing-page {
   font-family: 'Arial', sans-serif;
   color: #333;
-  overflow-x: hidden;
   width: 100%;
+  max-width: 100%;
+  overflow-x: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure all direct children respect boundaries */
+.landing-page > * {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* ========================================
@@ -22,7 +31,44 @@
   padding: 12px 50px;
   background-color: #fff;
   border-bottom: 1px solid #e0e0e0;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+  margin: 0;
+}
+
+@media (max-width: 1200px) {
+  .header {
+    padding: 12px 30px;
+  }
+}
+
+@media (max-width: 992px) {
+  .header {
+    padding: 12px 20px;
+  }
+  
+  .search-bar {
+    flex: 0 1 200px;
+    max-width: 200px;
+    margin-right: 10px;
+  }
+  
+  .logo {
+    margin-right: 20px;
+  }
+  
+  .header-right {
+    gap: 15px;
+  }
+  
+  .header-icons {
+    gap: 10px;
+  }
 }
 
 .mobile-menu-toggle {
@@ -61,6 +107,8 @@
   font-weight: bold;
   color: #333;
   margin-right: 40px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .logo img {
@@ -69,18 +117,22 @@
 }
 
 .search-bar {
-  flex: 0 500px;
+  flex: 0 1 400px;
+  max-width: 400px;
+  min-width: 0;
   position: relative;
   margin-right: 30px;
 }
 
 .search-bar input {
   width: 100%;
+  max-width: 100%;
   padding: 8px 35px 8px 15px;
   border: 1px solid #e0e0e0;
   border-radius: 5px;
   background-color: #f5f5f5;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 .search-bar input:focus {
@@ -103,6 +155,8 @@
   display: flex;
   align-items: center;
   gap: 25px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .header-links {
@@ -127,6 +181,8 @@
   gap: 35px;
   flex: 1;
   justify-content: center;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .nav a {
@@ -147,6 +203,8 @@
   display: flex;
   gap: 15px;
   align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .header-icons a {
@@ -214,6 +272,10 @@
 }
 
 /* Notification Icon */
+.notification-dropdown-container {
+  position: relative;
+}
+
 .notification-icon-wrapper {
   position: relative;
   cursor: pointer;
@@ -242,6 +304,182 @@
   text-align: center;
 }
 
+/* Notification Dropdown Menu - FIXED POSITIONING */
+.notification-dropdown-menu {
+  position: fixed !important;
+  top: 70px !important;
+  right: 20px !important;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 380px;
+  max-height: 500px;
+  z-index: 10000 !important;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.2s ease;
+  border: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.notification-dropdown-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.mark-all-read-btn {
+  background: none;
+  border: none;
+  color: #00bcd4;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.mark-all-read-btn:hover {
+  background: #e0f7fa;
+}
+
+.notification-dropdown-body {
+  overflow-y: auto;
+  max-height: 400px;
+  flex: 1;
+}
+
+.notification-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #999;
+  text-align: center;
+}
+
+.notification-empty svg {
+  margin-bottom: 12px;
+  color: #ccc;
+}
+
+.notification-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.notification-item:hover {
+  background: #f8f9fa;
+}
+
+.notification-item.unread {
+  background: #e3f2fd;
+}
+
+.notification-item.unread:hover {
+  background: #d1e7f8;
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e0f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #00bcd4;
+  font-size: 16px;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.4;
+}
+
+.notification-message {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.notification-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.notification-unread-dot {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 8px;
+  height: 8px;
+  background: #00bcd4;
+  border-radius: 50%;
+}
+
+.notification-dropdown-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.view-all-notifications-btn {
+  width: 100%;
+  padding: 10px;
+  background: #00bcd4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.view-all-notifications-btn:hover {
+  background: #0097a7;
+}
+
 /* Profile Dropdown */
 .profile-dropdown-container {
   position: relative;
@@ -262,14 +500,14 @@
 }
 
 .profile-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
+  position: fixed !important;
+  top: 70px !important;
+  right: 20px !important;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 260px;
-  z-index: 1000;
+  z-index: 10000 !important;
   overflow: hidden;
   animation: dropdownFadeIn 0.2s ease;
   border: 1px solid #e0e0e0;
@@ -594,6 +832,15 @@
   padding: 20px 50px;
   background-color: #fff;
   border-bottom: 1px solid #e0e0e0;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: visible;
+  margin: 0;
+  left: 0;
+  right: 0;
+  position: relative;
+  z-index: 100;
 }
 
 .collections-nav a {
@@ -622,6 +869,26 @@
   align-items: center;
   position: relative;
   overflow: hidden;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  margin: 0;
+  left: 0;
+  right: 0;
+}
+
+@media (max-width: 1200px) {
+  .hero {
+    padding: 40px 30px;
+    gap: 30px;
+  }
+}
+
+@media (max-width: 992px) {
+  .hero {
+    padding: 30px 20px;
+    gap: 20px;
+  }
 }
 
 .hero-content {
@@ -777,6 +1044,25 @@
   padding: 60px 50px;
   text-align: center;
   background-color: #ffffff;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: hidden;
+  margin: 0;
+  left: 0;
+  right: 0;
+}
+
+@media (max-width: 1200px) {
+  .trending-products {
+    padding: 50px 30px;
+  }
+}
+
+@media (max-width: 992px) {
+  .trending-products {
+    padding: 40px 20px;
+  }
 }
 
 .trending-products h2 {
@@ -815,6 +1101,24 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 30px;
   margin-bottom: 40px;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+@media (max-width: 1400px) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 25px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
 }
 
 .product-card {
@@ -1033,6 +1337,27 @@
   gap: 30px;
   padding: 60px 50px;
   background-color: #f5f5f5;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: hidden;
+  margin: 0;
+  left: 0;
+  right: 0;
+}
+
+@media (max-width: 1200px) {
+  .category-sections {
+    padding: 50px 30px;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 992px) {
+  .category-sections {
+    padding: 40px 20px;
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .category-card {
@@ -1149,6 +1474,13 @@
 .news-section {
   padding: 80px 50px;
   background-color: #fff;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  overflow: hidden;
+  margin: 0;
+  left: 0;
+  right: 0;
 }
 
 .news-section h2 {
@@ -1246,6 +1578,11 @@
   position: relative;
   border-top: 1px solid #e0e0e0;
   border-bottom: 1px solid #e0e0e0;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0;
+  left: 0;
+  right: 0;
 }
 
 .marquee-content {
@@ -1281,7 +1618,7 @@
 }
 
 .brand-item::after {
-  content: '★';
+  content: '?';
   margin-left: 40px;
   color: #ffffff;
   font-size: 12px;
@@ -1304,12 +1641,30 @@
   justify-content: center;
   gap: 80px;
   padding: 50px 20px;
-  width: 100vw;
-  margin-left: calc(-50vw + 50%);
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0;
   background-color: #323232;
   color: white;
   position: relative;
   box-sizing: border-box;
+  overflow: hidden;
+  left: 0;
+  right: 0;
+}
+
+@media (max-width: 1200px) {
+  .footer {
+    gap: 40px;
+    padding: 40px 20px;
+  }
+}
+
+@media (max-width: 992px) {
+  .footer {
+    gap: 30px;
+    padding: 30px 15px;
+  }
 }
 
 .footer-section {
@@ -2002,7 +2357,7 @@
 }
 
 .collection-dropdown {
-  position: static;
+  position: relative;
 }
 
 .collection-dropdown > a {
@@ -2032,7 +2387,7 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   padding: 0;
   margin-top: 0;
-  z-index: 1000;
+  z-index: 10001;
   display: flex;
   color: #333;
   pointer-events: auto;
@@ -2170,18 +2525,19 @@
 }
 
 .landing-search-suggestions {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
   background: #ffffff;
   border-radius: 8px;
   max-height: 500px;
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
   color: #333;
   border: 1px solid #e5e5e5;
+}
+
+@media (max-width: 768px) {
+  .landing-search-suggestions {
+    max-height: 400px;
+  }
 }
 
 .landing-search-suggestions .suggestions-section {
@@ -2399,4 +2755,75 @@
   border-radius: 12px;
   font-size: 10px;
   font-weight: 600;
+}
+
+/* Responsive Notification Dropdown */
+@media (max-width: 768px) {
+  .notification-dropdown-menu {
+    width: 320px;
+    right: -20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .notification-dropdown-menu {
+    position: fixed;
+    top: 60px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-height: calc(100vh - 80px);
+  }
+}
+
+
+/* ========================================
+   FIX HORIZONTAL SCROLL ISSUES
+   ======================================== */
+
+/* Ensure landing page doesn't overflow */
+.landing-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden !important;
+  position: relative;
+}
+
+/* Fix notification dropdown on small screens */
+@media (max-width: 480px) {
+  .notification-dropdown-menu {
+    position: fixed !important;
+    top: 60px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-height: calc(100vh - 80px);
+  }
+}
+
+/* Fix cart dropdown overflow */
+.cart-dropdown {
+  max-width: calc(100% - 40px);
+}
+
+@media (max-width: 768px) {
+  .cart-dropdown {
+    right: 20px;
+    width: calc(100% - 40px);
+    max-width: 420px;
+  }
+}
+
+/* Fix search modal overflow */
+.search-modal-content {
+  max-width: calc(100% - 40px);
+}
+
+/* Ensure all containers respect viewport width */
+.header,
+.hero-section,
+.products-section,
+.footer {
+  max-width: 100%;
+  overflow-x: hidden;
 }

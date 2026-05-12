@@ -10,6 +10,10 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* Sidebar Navigation */
@@ -371,14 +375,14 @@
   transform: scale(1.05);
 }
 .seller-container .notification-dropdown {
-  position: absolute;
-  top: 60px;
-  right: -200px;
+  position: fixed;
+  top: 70px;
+  right: 20px;
   width: 420px;
   background: white;
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05);
-  z-index: 1000;
+  z-index: 10000;
   max-height: 550px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
@@ -9068,4 +9072,23 @@
   font-size: 16px;
   color: #666;
   margin: 0;
+}
+
+/* Help Center Menu Item - Special Styling */
+.sidebar .menu-item.support-menu-item {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  margin: 8px 0;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.sidebar .menu-item.support-menu-item:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  transform: translateX(6px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.sidebar .menu-item.support-menu-item svg {
+  color: white;
 }

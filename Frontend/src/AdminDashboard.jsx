@@ -12,8 +12,10 @@ import { FaUser as FaUserIcon } from 'react-icons/fa';
 import {
   MdPeople, MdStorefront, MdInventory, MdAttachMoney, MdShowChart
 } from 'react-icons/md';
+import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
 import './AdminDashboard.css';
 import Chatbot from './components/Chatbot';
+import AdminSupport from './AdminSupport';
 import {
   RevenueTrendChart,
   TopProductsChart,
@@ -40,6 +42,7 @@ function AdminDashboard() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [auditFilter, setAuditFilter] = useState('all');
+  const [timeRange, setTimeRange] = useState('7'); // '7', '30', '90', '365', 'all'
 
   // State
   const [users, setUsers] = useState([]);
@@ -128,6 +131,23 @@ function AdminDashboard() {
   const [loadingFraud, setLoadingFraud] = useState(false);
   const [fraudFilter, setFraudFilter] = useState('all');
   
+  // Support Tickets State
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [supportStats, setSupportStats] = useState({
+    totalTickets: 0,
+    openTickets: 0,
+    pendingTickets: 0,
+    resolvedTickets: 0,
+    closedTickets: 0,
+    unreadTickets: 0
+  });
+  const [selectedSupportTicket, setSelectedSupportTicket] = useState(null);
+  const [supportMessages, setSupportMessages] = useState([]);
+  const [supportSearchQuery, setSupportSearchQuery] = useState('');
+  const [supportFilterStatus, setSupportFilterStatus] = useState('all');
+  const [supportFilterCategory, setSupportFilterCategory] = useState('all');
+  const [supportFilterPriority, setSupportFilterPriority] = useState('all');
+  
   // Get user data from localStorage
   const getUserData = () => {
     try {
@@ -202,7 +222,7 @@ function AdminDashboard() {
       fetchNotifications();
     }, 120000);
     return () => clearInterval(interval);
-  }, []);
+  }, [timeRange]);
 
   // Load fraud alerts when fraud detection tab is active
   useEffect(() => {
@@ -224,28 +244,30 @@ function AdminDashboard() {
         'Content-Type': 'application/json'
       };
 
-      const response = await fetch('http://localhost:5000/api/admin/analytics-data', { headers });
+      // Silently fetch analytics data - don't show errors to user
+      const response = await fetch('http://localhost:5000/api/admin/analytics-data', { headers }).catch(() => null);
       
-      if (response.ok) {
-        const data = await response.json();
+      if (response && response.ok) {
+        const data = await response.json().catch(() => null);
         
-        if (data.success && data.chartData) {
+        if (data && data.success && data.chartData) {
           setChartData(data.chartData);
         }
       }
 
-      // Fetch sales stats
-      const salesResponse = await fetch('http://localhost:5000/api/admin/sales-reports', { headers });
+      // Silently fetch sales stats - don't show errors to user
+      const salesResponse = await fetch(`http://localhost:5000/api/admin/sales-reports?days=${timeRange}`, { headers }).catch(() => null);
       
-      if (salesResponse.ok) {
-        const salesData = await salesResponse.json();
+      if (salesResponse && salesResponse.ok) {
+        const salesData = await salesResponse.json().catch(() => null);
         
-        if (salesData.success && salesData.stats) {
+        if (salesData && salesData.success && salesData.stats) {
           setSalesStats(salesData.stats);
         }
       }
     } catch (error) {
-      console.error('❌ Error fetching analytics data:', error);
+      // Silently log error - analytics is not critical
+      console.log('Analytics data unavailable');
     }
   };
 
@@ -267,58 +289,69 @@ function AdminDashboard() {
 
       console.log('Fetching admin data from backend...');
 
+      // Add timeout to prevent infinite loading
+      const fetchWithTimeout = (url, options, timeout = 10000) => {
+        return Promise.race([
+          fetch(url, options),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout')), timeout)
+          )
+        ]);
+      };
+
       const [statsRes, usersRes, pendingSellersRes, approvedSellersRes, suspendedSellersRes, rejectedSellersRes, productsRes, ordersRes, auditRes, announcementsRes, loyaltyRes, settingsRes, profileRes] = await Promise.all([
-        fetch('http://localhost:5000/api/admin/stats', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/stats', { headers }).catch(err => {
           console.error('Stats fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/users', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/users', { headers }).catch(err => {
           console.error('Users fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/sellers/pending', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/sellers/pending', { headers }).catch(err => {
           console.error('Pending sellers fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/sellers/approved', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/sellers/approved', { headers }).catch(err => {
           console.error('Approved sellers fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/sellers/suspended', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/sellers/suspended', { headers }).catch(err => {
           console.error('Suspended sellers fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/sellers/rejected', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/sellers/rejected', { headers }).catch(err => {
           console.error('Rejected sellers fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/products', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/products', { headers }).catch(err => {
           console.error('Products fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/orders', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/orders', { headers }).catch(err => {
           console.error('Orders fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/audit-logs', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/audit-logs', { headers }).catch(err => {
           console.error('Audit logs fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/announcements', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/announcements', { headers }).catch(err => {
           console.error('Announcements fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/loyalty-points', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/loyalty-points', { headers }).catch(err => {
           console.error('Loyalty points fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/settings', { headers }).catch(err => {
+        fetchWithTimeout('http://localhost:5000/api/admin/settings', { headers }).catch(err => {
+          // Settings endpoint should work without auth
           console.error('Settings fetch error:', err);
           return { ok: false, status: 500 };
         }),
-        fetch('http://localhost:5000/api/admin/profile', { headers }).catch(err => {
-          console.error('Profile fetch error:', err);
-          return { ok: false, status: 500 };
+        fetchWithTimeout('http://localhost:5000/api/admin/profile', { headers }).catch(err => {
+          // Profile endpoint requires auth - this is expected to fail sometimes
+          return { ok: false, status: 401 };
         })
       ]);
 
@@ -334,8 +367,8 @@ function AdminDashboard() {
         audit: auditRes.status,
         announcements: announcementsRes.status,
         loyalty: loyaltyRes.status,
-        settings: settingsRes.status,
-        profile: profileRes.status
+        settings: settingsRes.status
+        // profile status omitted - may require auth
       });
 
       // Check for authentication errors
@@ -1718,12 +1751,15 @@ function AdminDashboard() {
         </div>
 
         <nav className="sidebar-nav">
+          <div className="menu-title">MAIN</div>
           <button 
             className={activeTab === 'overview' ? 'active' : ''} 
             onClick={() => setActiveTab('overview')}
           >
             <FiGrid /> Dashboard
           </button>
+          
+          <div className="menu-title">MANAGEMENT</div>
           <button 
             className={activeTab === 'seller-approval' ? 'active' : ''} 
             onClick={() => setActiveTab('seller-approval')}
@@ -1749,6 +1785,7 @@ function AdminDashboard() {
             <FiShoppingBag /> Orders
           </button>
 
+          <div className="menu-title">ANALYTICS</div>
           <button 
             className={activeTab === 'sales' ? 'active' : ''} 
             onClick={() => setActiveTab('sales')}
@@ -1762,6 +1799,7 @@ function AdminDashboard() {
             <FiClock /> Audit Log
           </button>
 
+          <div className="menu-title">SECURITY</div>
           <button 
             className={activeTab === 'fraud-detection' ? 'active' : ''} 
             onClick={() => setActiveTab('fraud-detection')}
@@ -1776,12 +1814,22 @@ function AdminDashboard() {
             <FiCheckCircle /> Verifications
           </button>
 
+          <div className="menu-title">COMMUNICATION</div>
           <button 
             className={activeTab === 'announcements' ? 'active' : ''} 
             onClick={() => setActiveTab('announcements')}
           >
             <FiBell /> Announcements
           </button>
+          
+          <button 
+            className={activeTab === 'support' ? 'active' : ''}
+            onClick={() => setActiveTab('support')}
+          >
+            <FiMessageSquare /> Support Tickets
+          </button>
+          
+          <div className="menu-title">REWARDS & FINANCE</div>
           <button 
             className={activeTab === 'loyalty' ? 'active' : ''} 
             onClick={() => setActiveTab('loyalty')}
@@ -1795,7 +1843,9 @@ function AdminDashboard() {
           >
             <FiDollarSign /> Payouts
           </button>
+        </nav>
 
+        <div className="sidebar-footer">
           <button 
             className={activeTab === 'settings' ? 'active' : ''} 
             onClick={() => setActiveTab('settings')}
@@ -1809,7 +1859,7 @@ function AdminDashboard() {
           >
             <FiLogOut /> Logout
           </button>
-        </nav>
+        </div>
 
       </aside>
 
@@ -1828,6 +1878,7 @@ function AdminDashboard() {
               {activeTab === 'fraud-detection' && 'Fraud Detection'}
               {activeTab === 'verifications' && 'Condition Verifications'}
               {activeTab === 'announcements' && 'Announcements'}
+              {activeTab === 'support' && 'Support Ticket Management'}
               {activeTab === 'loyalty' && 'Loyalty Points'}
               {activeTab === 'payouts' && 'Seller Payouts'}
               {activeTab === 'profile' && 'Admin Profile'}
@@ -1845,6 +1896,7 @@ function AdminDashboard() {
               {activeTab === 'fraud-detection' && 'Detect and prevent fraudulent activities'}
               {activeTab === 'verifications' && 'Review and approve customer verifications'}
               {activeTab === 'announcements' && 'Manage platform announcements'}
+              {activeTab === 'support' && 'Manage customer and seller support requests'}
               {activeTab === 'loyalty' && 'Manage loyalty points program'}
               {activeTab === 'payouts' && 'Process seller payout requests'}
               {activeTab === 'profile' && 'Manage your admin account'}
@@ -2218,7 +2270,10 @@ function AdminDashboard() {
                   <FiClock className="section-icon" />
                   Recent Activity
                 </h2>
-                <button className="view-all-btn">
+                <button 
+                  className="view-all-btn"
+                  onClick={() => setActiveTab('audit')}
+                >
                   View All <FiEye />
                 </button>
               </div>
@@ -2254,65 +2309,111 @@ function AdminDashboard() {
                 <div className="activity-card">
                   <div className="activity-card-header">
                     <h3>
-                      <FiAlertCircle className="card-icon" />
-                      Pending Approvals
+                      <FiShoppingBag className="card-icon" />
+                      Total Orders
                     </h3>
-                    <span className="badge warning">{pendingProducts + pendingSellers.length}</span>
+                    <span className="badge">{orders.length}</span>
                   </div>
-                  <div className="activity-list">
-                    {/* Pending Sellers */}
-                    {pendingSellers.slice(0, 2).map(seller => (
-                      <div key={seller.id} className="activity-item">
-                        <div className="activity-icon warning">
-                          <FiUserCheck />
-                        </div>
-                        <div className="activity-info">
-                          <p className="activity-title">
-                            <strong>{seller.name}</strong> - Seller Application
-                          </p>
-                          <span className="activity-time">{seller.storeName}</span>
-                        </div>
-                        <div className="quick-actions">
-                          <button className="quick-approve" onClick={() => handleApproveSeller(seller.id)}>
-                            <FiCheckCircle />
-                          </button>
-                          <button className="quick-reject" onClick={() => handleRejectSeller(seller.id)}>
-                            <FiXCircle />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {/* Pending Products */}
-                    {products.filter(p => p.status === 'Pending').slice(0, 2).map(product => (
-                      <div key={product.id} className="activity-item">
-                        <div className="activity-icon warning">
-                          <FiPackage />
-                        </div>
-                        <div className="activity-info">
-                          <p className="activity-title">
-                            <strong>{product.name}</strong> by {product.seller}
-                          </p>
-                          <span className="activity-time">Awaiting approval</span>
-                        </div>
-                        <div className="quick-actions">
-                          <button className="quick-approve" onClick={() => handleApproveProduct(product.id)}>
-                            <FiCheckCircle />
-                          </button>
-                          <button className="quick-reject" onClick={() => handleRejectProduct(product.id)}>
-                            <FiXCircle />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {pendingSellers.length === 0 && products.filter(p => p.status === 'Pending').length === 0 && (
-                      <div className="activity-item" style={{ justifyContent: 'center', padding: '20px' }}>
-                        <p style={{ color: '#8e8e8e' }}>No pending approvals</p>
-                      </div>
-                    )}
+                  <div className="chart-wrapper" style={{ padding: '10px 5px' }}>
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Processing', value: orders.filter(o => o.status === 'Processing').length, color: '#f59e0b' },
+                            { name: 'Shipped', value: orders.filter(o => o.status === 'Shipped').length, color: '#3b82f6' },
+                            { name: 'Delivered', value: orders.filter(o => o.status === 'Delivered').length, color: '#10b981' },
+                            { name: 'Cancelled', value: orders.filter(o => o.status === 'Cancelled').length, color: '#ef4444' }
+                          ].filter(item => item.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={35}
+                          outerRadius={55}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {[
+                            { name: 'Processing', value: orders.filter(o => o.status === 'Processing').length, color: '#f59e0b' },
+                            { name: 'Shipped', value: orders.filter(o => o.status === 'Shipped').length, color: '#3b82f6' },
+                            { name: 'Delivered', value: orders.filter(o => o.status === 'Delivered').length, color: '#10b981' },
+                            { name: 'Cancelled', value: orders.filter(o => o.status === 'Cancelled').length, color: '#ef4444' }
+                          ].filter(item => item.value > 0).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend 
+                          verticalAlign="bottom" 
+                          height={28}
+                          iconType="circle"
+                          formatter={(value) => <span style={{ fontSize: '9px' }}>{value}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Seller Approvals Section */}
+            {pendingSellers.length > 0 && (
+              <div className="activity-section">
+                <div className="section-title-row">
+                  <h2>
+                    <FiUserCheck className="section-icon" />
+                    Pending Seller Approvals ({pendingSellers.length})
+                  </h2>
+                  <button 
+                    className="view-all-btn"
+                    onClick={() => setActiveTab('seller-approval')}
+                  >
+                    View All <FiChevronRight />
+                  </button>
+                </div>
+                
+                <div className="sellers-approval-grid">
+                  {pendingSellers.slice(0, 3).map(seller => (
+                    <div key={seller.id} className="seller-approval-card">
+                      <div className="seller-card-header">
+                        <div className="seller-avatar">
+                          {seller.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="seller-info">
+                          <h3>{seller.name}</h3>
+                          <p className="store-name">{seller.storeName}</p>
+                        </div>
+                        <span className="doc-badge pending">Pending</span>
+                      </div>
+                      <div className="seller-details-grid">
+                        <div className="detail-item">
+                          <span className="detail-label">Email</span>
+                          <span className="detail-value">{seller.email}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Phone</span>
+                          <span className="detail-value">{seller.phone}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Applied Date</span>
+                          <span className="detail-value">{seller.appliedDate}</span>
+                        </div>
+                        <div className="detail-item">
+                          <span className="detail-label">Documents</span>
+                          <span className="detail-value">{seller.documents}</span>
+                        </div>
+                      </div>
+                      <div className="seller-actions">
+                        <button className="approve-btn" onClick={() => handleApproveSeller(seller.id)}>
+                          <FiCheckCircle /> Approve
+                        </button>
+                        <button className="reject-btn" onClick={() => handleRejectSeller(seller.id)}>
+                          <FiXCircle /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Charts Section */}
             {/* Analytics Overview - Quick Insights */}
@@ -2895,36 +2996,49 @@ function AdminDashboard() {
         {/* Sales & Reports Tab */}
         {activeTab === 'sales' && (
           <div className="content-section">
-            <button 
-              className="export-btn" 
-              style={{marginBottom: '20px'}}
-              onClick={async () => {
-                try {
-                  const token = localStorage.getItem('token');
-                  const response = await fetch('http://localhost:5000/api/admin/export-sales-report', {
-                    headers: {
-                      'Authorization': `Bearer ${token}`
-                    }
-                  });
+            <div style={{display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center'}}>
+              <button 
+                className="export-btn"
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('token');
+                    const response = await fetch('http://localhost:5000/api/admin/export-sales-report', {
+                      headers: {
+                        'Authorization': `Bearer ${token}`
+                      }
+                    });
 
-                  if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `sales-report-${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
+                    if (response.ok) {
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `sales-report-${new Date().toISOString().split('T')[0]}.csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    }
+                  } catch (error) {
+                    console.error('Error exporting report:', error);
                   }
-                } catch (error) {
-                  console.error('Error exporting report:', error);
-                }
-              }}
-            >
-              <FiDownload /> Export Sales Report
-            </button>
+                }}
+              >
+                <FiDownload /> Export
+              </button>
+
+              <select 
+                className="time-range-select"
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+              >
+                <option value="7">Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
+                <option value="90">Last 90 Days</option>
+                <option value="365">Last Year</option>
+                <option value="all">All Time</option>
+              </select>
+            </div>
 
             {/* Analytics Stats - Clickable */}
             <div className="analytics-grid">
@@ -2976,21 +3090,21 @@ function AdminDashboard() {
             {/* Additional Metrics - Clickable */}
             <div className="metrics-row">
               <div 
-                className={`metric-card clickable-metric ${selectedMetric === 'avgOrder' ? 'active' : ''}`}
+                className={`metric-card avgorder clickable-metric ${selectedMetric === 'avgOrder' ? 'active' : ''}`}
                 onClick={() => setSelectedMetric(selectedMetric === 'avgOrder' ? null : 'avgOrder')}
               >
                 <h4>Average Order Value</h4>
                 <p className="metric-value">Rs. {salesData.averageOrderValue.toLocaleString()}</p>
               </div>
               <div 
-                className={`metric-card clickable-metric ${selectedMetric === 'commission' ? 'active' : ''}`}
+                className={`metric-card commission clickable-metric ${selectedMetric === 'commission' ? 'active' : ''}`}
                 onClick={() => setSelectedMetric(selectedMetric === 'commission' ? null : 'commission')}
               >
                 <h4>Commission Rate</h4>
                 <p className="metric-value">{salesData.commissionRate}%</p>
               </div>
               <div 
-                className={`metric-card clickable-metric ${selectedMetric === 'topCategory' ? 'active' : ''}`}
+                className={`metric-card topcategory clickable-metric ${selectedMetric === 'topCategory' ? 'active' : ''}`}
                 onClick={() => setSelectedMetric(selectedMetric === 'topCategory' ? null : 'topCategory')}
               >
                 <h4>Top Category</h4>
@@ -3650,6 +3764,13 @@ function AdminDashboard() {
                 <p>Loyalty points will appear here</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Support Tickets Tab */}
+        {activeTab === 'support' && (
+          <div className="content-section" style={{padding: 0, background: 'transparent'}}>
+            <AdminSupport embedded={true} />
           </div>
         )}
 

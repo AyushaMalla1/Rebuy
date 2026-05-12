@@ -455,6 +455,31 @@ router.post('/login', async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
+    // Record login history
+    try {
+      const userAgent = req.headers['user-agent'] || 'Unknown Device';
+      const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown IP';
+      
+      // Add login history entry
+      user.loginHistory = user.loginHistory || [];
+      user.loginHistory.push({
+        timestamp: new Date(),
+        ipAddress,
+        userAgent,
+        location: 'Nepal' // You can integrate IP geolocation service for accurate location
+      });
+      
+      // Keep only last 10 login entries
+      if (user.loginHistory.length > 10) {
+        user.loginHistory = user.loginHistory.slice(-10);
+      }
+      
+      await user.save();
+    } catch (historyError) {
+      console.error('Error saving login history:', historyError);
+      // Don't fail login if history save fails
+    }
+
     // Log audit
     await logAudit({
       action: 'User Login',
