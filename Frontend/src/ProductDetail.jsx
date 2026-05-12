@@ -371,6 +371,25 @@ function ProductDetail() {
 
   return (
     <div className="product-detail-page">
+      {/* Breadcrumb Navigation */}
+      <div className="breadcrumb-container">
+        <nav className="breadcrumb">
+          <Link to="/">Home</Link>
+          <span className="breadcrumb-separator">/</span>
+          <Link to="/shop">Shop</Link>
+          <span className="breadcrumb-separator">/</span>
+          <Link to={
+            product.category === "Men's Collection" ? "/mens-outlet" :
+            product.category === "Women's Collection" ? "/womens-outlet" :
+            "/shop"
+          }>
+            {product.category || 'Category'}
+          </Link>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current">{product.name}</span>
+        </nav>
+      </div>
+
       <div className="detail-container">
         {/* Image Gallery */}
         <div className="image-gallery">
@@ -542,98 +561,6 @@ function ProductDetail() {
             <p>{product.description || `${product.condition} condition. Carefully inspected and cleaned. Perfect for sustainable fashion lovers.`}</p>
           </div>
 
-          {/* Features */}
-          <div className="product-features-compact">
-            <div className="feature-compact">
-              <FiTruck className="feature-icon-compact" />
-              <div>
-                <strong>Free Shipping</strong>
-                <p>On all orders over $100</p>
-              </div>
-            </div>
-            <div className="feature-compact">
-              <FiAward className="feature-icon-compact" />
-              <div>
-                <strong>Genuine Quality</strong>
-                <p>Certified Rebuy Vendor</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Seller Profile Section */}
-          <div className="seller-profile-card">
-            <h3>About the Seller</h3>
-            
-            <div 
-              className="seller-info-header clickable-seller-info"
-              onClick={() => {
-                const sellerId = product.seller?._id || product.seller;
-                if (sellerId) {
-                  navigate(`/seller/${sellerId}`);
-                } else {
-                  console.error('No seller ID found in product');
-                }
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <img src={sellerInfo.avatar} alt={sellerInfo.name} className="seller-avatar" />
-              <div className="seller-basic-info">
-                <h4>{sellerInfo.name}</h4>
-                <p className="seller-store-name">{sellerInfo.storeName}</p>
-                <div className="seller-rating">
-                  <FiStar className="star-filled" />
-                  <span>
-                    {sellerInfo.totalReviews > 0 
-                      ? `${sellerInfo.rating} (${sellerInfo.totalReviews} reviews)` 
-                      : 'No reviews yet'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="seller-stats">
-              <div className="seller-stat">
-                <FiPackage className="stat-icon" />
-                <div>
-                  <strong>{sellerInfo.itemsForSale}</strong>
-                  <p>Items for Sale</p>
-                </div>
-              </div>
-              <div className="seller-stat">
-                <FiRefreshCw className="stat-icon" />
-                <div>
-                  <strong>{sellerInfo.totalTransactions}</strong>
-                  <p>Total Sales</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="seller-badges">
-              {sellerInfo.badges.map((badge, index) => (
-                <span key={index} className="seller-badge">
-                  <FiAward /> {badge}
-                </span>
-              ))}
-            </div>
-
-            <div className="seller-details">
-              <div className="seller-detail-item">
-                <FiZap className="detail-icon" />
-                <div>
-                  <strong>Response Time</strong>
-                  <p>{sellerInfo.responseTime}</p>
-                </div>
-              </div>
-              <div className="seller-detail-item">
-                <FiTruck className="detail-icon" />
-                <div>
-                  <strong>Shipping Time</strong>
-                  <p>{sellerInfo.shippingTime}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Contact Seller */}
           <button className="btn-contact-seller" onClick={() => setShowContactModal(true)}>
             <FiMessageSquare /> Contact Seller
@@ -650,6 +577,98 @@ function ProductDetail() {
           </div>
         </div>
       )}
+
+      {/* Features */}
+      <div className="product-features-compact">
+        <div className="feature-compact">
+          <FiTruck className="feature-icon-compact" />
+          <div>
+            <strong>Free Shipping</strong>
+            <p>On all orders over Rs. 5000</p>
+          </div>
+        </div>
+        <div className="feature-compact">
+          <FiAward className="feature-icon-compact" />
+          <div>
+            <strong>Genuine Quality</strong>
+            <p>Certified Rebuy Vendor</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Seller Profile Section */}
+      <div className="seller-profile-card">
+        <h3>About the Seller</h3>
+        
+        <div 
+          className="seller-info-header clickable-seller-info"
+          onClick={() => {
+            const sellerId = product.seller?._id || product.seller;
+            if (sellerId) {
+              navigate(`/seller/${sellerId}`);
+            } else {
+              console.error('No seller ID found in product');
+            }
+          }}
+          style={{ cursor: 'pointer' }}
+        >
+          <img src={sellerInfo.avatar} alt={sellerInfo.name} className="seller-avatar" />
+          <div className="seller-basic-info">
+            <h4>{sellerInfo.name}</h4>
+            <p className="seller-store-name">{sellerInfo.storeName}</p>
+            <div className="seller-rating">
+              <FiStar className="star-filled" />
+              <span>
+                {sellerInfo.totalReviews > 0 
+                  ? `${sellerInfo.rating} (${sellerInfo.totalReviews} reviews)` 
+                  : 'No reviews yet'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="seller-stats">
+          <div className="seller-stat">
+            <FiPackage className="stat-icon" />
+            <div>
+              <strong>{sellerInfo.itemsForSale}</strong>
+              <p>Items for Sale</p>
+            </div>
+          </div>
+          <div className="seller-stat">
+            <FiRefreshCw className="stat-icon" />
+            <div>
+              <strong>{sellerInfo.totalTransactions}</strong>
+              <p>Total Sales</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="seller-badges">
+          {sellerInfo.badges.map((badge, index) => (
+            <span key={index} className="seller-badge">
+              <FiAward /> {badge}
+            </span>
+          ))}
+        </div>
+
+        <div className="seller-details">
+          <div className="seller-detail-item">
+            <FiZap className="detail-icon" />
+            <div>
+              <strong>Response Time</strong>
+              <p>{sellerInfo.responseTime}</p>
+            </div>
+          </div>
+          <div className="seller-detail-item">
+            <FiTruck className="detail-icon" />
+            <div>
+              <strong>Shipping Time</strong>
+              <p>{sellerInfo.shippingTime}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Product Reviews - Condition Verifications */}
       <ProductReviews productId={id} />

@@ -1,6 +1,6 @@
 .product-reviews {
   padding: 40px 0;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -340,24 +340,33 @@
 
 .verification-images {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 12px;
+  margin-top: 16px;
   flex-wrap: wrap;
 }
 
 .verification-image {
-  width: 80px;
-  height: 80px;
+  width: 150px;
+  height: 150px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 2px solid #00bcd4;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .verification-image:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 8px rgba(0, 188, 212, 0.3);
+  transform: scale(1.08);
+  box-shadow: 0 6px 16px rgba(0, 188, 212, 0.4);
+  border-color: #0097a7;
+}
+
+.no-images-message {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+  margin-top: 8px;
 }
 
 /* Rating Form Container */

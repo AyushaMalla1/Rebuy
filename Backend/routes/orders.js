@@ -331,6 +331,23 @@ router.post('/:orderId/verify-condition', async (req, res) => {
       return res.status(400).json({ message: 'Notes about product condition are required' });
     }
     
+    // Upload base64 images to Cloudinary
+    const { cloudinary } = require('../config/cloudinary');
+    const uploadedImageUrls = [];
+    
+    for (const base64Image of images) {
+      try {
+        const uploadResult = await cloudinary.uploader.upload(base64Image, {
+          folder: 'rebuy-verifications',
+          resource_type: 'auto'
+        });
+        uploadedImageUrls.push(uploadResult.secure_url);
+      } catch (uploadError) {
+        console.error('Error uploading verification image:', uploadError);
+        return res.status(500).json({ message: 'Failed to upload verification images' });
+      }
+    }
+    
     // Convert boolean to string if needed for backward compatibility
     let matchesDescriptionValue = matchesDescription;
     if (typeof matchesDescription === 'boolean') {
@@ -343,7 +360,7 @@ router.post('/:orderId/verify-condition', async (req, res) => {
       verifiedAt: Date.now(),
       matchesDescription: matchesDescriptionValue,
       customerFeedback: customerNotes,
-      verificationImages: images || []
+      verificationImages: uploadedImageUrls
     };
     
     await order.save();
@@ -389,7 +406,7 @@ router.post('/:orderId/verify-condition', async (req, res) => {
           matchesDescription: matchesDescriptionValue,
           rating: rating,
           customerNotes: customerNotes || '',
-          verificationImages: images || [],
+          verificationImages: uploadedImageUrls || [],
           disputeRaised: matchesDescriptionValue === 'no',
           // Admin approval system - prevents seller bias
           approvalStatus: 'pending',  // Starts as pending

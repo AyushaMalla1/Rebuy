@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { FiStar, FiPackage, FiShoppingBag, FiMapPin, FiClock, FiTruck, FiAward, FiChevronLeft, FiMessageCircle, FiShield } from 'react-icons/fi';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { FiStar, FiPackage, FiShoppingBag, FiMapPin, FiClock, FiTruck, FiAward, FiMessageCircle, FiShield } from 'react-icons/fi';
 import './SellerProfile.css';
 
 function SellerProfile() {
@@ -147,12 +147,15 @@ function SellerProfile() {
   if (!seller && !loading) {
     return (
       <div className="seller-profile-page">
-        <div className="seller-nav">
-          <div className="seller-nav-content">
-            <button className="back-button" onClick={() => navigate(-1)}>
-              <FiChevronLeft /> Back
-            </button>
-          </div>
+        {/* Breadcrumb Navigation */}
+        <div className="breadcrumb-container">
+          <nav className="breadcrumb">
+            <Link to="/">Home</Link>
+            <span className="breadcrumb-separator">/</span>
+            <Link to="/shop">Shop</Link>
+            <span className="breadcrumb-separator">/</span>
+            <span className="breadcrumb-current">Seller Not Found</span>
+          </nav>
         </div>
         <div className="error-container">
           <FiPackage size={64} color="#ccc" />
@@ -168,13 +171,15 @@ function SellerProfile() {
 
   return (
     <div className="seller-profile-page">
-      {/* Top Navigation */}
-      <div className="seller-nav">
-        <div className="seller-nav-content">
-          <button className="back-button" onClick={() => navigate(-1)}>
-            <FiChevronLeft /> Back
-          </button>
-        </div>
+      {/* Breadcrumb Navigation */}
+      <div className="breadcrumb-container">
+        <nav className="breadcrumb">
+          <Link to="/">Home</Link>
+          <span className="breadcrumb-separator">/</span>
+          <Link to="/shop">Shop</Link>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current">{seller.storeName || seller.fullName}</span>
+        </nav>
       </div>
 
       {/* Seller Header Section */}

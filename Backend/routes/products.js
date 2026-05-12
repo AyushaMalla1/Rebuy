@@ -294,7 +294,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Get similar products by subcategory
+// Get similar products by subcategory ONLY
 router.get('/:id/similar', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -305,30 +305,12 @@ router.get('/:id/similar', async (req, res) => {
     
     let similarProducts = [];
     
-    // First, try to find products with same subcategory
+    // Only find products with same subcategory (no category fallback)
     if (product.subcategory) {
       similarProducts = await Product.find({
         _id: { $ne: product._id }, // Exclude current product
         status: 'Approved',
-        category: product.category,
-        subcategory: product.subcategory
-      })
-      .populate('seller', 'status')
-      .sort({ createdAt: -1 })
-      .limit(4);
-      
-      // Filter out products from unapproved sellers
-      similarProducts = similarProducts.filter(p => 
-        p.seller && p.seller.status === 'approved'
-      );
-    }
-    
-    // If no subcategory matches found, fall back to category matching
-    if (similarProducts.length === 0) {
-      similarProducts = await Product.find({
-        _id: { $ne: product._id },
-        status: 'Approved',
-        category: product.category
+        subcategory: product.subcategory // Match subcategory only
       })
       .populate('seller', 'status')
       .sort({ createdAt: -1 })
@@ -343,7 +325,7 @@ router.get('/:id/similar', async (req, res) => {
     res.json({
       success: true,
       products: similarProducts,
-      matchedBy: product.subcategory && similarProducts.length > 0 ? 'subcategory' : 'category'
+      matchedBy: 'subcategory'
     });
   } catch (error) {
     res.status(500).json({ 

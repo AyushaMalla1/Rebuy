@@ -1432,13 +1432,22 @@ function BuyerProfile() {
       // Convert boolean to string format expected by backend
       const matchesDescriptionValue = verificationData.matchesDescription ? 'yes' : 'no';
       
-      // Convert images to base64 or URLs (for now, just send preview URLs)
-      const imageUrls = verificationData.images.map(img => img.preview);
+      // Convert images to base64 for upload
+      const imagePromises = verificationData.images.map(img => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(img);
+        });
+      });
+      
+      const imageBase64Array = await Promise.all(imagePromises);
       
       const response = await orderAPI.verifyCondition(selectedOrder._id || selectedOrder.id, {
         matchesDescription: matchesDescriptionValue,
         customerNotes: verificationData.customerNotes || '',
-        images: imageUrls,
+        images: imageBase64Array,
         rating: verificationData.rating
       });
       
