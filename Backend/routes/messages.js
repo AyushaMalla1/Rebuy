@@ -174,14 +174,25 @@ router.post('/', async (req, res) => {
   try {
     const { senderId, senderModel, receiverId, receiverModel, productId, message } = req.body;
 
+    console.log('Received message request:', { senderId, senderModel, receiverId, receiverModel, productId, message });
+
     if (!senderId || !senderModel || !receiverId || !receiverModel || !message) {
+      console.error('Missing required fields:', { senderId, senderModel, receiverId, receiverModel, message });
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields'
+        message: 'Missing required fields',
+        missingFields: {
+          senderId: !senderId,
+          senderModel: !senderModel,
+          receiverId: !receiverId,
+          receiverModel: !receiverModel,
+          message: !message
+        }
       });
     }
 
     const conversationId = generateConversationId(senderId, receiverId);
+    console.log('Generated conversationId:', conversationId);
 
     const newMessage = new Message({
       conversationId,
@@ -194,6 +205,7 @@ router.post('/', async (req, res) => {
     });
 
     await newMessage.save();
+    console.log('Message saved successfully:', newMessage._id);
 
     // Populate sender info
     let senderInfo;
@@ -213,10 +225,12 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error sending message:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Failed to send message',
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });

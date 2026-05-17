@@ -7,32 +7,50 @@
   background: white;
   padding: 20px 40px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.back-link {
+  position: absolute;
+  left: 40px;
+  color: #00bcd4;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.back-link:hover {
+  color: #0097a7;
+}
+
+.header-title {
+  text-align: center;
+}
+
+.header-title h1 {
+  font-size: 20px;
+  margin: 0 0 4px 0;
+  font-weight: 600;
+  color: #333;
+}
+
+.header-title p {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
 }
 
 .contact-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 40px 20px;
-}
-
-.contact-hero {
-  text-align: center;
-  padding: 40px 20px;
-  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
-  color: white;
-  border-radius: 12px;
-  margin-bottom: 40px;
-}
-
-.contact-hero h1 {
-  font-size: 28px;
-  margin-bottom: 12px;
-  font-weight: 700;
-}
-
-.contact-hero p {
-  font-size: 14px;
-  opacity: 0.95;
 }
 
 .contact-content {
@@ -44,46 +62,47 @@
 
 .contact-info h2,
 .contact-form-section h2 {
-  font-size: 20px;
-  margin-bottom: 12px;
+  font-size: 16px;
+  margin-bottom: 10px;
   color: #333;
 }
 
 .contact-info > p {
   color: #666;
-  margin-bottom: 20px;
-  font-size: 13px;
+  margin-bottom: 16px;
+  font-size: 12px;
 }
 
 .info-cards {
   display: grid;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .info-card {
   background: white;
-  padding: 16px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 12px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 .info-icon {
-  font-size: 24px;
+  font-size: 20px;
   color: #00bcd4;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .info-card h3 {
-  font-size: 15px;
-  margin-bottom: 6px;
+  font-size: 13px;
+  margin-bottom: 4px;
   color: #333;
+  font-weight: 600;
 }
 
 .info-card p {
   color: #666;
   margin: 2px 0;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .social-links {

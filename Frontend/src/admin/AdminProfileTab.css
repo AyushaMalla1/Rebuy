@@ -1,0 +1,260 @@
+/* ADMIN PROFILE TAB STYLES */
+/* Split from AdminDashboard.css */
+
+.profile-main-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.profile-card {
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+}
+
+.profile-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 4px solid #e5e7eb;
+  object-fit: cover;
+}
+
+.profile-status-indicator {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  background: #10b981;
+  border-radius: 50%;
+  border: 3px solid white;
+}
+
+.profile-image-input {
+  display: none;
+}
+
+.profile-camera-label {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  background: #00bcd4;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.profile-camera-label:hover {
+  background: #00acc1;
+}
+
+.profile-camera-label svg {
+  color: #ffffff;
+  width: 15px;
+  height: 15px;
+}
+
+.profile-store-name {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.profile-verified-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: #dbeafe;
+  color: #0284c7;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.profile-save-btn {
+  margin-top: 8px;
+  width: auto;
+  min-width: 160px;
+}
+
+.profile-section {
+  margin-bottom: 32px;
+}
+
+.profile-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #00bcd4;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.profile-form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.profile-form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.profile-form-input:enabled {
+  background: white;
+}
+
+.profile-form-input:disabled {
+  background: #f9fafb;
+}
+
+.profile-form-textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.profile-form-textarea:enabled {
+  background: white;
+}
+
+.profile-form-textarea:disabled {
+  background: #f9fafb;
+}
+
+.profile-full-width {
+  grid-column: 1 / -1;
+}
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.profile-stat-card {
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.profile-stat-card.yellow {
+  background: #fef3c7;
+}
+
+.profile-stat-icon {
+  margin-bottom: 8px;
+}
+
+.profile-stat-icon.yellow {
+  color: #f59e0b;
+}
+
+.profile-stat-label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.profile-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.profile-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+.profile-save-btn {
+  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
+  color: white;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.profile-save-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 188, 212, 0.3);
+}
+
+.profile-cancel-btn {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 14px 32px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.profile-cancel-btn:hover {
+  background: #e2e8f0;
+}
+
+/* Split from AdminDashboard.css by component usage */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+/* Final split from AdminDashboard.css */
+
+/* ============================================
+   PROFILE TAB
+   ============================================ */
+.profile-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}

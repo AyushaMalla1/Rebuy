@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const Admin = require('../models/Admin');
 const Seller = require('../models/Seller');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
@@ -667,8 +668,11 @@ router.get('/loyalty-points', async (req, res) => {
       createdAt: record.createdAt,
       updatedAt: record.updatedAt
     }));
+    
+    // Filter out orphaned records where the customer document was deleted
+    const validRecords = formattedRecords.filter(record => record.userId !== null && record.userId !== undefined);
       
-    res.json({ success: true, loyaltyRecords: formattedRecords });
+    res.json({ success: true, loyaltyRecords: validRecords });
   } catch (error) {
     console.error('Get loyalty points error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -757,14 +761,27 @@ router.patch('/settings', async (req, res) => {
 // Admin Profile Routes
 router.get('/profile', async (req, res) => {
   try {
-    // Get admin ID from token or request
-    const adminId = req.user?.id || req.userId;
+    // Get admin ID from token, request, or query
+    let adminId = req.user?.id || req.userId || req.query.adminId;
+    
+    if (!adminId) {
+      try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (token) {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+          adminId = decoded.id;
+        }
+      } catch (tokenErr) {
+        console.error('Admin profile token verify error:', tokenErr);
+      }
+    }
     
     if (!adminId) {
       return res.status(401).json({ success: false, message: 'Not authenticated' });
     }
     
-    const admin = await User.findById(adminId).select('-password');
+    const admin = await Admin.findById(adminId).select('-password');
     
     if (!admin) {
       return res.status(404).json({ success: false, message: 'Admin not found' });
@@ -781,14 +798,27 @@ router.patch('/profile', async (req, res) => {
   try {
     const { fullName, email, phone } = req.body;
     
-    // Get admin ID from token or request
-    const adminId = req.user?.id || req.userId;
+    // Get admin ID from token, request, or body
+    let adminId = req.user?.id || req.userId || req.query.adminId || req.body.adminId;
+    
+    if (!adminId) {
+      try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (token) {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+          adminId = decoded.id;
+        }
+      } catch (tokenErr) {
+        console.error('Admin profile patch token verify error:', tokenErr);
+      }
+    }
     
     if (!adminId) {
       return res.status(401).json({ success: false, message: 'Not authenticated' });
     }
     
-    const admin = await User.findByIdAndUpdate(
+    const admin = await Admin.findByIdAndUpdate(
       adminId,
       { fullName, email, phone },
       { new: true }

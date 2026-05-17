@@ -28,7 +28,7 @@ router.get('/seller/:sellerId/summary', async (req, res) => {
       // Check if this order has been paid out
       const existingPayout = await Payout.findOne({
         orders: order._id,
-        status: { $in: ['completed', 'processing'] }
+        status: { $in: ['pending', 'processing', 'completed'] }
       });
 
       if (!existingPayout) {
@@ -42,19 +42,25 @@ router.get('/seller/:sellerId/summary', async (req, res) => {
 
         pendingAmount += sellerPayout;
         pendingOrders.push({
+          _id: order._id,
           orderId: order.orderId,
           amount: sellerPayout,
           commission: commission,
-          orderDate: order.orderDate,
+          orderDate: order.orderDate || order.createdAt,
           deliveredAt: order.deliveredAt
         });
       }
     }
 
     // Get payout history
-    const payoutHistory = await Payout.find({
-      seller: req.params.sellerId
-    }).sort({ createdAt: -1 }).limit(10);
+    const payoutHistory = await Payout.find({ seller: req.params.sellerId }).sort({ createdAt: -1 }).limit(10);
+
+    const completedPayoutsResult = await Payout.aggregate([
+      { $match: { seller: seller._id, status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const completedPayoutsAmount = completedPayoutsResult.length > 0 ? completedPayoutsResult[0].total : 0;
+    const totalEarnedAmount = completedPayoutsAmount + pendingAmount;
 
     res.json({
       seller: {
@@ -66,9 +72,9 @@ router.get('/seller/:sellerId/summary', async (req, res) => {
         esewaId: seller.payoutDetails?.esewaId || ''
       },
       earnings: {
-        totalEarned: seller.earnings?.totalEarned || 0,
+        totalEarned: totalEarnedAmount,
         pendingPayout: pendingAmount,
-        completedPayouts: seller.earnings?.completedPayouts || 0,
+        completedPayouts: completedPayoutsAmount,
         lastPayoutDate: seller.earnings?.lastPayoutDate
       },
       pendingOrders,
@@ -151,6 +157,7 @@ router.post('/seller/:sellerId/request', async (req, res) => {
       orders: orderIds,
       payoutMethod: seller.payoutDetails?.preferredMethod || 'bank',
       khaltiMobile: seller.payoutDetails?.khaltiMobile || '',
+      esewaId: seller.payoutDetails?.esewaId || '',
       bankDetails: seller.payoutDetails?.bankAccount || {},
       status: 'pending'
     });
@@ -197,6 +204,10 @@ router.post('/:payoutId/complete', async (req, res) => {
   try {
     const { transactionReference, adminNotes } = req.body;
 
+    if (!transactionReference || !transactionReference.trim()) {
+      return res.status(400).json({ message: 'Transaction reference is required' });
+    }
+
     const payout = await Payout.findById(req.params.payoutId).populate('seller');
     if (!payout) {
       return res.status(404).json({ message: 'Payout not found' });
@@ -206,9 +217,49 @@ router.post('/:payoutId/complete', async (req, res) => {
       return res.status(400).json({ message: 'Payout already completed' });
     }
 
+    // If payout method is eSewa, verify the transaction via eSewa status API
+    if (payout.payoutMethod === 'esewa') {
+      try {
+        const axios = require('axios');
+        const crypto = require('crypto');
+
+        const merchantId = process.env.ESEWA_MERCHANT_ID || 'EPAYTEST';
+        const secretKey = process.env.ESEWA_SECRET_KEY || '8gBm/:&EnhH.1/q';
+        const statusUrl = process.env.ESEWA_STATUS_URL || 'https://rc.esewa.com.np/mobile/transaction';
+
+        // eSewa transaction status check
+        const verifyResponse = await axios.get(statusUrl, {
+          params: {
+            txnRefId: transactionReference,
+            merchantCode: merchantId
+          },
+          headers: {
+            'merchantId': merchantId,
+            'merchantSecret': secretKey
+          },
+          timeout: 8000
+        });
+
+        const txnData = verifyResponse.data;
+
+        // Check if transaction is valid and completed
+        if (!txnData || txnData.TransactionState !== 'COMPLETE') {
+          return res.status(400).json({
+            message: `eSewa transaction verification failed. Status: ${txnData?.TransactionState || 'Unknown'}. Please check the transaction ID.`
+          });
+        }
+
+        console.log(`eSewa transaction ${transactionReference} verified: COMPLETE`);
+      } catch (esewaError) {
+        // If eSewa API is unreachable (network issue), log and allow manual override
+        console.warn('eSewa verification API unreachable, proceeding with manual entry:', esewaError.message);
+        // Don't block — allow admin to proceed if eSewa API is down
+      }
+    }
+
     // Update payout as completed
     payout.status = 'completed';
-    payout.khaltiTransactionId = transactionReference || `MANUAL_${Date.now()}`;
+    payout.khaltiTransactionId = transactionReference.trim();
     payout.completedAt = new Date();
     payout.adminNotes = adminNotes || '';
     await payout.save();
@@ -327,12 +378,65 @@ router.get('/admin/all', async (req, res) => {
       total,
       summary: {
         pendingAmount: pendingTotal[0]?.total || 0,
-        completedAmount: completedTotal[0]?.total || 0
+        completedAmount: completedTotal[0]?.total || 0,
+        pendingCount: await Payout.countDocuments({ status: 'pending' }),
+        completedCount: await Payout.countDocuments({ status: 'completed' })
       }
     });
 
   } catch (error) {
     console.error('Get all payouts error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Verify eSewa transaction ID (admin can check before completing payout)
+router.post('/verify-esewa-transaction', async (req, res) => {
+  try {
+    const { transactionReference } = req.body;
+
+    if (!transactionReference || !transactionReference.trim()) {
+      return res.status(400).json({ message: 'Transaction reference is required' });
+    }
+
+    const axios = require('axios');
+    const merchantId = process.env.ESEWA_MERCHANT_ID || 'EPAYTEST';
+    const secretKey = process.env.ESEWA_SECRET_KEY || '8gBm/:&EnhH.1/q';
+    const statusUrl = process.env.ESEWA_STATUS_URL || 'https://rc.esewa.com.np/mobile/transaction';
+
+    try {
+      const verifyResponse = await axios.get(statusUrl, {
+        params: {
+          txnRefId: transactionReference.trim(),
+          merchantCode: merchantId
+        },
+        headers: {
+          'merchantId': merchantId,
+          'merchantSecret': secretKey
+        },
+        timeout: 8000
+      });
+
+      const txnData = verifyResponse.data;
+      const isComplete = txnData?.TransactionState === 'COMPLETE';
+
+      return res.json({
+        success: isComplete,
+        transactionState: txnData?.TransactionState || 'UNKNOWN',
+        amount: txnData?.totalAmount,
+        message: isComplete
+          ? 'Transaction verified successfully'
+          : `Transaction status: ${txnData?.TransactionState || 'Unknown'}`
+      });
+    } catch (apiError) {
+      return res.json({
+        success: false,
+        transactionState: 'API_UNAVAILABLE',
+        message: 'eSewa verification API is currently unavailable. You can still proceed manually.'
+      });
+    }
+  } catch (error) {
+    console.error('Verify eSewa transaction error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

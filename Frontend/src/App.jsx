@@ -6,8 +6,8 @@ import Login from './Login';
 import GoogleAuthSuccess from './GoogleAuthSuccess';
 import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
-import SellerDashboard from './SellerDashboard';
-import AdminDashboard from './AdminDashboard';
+import SellerDashboard from './seller/SellerDashboard';
+import AdminDashboard from './admin/AdminDashboard';
 import BecomeASeller from './BecomeASeller';
 import BuyerProfile from './BuyerProfile';
 import ProductDetail from './ProductDetail';
@@ -35,7 +35,7 @@ import WomensSkirt from './components/WomensSkirt';
 import WomensTop from './components/WomensTop';
 import BlogArticle from './BlogArticle';
 import HelpCenter from './HelpCenter';
-import AdminSupport from './AdminSupport';
+import AdminSupport from './admin/AdminSupport';
 
 // Scroll to top on route change
 function ScrollToTop() {

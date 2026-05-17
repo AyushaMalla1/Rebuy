@@ -1,0 +1,740 @@
+/* SETTINGS TAB STYLES */
+
+/* ============================================
+   SETTINGS TAB
+   ============================================ */
+.settings-card {
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.settings-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #00bcd4;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-item {
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.settings-item-content {
+  flex: 1;
+}
+
+.settings-item-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.settings-item-description {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.settings-2fa-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #d1fae5;
+  border-radius: 20px;
+  margin-top: 8px;
+}
+
+.settings-2fa-badge-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #059669;
+}
+
+.settings-change-btn {
+  background: #00bcd4;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-change-btn:hover {
+  background: #00acc1;
+}
+
+.settings-disable-btn {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 2px solid #fecaca;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-disable-btn:hover {
+  background: #fecaca;
+}
+
+.settings-enable-btn {
+  background: #00bcd4;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-enable-btn:hover {
+  background: #00acc1;
+}
+
+.settings-view-btn {
+  background: #f1f5f9;
+  color: #64748b;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-view-btn:hover {
+  background: #e2e8f0;
+}
+
+.settings-deactivate-item {
+  padding: 20px;
+  background: #fef3c7;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 2px solid #fbbf24;
+}
+
+.settings-deactivate-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 4px;
+}
+
+.settings-deactivate-description {
+  font-size: 13px;
+  color: #78350f;
+}
+
+.settings-deactivate-btn {
+  background: #fbbf24;
+  color: #78350f;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-deactivate-btn:hover {
+  background: #f59e0b;
+}
+
+.settings-delete-item {
+  padding: 20px;
+  background: #fee2e2;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 2px solid #ef4444;
+}
+
+.settings-delete-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #991b1b;
+  margin-bottom: 4px;
+}
+
+.settings-delete-description {
+  font-size: 13px;
+  color: #7f1d1d;
+}
+
+.settings-delete-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-delete-btn:hover {
+  background: #dc2626;
+}
+/* Split from SellerDashboard.css */
+
+.seller-container .settings-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 24px;
+}
+
+.seller-container .settings-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #00bcd4;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.seller-container .settings-item-info {
+  flex: 1;
+}
+
+.seller-container .settings-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 3px;
+}
+
+.seller-container .settings-item-description {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.seller-container .settings-item-btn.secondary {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.seller-container .settings-item-btn.danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 2px solid #fecaca;
+}
+
+.seller-container .settings-2fa-badge-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: #059669;
+}
+
+.seller-container .settings-danger-item.warning {
+  background: #fef3c7;
+  border: 2px solid #fbbf24;
+}
+
+.seller-container .settings-danger-item.danger {
+  background: #fee2e2;
+  border: 2px solid #ef4444;
+}
+
+.seller-container .settings-danger-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.seller-container .settings-danger-title.warning {
+  color: #92400e;
+}
+
+.seller-container .settings-danger-title.danger {
+  color: #991b1b;
+}
+
+.seller-container .settings-danger-description {
+  font-size: 12px;
+}
+
+.seller-container .settings-danger-description.warning {
+  color: #78350f;
+}
+
+.seller-container .settings-danger-description.danger {
+  color: #7f1d1d;
+}
+
+.seller-container .settings-danger-btn.warning {
+  background: #fbbf24;
+  color: #78350f;
+}
+
+.seller-container .settings-danger-btn.danger {
+  background: #ef4444;
+  color: white;
+}
+
+.seller-container .modal-success-icon.green {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.seller-container .modal-success-icon.red {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.seller-container .settings-section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #00bcd4;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seller-container .settings-item-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.seller-container .settings-item-description {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.seller-container .twofa-badge-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #059669;
+}
+
+.twofa-modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.twofa-modal-description {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 32px;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.twofa-form-group {
+  margin-bottom: 24px;
+}
+
+.twofa-form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.twofa-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.twofa-confirm-btn.enable {
+  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
+}
+
+.twofa-confirm-btn.disable {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.twofa-confirm-btn:hover {
+  transform: translateY(-2px);
+}
+
+.twofa-cancel-btn:hover {
+  transform: translateY(-2px);
+  background: #e2e8f0;
+}
+
+.success-icon.enable {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.success-icon.disable {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.success-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.success-modal-description {
+  font-size: 15px;
+  color: #64748b;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.change-password-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.change-password-form-group {
+  margin-bottom: 20px;
+}
+
+.change-password-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.change-password-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.change-password-submit-btn:hover {
+  transform: translateY(-2px);
+}
+
+.change-password-cancel-btn:hover {
+  transform: translateY(-2px);
+  background: #e2e8f0;
+}
+
+.twofa-note-text {
+  font-size: 13px;
+  color: #0369a1;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Final split from SellerDashboard.css */
+
+.seller-container .login-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+/* ============================================
+   2FA PASSWORD VERIFICATION MODAL
+   ============================================ */
+.twofa-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.success-ok-btn:hover {
+  transform: translateY(-2px);
+}
+
+.login-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.login-history-close-btn:hover {
+  background: #f1f5f9;
+}
+
+.login-history-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.change-password-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.change-password-close-btn:hover {
+  background: #f1f5f9;
+}
+
+/* Final dashboard extraction */
+
+.seller-container .modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* Moved from SellerProductsTab.css */
+
+.seller-container .login-history-empty {
+text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+}
+
+.seller-container .login-history-empty-title {
+font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.seller-container .login-history-empty-text {
+font-size: 14px;
+}
+
+.seller-container .login-history-item {
+padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.seller-container .login-history-content {
+flex: 1;
+}
+
+.seller-container .login-history-device {
+display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.seller-container .login-history-device-name {
+font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.seller-container .login-history-time {
+display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.seller-container .login-history-time-text {
+font-size: 13px;
+  color: #64748b;
+}
+
+.seller-container .login-history-ip {
+display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seller-container .login-history-ip-text {
+font-size: 13px;
+  color: #64748b;
+}
+
+.seller-container .login-history-current-badge {
+padding: 4px 12px;
+  background: #dbeafe;
+  color: #0284c7;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.seller-container .login-history-item {
+padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.seller-container .login-history-device {
+font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.seller-container .login-history-time {
+font-size: 13px;
+  color: #64748b;
+}
+
+.seller-container .login-history-ip {
+font-size: 13px;
+  color: #64748b;
+}
+
+.seller-container .login-history-current-badge {
+padding: 4px 12px;
+  background: #dbeafe;
+  color: #0284c7;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.twofa-form-input {
+width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.twofa-form-input:focus {
+border-color: #00bcd4;
+}
+
+.login-history-title {
+font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.login-history-empty {
+text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+}
+
+.login-history-empty-icon {
+margin: 0 auto 16px;
+}
+
+.login-history-empty-title {
+font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.login-history-empty-text {
+font-size: 14px;
+}
+
+.login-history-item {
+padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.login-history-item-content {
+flex: 1;
+}
+
+.login-history-device {
+display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.login-history-device-name {
+font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.login-history-time {
+display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.login-history-time-text {
+font-size: 13px;
+  color: #64748b;
+}
+
+.login-history-ip {
+display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-history-ip-text {
+font-size: 13px;
+  color: #64748b;
+}
+
+.login-history-current-badge {
+padding: 4px 12px;
+  background: #dbeafe;
+  color: #0284c7;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.login-history-close-bottom-btn {
+width: 100%;
+  margin-top: 16px;
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 14px 24px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  transition: background 0.2s;
+}
+
+.login-history-close-bottom-btn:hover {
+background: #e2e8f0;
+}

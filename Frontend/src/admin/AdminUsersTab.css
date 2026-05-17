@@ -1,0 +1,325 @@
+/* ADMIN USERS TAB STYLES */
+
+/* Split from AdminDashboard.css by component usage */
+
+.content-section {
+  background: #ffffff;
+  padding: 16px 20px;
+  border-radius: 12px;
+  box-shadow: none;
+  border: 1px solid #e5e7eb;
+  margin: 0 32px 20px;
+  transition: all 0.2s ease;
+}
+
+.content-section:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transform: none;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  padding-top: 12px;
+}
+
+/* Buttons */
+.filter-btn {
+  padding: 6px 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: none;
+}
+
+.filter-btn svg {
+  font-size: 12px;
+}
+
+.filter-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  box-shadow: none;
+}
+
+/* Table */
+.table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+}
+
+.data-table thead {
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.data-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 9px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.data-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 11px;
+  color: #555;
+  vertical-align: middle;
+}
+
+.data-table tbody tr {
+  transition: none;
+}
+
+.data-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.user-name,
+.product-name,
+.customer-name {
+  font-weight: 600;
+  color: #333;
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.view-btn {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.view-btn:hover {
+  background: #1976d2;
+  color: white;
+}
+
+.edit-btn {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.edit-btn:hover {
+  background: #f57c00;
+  color: white;
+}
+
+.delete-btn {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+.delete-btn:hover {
+  background: #d32f2f;
+  color: white;
+}
+
+/* Final split from AdminDashboard.css */
+
+/* Badges */
+.type-badge,
+.status-badge {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-block;
+  text-transform: capitalize;
+}
+
+.type-badge.seller {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.type-badge.user {
+  background: #e9d5ff;
+  color: #7c3aed;
+}
+
+.status-badge.active,
+.status-badge.approved {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-badge.inactive,
+.status-badge.rejected {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-badge.pending,
+.status-badge.processing {
+  background: #fed7aa;
+  color: #ea580c;
+}
+
+.status-badge.shipped {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.status-badge.delivered {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.notification-type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.notification-type-badge.order {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.notification-type-badge.product {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.notification-type-badge.message {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.notification-type-badge.stock {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.notification-type-badge.system {
+  background: #e0e0e0;
+  color: #555;
+}
+
+.notification-delete-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.notification-delete-btn:hover {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+.announcement-badges .type-badge,
+.announcement-badges .priority-badge,
+.announcement-badges .audience-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+}
+
+.announcement-badges .type-badge.info {
+  background: #3b82f6;
+}
+
+.announcement-badges .type-badge.success {
+  background: #10b981;
+}
+
+.announcement-badges .type-badge.warning {
+  background: #f59e0b;
+}
+
+.announcement-badges .type-badge.error {
+  background: #ef4444;
+}
+
+.profile-edit-btn {
+  background: #00bcd4;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-edit-btn:hover {
+  background: #00acc1;
+}
+
+/* Final dashboard extraction */
+
+.section-title-group h2 {
+  font-size: 14px;
+  color: #111827;
+  margin: 0 0 4px 0;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-subtitle {
+  font-size: 10px;
+  color: #6b7280;
+  margin: 0;
+  font-weight: 400;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-btn.active {
+  background: #00bcd4;
+  color: #ffffff;
+  border-color: #00bcd4;
+}

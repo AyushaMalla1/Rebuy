@@ -1,10 +1,36 @@
 // API Base URL
-const API_URL = 'http://localhost:5000/api';
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+// Build full API URL helper
+export const buildApiUrl = (endpoint) => `${API_BASE_URL}${endpoint}`;
+
+// Fetch wrapper with auth token support
+export const apiFetch = async (endpoint, options = {}) => {
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+  const config = {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  };
+  const token = localStorage.getItem('token');
+  if (token) config.headers['Authorization'] = `Bearer ${token}`;
+  try {
+    return await fetch(url, config);
+  } catch (error) {
+    console.error('Network error:', error);
+    throw error;
+  }
+};
+
+// API Base URL alias for internal use
+const API_URL = API_BASE_URL;
 
 // Helper function for API calls
 const apiCall = async (endpoint, options = {}) => {
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await apiFetch(endpoint, {
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,

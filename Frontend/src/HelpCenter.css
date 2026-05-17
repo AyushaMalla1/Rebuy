@@ -1,57 +1,8 @@
-/* Help Center Styles */
-.help-center {
+/* Help Center Styles - Matching Product Tab Design */
+.help-center-container {
+  padding: 0;
+  background: #f8f9fa;
   min-height: 100vh;
-  background: #f5f7fa;
-  padding: 20px;
-}
-
-.help-center-loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  font-size: 18px;
-  color: #666;
-}
-
-.help-center-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  padding: 0 20px;
-}
-
-.help-center-title h1 {
-  font-size: 32px;
-  color: #333;
-  margin: 0 0 5px 0;
-}
-
-.help-center-title p {
-  color: #666;
-  margin: 0;
-}
-
-.create-ticket-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  background: #00bcd4;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.create-ticket-btn:hover {
-  background: #0097a7;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 188, 212, 0.3);
 }
 
 .help-center-content {

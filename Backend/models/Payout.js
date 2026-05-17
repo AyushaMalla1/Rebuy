@@ -4,7 +4,7 @@ const payoutSchema = new mongoose.Schema({
   // Seller Information
   seller: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Seller',
     required: true,
     index: true
   },
@@ -26,12 +26,13 @@ const payoutSchema = new mongoose.Schema({
   // Payment Method
   payoutMethod: {
     type: String,
-    enum: ['khalti', 'bank', 'manual'],
+    enum: ['khalti', 'esewa', 'bank', 'manual'],
     default: 'khalti'
   },
   
   // Khalti Details
   khaltiMobile: String,
+  esewaId: String,
   khaltiTransactionId: String,
   
   // Bank Details (backup)

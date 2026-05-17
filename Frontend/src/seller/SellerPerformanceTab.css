@@ -1,0 +1,37 @@
+/* SELLER PERFORMANCE TAB STYLES */
+
+/* ============================================
+   PERFORMANCE TAB
+   ============================================ */
+.performance-container {
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.performance-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 20px;
+}
+/* Split from SellerDashboard.css */
+
+.seller-container .performance-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.seller-container .performance-section {
+  padding: 0 32px;
+}
+
+.seller-container .performance-analytics-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 20px;
+}

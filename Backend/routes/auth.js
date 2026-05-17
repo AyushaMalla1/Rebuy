@@ -501,7 +501,8 @@ router.post('/login', async (req, res) => {
       userType: 'customer',
       phone: user.phone,
       address: user.address,
-      city: user.city
+      city: user.city,
+      profileImage: user.profileImage || ''
     };
 
     res.status(200).json({

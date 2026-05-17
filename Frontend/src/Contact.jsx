@@ -35,14 +35,13 @@ function Contact() {
         <Link to="/" className="back-link">
           <FiArrowLeft /> Back to Home
         </Link>
+        <div className="header-title">
+          <h1>Contact Us</h1>
+          <p>We'd love to hear from you. Get in touch with our team.</p>
+        </div>
       </header>
 
       <div className="contact-container">
-        <section className="contact-hero">
-          <h1>Contact Us</h1>
-          <p>We'd love to hear from you. Get in touch with our team.</p>
-        </section>
-
         <div className="contact-content">
           <div className="contact-info">
             <h2>Get In Touch</h2>

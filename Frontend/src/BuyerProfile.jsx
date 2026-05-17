@@ -62,6 +62,7 @@ function BuyerProfile() {
   const [messageText, setMessageText] = useState('');
   const [chats, setChats] = useState([]);
   const [loadingChats, setLoadingChats] = useState(false);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
 
@@ -142,6 +143,7 @@ function BuyerProfile() {
           const hasProfileImage = conv.otherUser.profileImage && 
                                   conv.otherUser.profileImage.trim() !== '' &&
                                   (conv.otherUser.profileImage.startsWith('http') || 
+                                   conv.otherUser.profileImage.startsWith('data:image') ||
                                    conv.otherUser.profileImage.startsWith('/'));
           
           console.log('Has valid profile image:', hasProfileImage);
@@ -222,6 +224,37 @@ function BuyerProfile() {
     return date.toLocaleDateString();
   };
 
+  // Format date divider for messages
+  const formatDateDivider = (messages) => {
+    if (!messages || messages.length === 0) return 'Today';
+    
+    // Get the most recent message date
+    const latestMessage = messages[messages.length - 1];
+    if (!latestMessage || !latestMessage.createdAt) return 'Today';
+    
+    const messageDate = new Date(latestMessage.createdAt);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Reset time to compare only dates
+    today.setHours(0, 0, 0, 0);
+    yesterday.setHours(0, 0, 0, 0);
+    messageDate.setHours(0, 0, 0, 0);
+    
+    if (messageDate.getTime() === today.getTime()) {
+      return 'Today';
+    } else if (messageDate.getTime() === yesterday.getTime()) {
+      return 'Yesterday';
+    } else {
+      return messageDate.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: messageDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined 
+      });
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!messageText.trim() || !selectedChat) return;
     
@@ -234,15 +267,24 @@ function BuyerProfile() {
       navigate('/login');
       return;
     }
+
+    // Validate sellerId exists
+    if (!selectedChat.sellerId) {
+      console.error('No sellerId in selectedChat:', selectedChat);
+      showToast('Cannot send message: Seller information missing', 'error');
+      return;
+    }
     
     try {
       const messageData = {
         senderId: userId,
-        senderModel: 'Customer',
+        senderModel: 'User', // Changed from 'Customer' to 'User' to match the Message model enum
         receiverId: selectedChat.sellerId,
         receiverModel: 'Seller',
         message: messageText
       };
+
+      console.log('Sending message with data:', messageData);
       
       const response = await messageAPI.send(messageData);
       
@@ -266,9 +308,12 @@ function BuyerProfile() {
         
         // Refresh conversations to update last message
         fetchConversations();
+        
+        showToast('Message sent successfully', 'success');
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      console.error('Error details:', error.response || error.message);
       showToast('Failed to send message', 'error');
     }
   };
@@ -1323,6 +1368,16 @@ function BuyerProfile() {
     }
   };
 
+  const filteredChats = chats.filter(chat => {
+    const query = chatSearchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    return (
+      chat.sellerName?.toLowerCase().includes(query) ||
+      chat.lastMessage?.toLowerCase().includes(query)
+    );
+  });
+
   const handleAddToCartFromWishlist = async (item) => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));
@@ -1595,22 +1650,6 @@ function BuyerProfile() {
         <div className="logo" onClick={() => navigate('/')}>
           <img src="/logo.png" alt="Rebuy" />
         </div>
-        
-        <div className="search-bar">
-          <input 
-            type="text" 
-            placeholder="Search products, sellers, pages..." 
-            onClick={() => navigate('/')}
-            readOnly
-            style={{ cursor: 'pointer' }}
-          />
-          <button type="button" className="search-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <path d="m21 21-4.35-4.35"></path>
-            </svg>
-          </button>
-        </div>
 
         <div className="header-right">
           <div className="header-icons">
@@ -1824,6 +1863,7 @@ function BuyerProfile() {
             {/* Order Status Tabs with Counts */}
             <div className="order-status-tabs">
               <div 
+                key="status-all"
                 className={`status-tab ${orderFilter === 'all' ? 'active' : ''}`}
                 onClick={() => setOrderFilter('all')}
               >
@@ -1837,6 +1877,7 @@ function BuyerProfile() {
               </div>
 
               <div 
+                key="status-processing"
                 className={`status-tab ${orderFilter === 'processing' ? 'active' : ''}`}
                 onClick={() => setOrderFilter('processing')}
               >
@@ -1850,6 +1891,7 @@ function BuyerProfile() {
               </div>
 
               <div 
+                key="status-shipped"
                 className={`status-tab ${orderFilter === 'shipped' ? 'active' : ''}`}
                 onClick={() => setOrderFilter('shipped')}
               >
@@ -1863,6 +1905,7 @@ function BuyerProfile() {
               </div>
 
               <div 
+                key="status-delivered"
                 className={`status-tab ${orderFilter === 'delivered' ? 'active' : ''}`}
                 onClick={() => setOrderFilter('delivered')}
               >
@@ -1876,6 +1919,7 @@ function BuyerProfile() {
               </div>
 
               <div 
+                key="status-returned"
                 className={`status-tab ${orderFilter === 'returned' ? 'active' : ''}`}
                 onClick={() => setOrderFilter('returned')}
               >
@@ -1889,6 +1933,7 @@ function BuyerProfile() {
               </div>
 
               <div 
+                key="status-cancelled"
                 className={`status-tab ${orderFilter === 'cancelled' ? 'active' : ''}`}
                 onClick={() => setOrderFilter('cancelled')}
               >
@@ -2489,7 +2534,12 @@ function BuyerProfile() {
                   <p>Chat with sellers about products</p>
                   <div className="messages-search">
                     <FiSearch />
-                    <input type="text" placeholder="Search conversations..." />
+                    <input
+                      type="text"
+                      value={chatSearchQuery}
+                      onChange={(e) => setChatSearchQuery(e.target.value)}
+                      placeholder="Search conversations..."
+                    />
                   </div>
                 </div>
 
@@ -2505,8 +2555,14 @@ function BuyerProfile() {
                       <h3>No messages yet</h3>
                       <p>Start a conversation with a seller from any product page</p>
                     </div>
+                  ) : filteredChats.length === 0 ? (
+                    <div className="conversations-empty">
+                      <FiSearch size={44} />
+                      <h3>No conversations found</h3>
+                      <p>Try another seller name or message</p>
+                    </div>
                   ) : (
-                    chats.map(chat => (
+                    filteredChats.map(chat => (
                       <div 
                         key={chat.id} 
                         className={`conversation-item ${selectedChat?.id === chat.id ? 'active' : ''} ${chat.unread > 0 ? 'unread' : ''}`}
@@ -2526,7 +2582,7 @@ function BuyerProfile() {
                           style={{ cursor: 'pointer' }}
                           title="View seller profile"
                         >
-                          {chat.sellerAvatar && chat.sellerAvatar.startsWith('http') ? (
+                          {chat.sellerAvatar && (chat.sellerAvatar.startsWith('http') || chat.sellerAvatar.startsWith('data:image') || chat.sellerAvatar.startsWith('/')) ? (
                             <img src={chat.sellerAvatar} alt={chat.sellerName} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                           ) : (
                             chat.sellerAvatar
@@ -2563,7 +2619,7 @@ function BuyerProfile() {
                           style={{ cursor: 'pointer' }}
                           title="View seller profile"
                         >
-                          {selectedChat.sellerAvatar && selectedChat.sellerAvatar.startsWith('http') ? (
+                          {selectedChat.sellerAvatar && (selectedChat.sellerAvatar.startsWith('http') || selectedChat.sellerAvatar.startsWith('data:image') || selectedChat.sellerAvatar.startsWith('/')) ? (
                             <img src={selectedChat.sellerAvatar} alt={selectedChat.sellerName} />
                           ) : (
                             selectedChat.sellerAvatar
@@ -2593,24 +2649,22 @@ function BuyerProfile() {
                     {/* Messages Area */}
                     <div className="messages-chat-body">
                       <div className="messages-date-divider">
-                        <span>Today</span>
+                        <span>{formatDateDivider(selectedChat.messages)}</span>
                       </div>
                       {selectedChat.messages && selectedChat.messages.length > 0 ? (
                         selectedChat.messages.map(msg => (
                           <div key={msg.id} className={`message-row ${msg.sender === 'buyer' ? 'message-sent' : 'message-received'}`}>
                             {msg.sender === 'seller' && (
                               <div className="message-avatar-small">
-                                {selectedChat.sellerAvatar && selectedChat.sellerAvatar.startsWith('http') ? (
+                                {selectedChat.sellerAvatar && (selectedChat.sellerAvatar.startsWith('http') || selectedChat.sellerAvatar.startsWith('data:image') || selectedChat.sellerAvatar.startsWith('/')) ? (
                                   <img src={selectedChat.sellerAvatar} alt={selectedChat.sellerName} />
                                 ) : (
                                   selectedChat.sellerAvatar
                                 )}
                               </div>
                             )}
-                            <div className="message-content">
-                              <div className="message-bubble">
-                                <p>{msg.text}</p>
-                              </div>
+                            <div className="message-bubble">
+                              <p>{msg.text}</p>
                               <span className="message-timestamp">{msg.time}</span>
                             </div>
                           </div>

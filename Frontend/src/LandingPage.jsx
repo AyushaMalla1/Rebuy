@@ -933,7 +933,7 @@ function LandingPage() {
                 {showProfileDropdown && (
                   <div className="profile-dropdown-menu">
                     <div className="profile-dropdown-item" onClick={() => handleProfileMenuClick('settings')}>
-                      <FiSettings />
+                      <FiUser />
                       <span>Manage My Account</span>
                     </div>
                     <div className="profile-dropdown-item" onClick={() => handleProfileMenuClick('orders')}>
@@ -960,10 +960,6 @@ function LandingPage() {
                       <FiGift />
                       <span>Loyalty Points & Rewards</span>
                     </div>
-                    <div className="profile-dropdown-item" onClick={() => handleProfileMenuClick('support')}>
-                      <FiMessageSquare />
-                      <span>Help Center & Support</span>
-                    </div>
                     <div className="profile-dropdown-divider"></div>
                     <div className="profile-dropdown-item logout-item" onClick={() => handleProfileMenuClick('logout')}>
                       <FiLogOut />
@@ -984,22 +980,13 @@ function LandingPage() {
       {/* Cart Dropdown - Removed, now using dedicated cart page */}
 
       {/* Collections Navigation */}
-      <nav className="collections-nav" onClick={(e) => {
-        // Close dropdown when clicking outside
-        if (e.target === e.currentTarget) {
-          setActiveDropdown(null);
-        }
-      }}>
+      <nav className="collections-nav">
         <div 
           className="collection-dropdown"
+          onMouseEnter={() => setActiveDropdown('men')}
+          onMouseLeave={() => setActiveDropdown(null)}
         >
-          <a 
-            style={{cursor: 'pointer'}}
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveDropdown(activeDropdown === 'men' ? null : 'men');
-            }}
-          >
+          <a style={{cursor: 'pointer'}}>
             MEN'S COLLECTIONS
           </a>
           {activeDropdown === 'men' && (
@@ -1040,14 +1027,10 @@ function LandingPage() {
 
         <div 
           className="collection-dropdown"
+          onMouseEnter={() => setActiveDropdown('women')}
+          onMouseLeave={() => setActiveDropdown(null)}
         >
-          <a 
-            style={{cursor: 'pointer'}}
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveDropdown(activeDropdown === 'women' ? null : 'women');
-            }}
-          >
+          <a style={{cursor: 'pointer'}}>
             WOMEN'S COLLECTIONS
           </a>
           {activeDropdown === 'women' && (
@@ -1088,14 +1071,10 @@ function LandingPage() {
 
         <div 
           className="collection-dropdown"
+          onMouseEnter={() => setActiveDropdown('sportswear')}
+          onMouseLeave={() => setActiveDropdown(null)}
         >
-          <a 
-            style={{cursor: 'pointer'}}
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveDropdown(activeDropdown === 'sportswear' ? null : 'sportswear');
-            }}
-          >
+          <a style={{cursor: 'pointer'}}>
             SPORTSWEAR COLLECTIONS
           </a>
           {activeDropdown === 'sportswear' && (
@@ -1134,14 +1113,10 @@ function LandingPage() {
 
         <div 
           className="collection-dropdown"
+          onMouseEnter={() => setActiveDropdown('vintage')}
+          onMouseLeave={() => setActiveDropdown(null)}
         >
-          <a 
-            style={{cursor: 'pointer'}}
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveDropdown(activeDropdown === 'vintage' ? null : 'vintage');
-            }}
-          >
+          <a style={{cursor: 'pointer'}}>
             VINTAGE COLLECTIONS
           </a>
           {activeDropdown === 'vintage' && (
@@ -1440,6 +1415,7 @@ function LandingPage() {
             <li onClick={() => navigate('/order-status')} style={{cursor: 'pointer'}}>Order Status</li>
             <li onClick={() => navigate('/payment-options')} style={{cursor: 'pointer'}}>Payment Options</li>
             <li onClick={() => navigate('/contact')} style={{cursor: 'pointer'}}>Contact Us</li>
+            <li onClick={() => navigate('/help-center')} style={{cursor: 'pointer'}}>Help Center & Support</li>
           </ul>
         </div>
         <div className="footer-logo">

@@ -16,7 +16,7 @@ import {
 } from "recharts";
 
 // Revenue Trend Chart
-export const RevenueTrendChart = ({ data, title = "Revenue Trend (Last 7 Days)" }) => {
+export const RevenueTrendChart = ({ data, title = "Revenue Trend (Last 7 Days)", dataKey = "revenue", lineName = "Revenue" }) => {
   // Handle empty or undefined data
   const chartData = data && data.length > 0 ? data : [
     { day: 'Mon', revenue: 0 },
@@ -36,10 +36,10 @@ export const RevenueTrendChart = ({ data, title = "Revenue Trend (Last 7 Days)" 
           <LineChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="day" />
-            <YAxis />
-            <Tooltip formatter={(value) => [`Rs. ${value.toLocaleString()}`, 'Revenue']} />
+            <YAxis domain={[0, 'dataMax']} allowDecimals={false} />
+            <Tooltip formatter={(value) => [`Rs. ${value.toLocaleString()}`, lineName]} />
             <Legend />
-            <Line type="monotone" dataKey="revenue" stroke="#00bcd4" strokeWidth={2} activeDot={{ r: 8 }} name="Revenue" />
+            <Line type="monotone" dataKey={dataKey} stroke="#00bcd4" strokeWidth={2} activeDot={{ r: 8 }} name={lineName} />
           </LineChart>
         </ResponsiveContainer>
       ) : (
@@ -53,15 +53,20 @@ export const RevenueTrendChart = ({ data, title = "Revenue Trend (Last 7 Days)" 
 
 // Top Products Chart
 export const TopProductsChart = ({ data, title = "Top Selling Products" }) => {
+  const chartData = (data || []).map(item => ({
+    ...item,
+    sales: Math.max(0, Number(item.sales || 0))
+  }));
+
   return (
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
-      {data && data.length > 0 ? (
+      {chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+          <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
-            <YAxis />
+            <YAxis domain={[0, 'dataMax']} allowDecimals={false} />
             <Tooltip />
             <Legend />
             <Bar dataKey="sales" fill="#00bcd4" />
@@ -76,59 +81,7 @@ export const TopProductsChart = ({ data, title = "Top Selling Products" }) => {
   );
 };
 
-// Category Performance Chart
-export const CategoryPerformanceChart = ({ data, title = "Category Performance" }) => {
-  const COLORS = ['#00bcd4', '#4caf50', '#ff9800', '#9c27b0', '#f44336'];
-  
-  return (
-    <div className="chart-card">
-      <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
-      {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={(entry) => `${entry.name}: ${entry.value}`}
-              outerRadius={110}
-              fill="#8884d8"
-              dataKey="value"
-            >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip />
-          </PieChart>
-        </ResponsiveContainer>
-      ) : (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-          <p>No category data available</p>
-        </div>
-      )}
-    </div>
-  );
-};
 
-// Stock Levels Chart
-export const StockLevelsChart = ({ data }) => {
-  return (
-    <div className="chart-card">
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="count" fill="#00bcd4" name="Products" />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
 
 // Monthly Sales Overview (Original)
 export const MonthlySalesChart = ({ data }) => {
@@ -334,7 +287,7 @@ export const OrdersTrendChart = ({ data, title = "Orders Trend" }) => {
           <LineChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="day" />
-            <YAxis />
+            <YAxis domain={[0, 'dataMax']} allowDecimals={false} />
             <Tooltip />
             <Legend />
             <Line type="monotone" dataKey="orders" stroke="#a855f7" strokeWidth={2} name="Orders" />
@@ -408,7 +361,7 @@ export const RevenueBreakdownChart = ({ data, title = "Revenue Breakdown" }) => 
 
 
 // Orders Bar Chart
-export const OrdersBarChart = ({ data, title = "Orders Trend" }) => {
+export const OrdersBarChart = ({ data, title = "Orders Trend", dataKey = "orders" }) => {
   const chartData = data && data.length > 0 ? data : [];
 
   return (
@@ -419,13 +372,13 @@ export const OrdersBarChart = ({ data, title = "Orders Trend" }) => {
           <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="day" stroke="#666" />
-            <YAxis stroke="#666" />
+            <YAxis stroke="#666" domain={[0, 'dataMax']} allowDecimals={false} />
             <Tooltip 
               contentStyle={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px' }}
               cursor={{ fill: 'rgba(59, 130, 246, 0.1)' }}
               formatter={(value) => [`${value} orders`, 'Orders']}
             />
-            <Bar dataKey="revenue" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Orders" />
+            <Bar dataKey={dataKey} fill="#3b82f6" radius={[8, 8, 0, 0]} name="Orders" />
           </BarChart>
         </ResponsiveContainer>
       ) : (
@@ -438,7 +391,7 @@ export const OrdersBarChart = ({ data, title = "Orders Trend" }) => {
 };
 
 // Average Order Value Area Chart
-export const AvgOrderValueChart = ({ data, title = "Average Order Value Trend" }) => {
+export const AvgOrderValueChart = ({ data, title = "Average Order Value Trend", dataKey = "avgOrderValue" }) => {
   const chartData = data && data.length > 0 ? data : [];
 
   return (
@@ -455,14 +408,14 @@ export const AvgOrderValueChart = ({ data, title = "Average Order Value Trend" }
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="day" stroke="#666" />
-            <YAxis stroke="#666" />
+            <YAxis stroke="#666" domain={[0, 'dataMax']} allowDecimals={false} />
             <Tooltip 
               contentStyle={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px' }}
               formatter={(value) => [`Rs. ${value.toLocaleString()}`, 'Avg Order Value']}
             />
             <Line 
               type="monotone" 
-              dataKey="revenue" 
+              dataKey={dataKey} 
               stroke="#f59e0b" 
               strokeWidth={3}
               fill="url(#colorAvg)"
@@ -483,24 +436,26 @@ export const AvgOrderValueChart = ({ data, title = "Average Order Value Trend" }
 };
 
 // Platform Fees Donut Chart
-export const PlatformFeesChart = ({ data, title = "Platform Fees Breakdown" }) => {
+export const PlatformFeesChart = ({ data, title = "Platform Fees Breakdown", dataKey = "platformFees" }) => {
   // Calculate total fees and revenue
-  const totalRevenue = data && data.length > 0 
-    ? data.reduce((sum, item) => sum + (item.revenue || 0), 0) 
+  const totalFees = data && data.length > 0 
+    ? data.reduce((sum, item) => sum + (item[dataKey] || 0), 0) 
     : 0;
   
-  const platformFees = totalRevenue * 0.03; // 3% platform fee
-  const sellerRevenue = totalRevenue - platformFees;
+  const grossRevenue = data && data.length > 0
+    ? data.reduce((sum, item) => sum + (item.revenue || 0), 0)
+    : 0;
+  const sellerRevenue = Math.max(0, grossRevenue - totalFees);
 
   const pieData = [
     { name: 'Your Revenue', value: sellerRevenue, color: '#10b981' },
-    { name: 'Platform Fees (3%)', value: platformFees, color: '#ef4444' }
+    { name: 'Platform Fees (3%)', value: totalFees, color: '#ef4444' }
   ];
 
   return (
     <div className="chart-card">
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
-      {totalRevenue > 0 ? (
+      {grossRevenue > 0 ? (
         <ResponsiveContainer width="100%" height={280}>
           <PieChart>
             <Pie
@@ -537,7 +492,7 @@ export const PlatformFeesChart = ({ data, title = "Platform Fees Breakdown" }) =
 };
 
 // Net Revenue Chart with Gradient
-export const NetRevenueChart = ({ data, title = "Net Revenue Trend" }) => {
+export const NetRevenueChart = ({ data, title = "Net Revenue Trend", dataKey = "netRevenue" }) => {
   const chartData = data && data.length > 0 ? data : [];
 
   return (
@@ -554,14 +509,14 @@ export const NetRevenueChart = ({ data, title = "Net Revenue Trend" }) => {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="day" stroke="#666" />
-            <YAxis stroke="#666" />
+            <YAxis stroke="#666" domain={[0, 'dataMax']} allowDecimals={false} />
             <Tooltip 
               contentStyle={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px' }}
               formatter={(value) => [`Rs. ${value.toLocaleString()}`, 'Net Revenue']}
             />
             <Line 
               type="monotone" 
-              dataKey="revenue" 
+              dataKey={dataKey} 
               stroke="#10b981" 
               strokeWidth={3}
               fill="url(#colorNet)"
@@ -575,6 +530,44 @@ export const NetRevenueChart = ({ data, title = "Net Revenue Trend" }) => {
       ) : (
         <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
           <p>No net revenue data available</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+// Category Performance Chart
+export const CategoryPerformanceChart = ({ data, title = "Category Performance" }) => {
+  const COLORS = ['#00bcd4', '#4caf50', '#ff9800', '#9c27b0', '#f44336'];
+  
+  return (
+    <div className="chart-card">
+      <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
+      {data && data.length > 0 ? (
+        <ResponsiveContainer width="100%" height={280}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={false}
+              outerRadius={80}
+              fill="#8884d8"
+              dataKey="value"
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip />
+            <Legend verticalAlign="bottom" height={36} />
+          </PieChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+          <p>No category data available</p>
         </div>
       )}
     </div>

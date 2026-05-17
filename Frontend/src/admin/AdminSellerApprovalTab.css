@@ -1,0 +1,289 @@
+/* ADMIN SELLER APPROVAL TAB STYLES - Compact Premium Theme */
+
+.section-header .section-icon {
+  color: #00bcd4;
+}
+
+.export-all-section {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e4e6eb;
+}
+
+.seller-approval-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.seller-status-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 8px;
+  flex: 1;
+}
+
+.seller-status-tab {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.01);
+}
+
+.seller-status-tab strong {
+  margin-left: auto;
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.seller-status-tab.active {
+  background: #00bcd4;
+  color: #ffffff;
+  border-color: #00bcd4;
+}
+
+.seller-status-tab.active strong {
+  color: #ffffff;
+}
+
+.seller-status-tab:hover:not(.active) {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.export-all-btn {
+  padding: 8px 16px;
+  background: #00bcd4;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.export-all-btn:hover:not(:disabled) {
+  background: #00acc1;
+  transform: translateY(-1px);
+}
+
+.export-all-btn:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.seller-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.seller-avatar-small {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e0f2fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0284c7;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.seller-avatar-small.approved {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.seller-avatar-small.suspended {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.seller-avatar-small.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.store-name-cell {
+  color: #00bcd4;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.rejected-row {
+  background: #fff8f8;
+}
+
+.suspended-row {
+  background: #fffaf2;
+}
+
+.sellers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 16px;
+}
+
+.rating-badge {
+  display: inline-block;
+  padding: 3px 6px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.trust-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.trust-badge.high {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.trust-badge.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.trust-badge.low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.suspend-btn {
+  padding: 8px 16px;
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.suspend-btn:hover {
+  background: #d97706;
+}
+
+/* Empty State Card - Compact */
+.empty-state-card {
+  text-align: center;
+  padding: 50px 30px;
+  color: #64748b;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.empty-state-card svg {
+  color: #cbd5e1;
+  margin-bottom: 14px;
+  font-size: 32px;
+}
+
+.empty-state-card h3 {
+  font-size: 16px;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+  font-weight: 600;
+}
+
+.empty-state-card p {
+  font-size: 12px;
+  margin: 0;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.section-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  color: #0f172a;
+  margin: 0;
+  font-weight: 600;
+}
+
+.reason-cell {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sales-cell {
+  color: #10b981;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.products-cell {
+  text-align: center;
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 12px;
+}
+
+@media (max-width: 1000px) {
+  .seller-approval-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .seller-status-tabs {
+    grid-template-columns: 1fr 1fr;
+  }
+}

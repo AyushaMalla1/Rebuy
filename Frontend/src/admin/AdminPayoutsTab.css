@@ -1,0 +1,82 @@
+/* ADMIN PAYOUTS TAB STYLES - Compact Premium Theme */
+
+.payout-method-subtext {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.payout-summary-grid {
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.table-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.payout-method-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.payout-method-filter {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 99px;
+  color: #475569;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.payout-method-filter.active {
+  background: #00bcd4;
+  color: #ffffff;
+  border-color: #00bcd4;
+}
+
+.payout-method-filter:hover:not(.active) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.payout-method-filter strong {
+  margin-left: 4px;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 5px;
+  border-radius: 99px;
+  font-size: 9px;
+}
+
+.payout-method-filter.active strong {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+@media (max-width: 900px) {
+  .payout-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
