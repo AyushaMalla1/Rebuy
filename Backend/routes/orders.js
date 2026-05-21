@@ -207,14 +207,23 @@ router.post('/', async (req, res) => {
 // Get customer orders
 router.get('/customer/:customerId', async (req, res) => {
   try {
-    const orders = await Order.find({ 
-      customer: req.params.customerId,
-      // Only exclude cancelled orders with failed payments
-      $or: [
-        { status: { $ne: 'Cancelled' } },
-        { status: 'Cancelled', paymentStatus: { $nin: ['Failed'] } }
-      ]
-    })
+      const orders = await Order.find({ 
+        customer: req.params.customerId,
+        $and: [
+          {
+            // Only exclude cancelled orders with failed payments
+            $or: [
+              { status: { $ne: 'Cancelled' } },
+              { status: 'Cancelled', paymentStatus: { $nin: ['Failed'] } }
+            ]
+          },
+          {
+            $nor: [
+              { paymentMethod: { $in: ['esewa', 'khalti'] }, paymentStatus: 'Pending' }
+            ]
+          }
+        ]
+      })
       .sort({ orderDate: -1 })
       .populate('items.product', 'name images');
     
@@ -334,17 +343,23 @@ router.post('/:orderId/verify-condition', async (req, res) => {
     // Upload base64 images to Cloudinary
     const { cloudinary } = require('../config/cloudinary');
     const uploadedImageUrls = [];
-    
     for (const base64Image of images) {
       try {
-        const uploadResult = await cloudinary.uploader.upload(base64Image, {
-          folder: 'rebuy-verifications',
-          resource_type: 'auto'
-        });
-        uploadedImageUrls.push(uploadResult.secure_url);
+        // Only attempt Cloudinary upload if valid credentials exist
+        if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_KEY !== 'your_api_key') {
+          const uploadResult = await cloudinary.uploader.upload(base64Image, {
+            folder: 'rebuy-verifications',
+            resource_type: 'auto'
+          });
+          uploadedImageUrls.push(uploadResult.secure_url);
+        } else {
+          // Fallback to base64 string if no Cloudinary keys
+          uploadedImageUrls.push(base64Image);
+        }
       } catch (uploadError) {
-        console.error('Error uploading verification image:', uploadError);
-        return res.status(500).json({ message: 'Failed to upload verification images' });
+        console.error('Error uploading verification image to Cloudinary, falling back to base64:', uploadError.message);
+        // Fallback to base64 data URI if upload fails
+        uploadedImageUrls.push(base64Image);
       }
     }
     
@@ -682,11 +697,13 @@ router.post('/:orderId/cancel', async (req, res) => {
 router.get('/seller/:sellerId', async (req, res) => {
   try {
     const { sellerId } = req.params;
-    
-    // Find all orders that contain products from this seller
-    const orders = await Order.find({
-      'items.seller': sellerId
-    })
+        // Find all orders that contain products from this seller
+      const orders = await Order.find({
+        'items.seller': sellerId,
+        $nor: [
+          { paymentMethod: { $in: ['esewa', 'khalti'] }, paymentStatus: 'Pending' }
+        ]
+      })
     .populate('customer', 'fullName email')
     .populate('items.product', 'name images')
     .sort({ createdAt: -1 });

@@ -241,15 +241,13 @@ router.post('/:payoutId/complete', async (req, res) => {
         });
 
         const txnData = verifyResponse.data;
-
+  
         // Check if transaction is valid and completed
         if (!txnData || txnData.TransactionState !== 'COMPLETE') {
-          return res.status(400).json({
-            message: `eSewa transaction verification failed. Status: ${txnData?.TransactionState || 'Unknown'}. Please check the transaction ID.`
-          });
+          console.warn(`eSewa transaction ${transactionReference} not found in merchant API (Status: ${txnData?.TransactionState || 'Unknown'}). Proceeding with manual entry since admin might have used a personal account.`);
+        } else {
+          console.log(`eSewa transaction ${transactionReference} verified: COMPLETE`);
         }
-
-        console.log(`eSewa transaction ${transactionReference} verified: COMPLETE`);
       } catch (esewaError) {
         // If eSewa API is unreachable (network issue), log and allow manual override
         console.warn('eSewa verification API unreachable, proceeding with manual entry:', esewaError.message);

@@ -49,6 +49,14 @@ export default function SellerDashboardController() {
     categories: []
   });
   const [globalSearch, setGlobalSearch] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchResults, setSearchResults] = useState({
+    products: [],
+    orders: [],
+    returns: [],
+    verifications: [],
+    messages: []
+  });
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -860,6 +868,66 @@ export default function SellerDashboardController() {
     }
   };
 
+  // Populate live categorized search results for landing-page style dropdown
+  useEffect(() => {
+    if (!globalSearch || !globalSearch.trim()) {
+      setShowSearchResults(false);
+      setSearchResults({ products: [], orders: [], returns: [], verifications: [], messages: [] });
+      return;
+    }
+
+    const query = globalSearch.toLowerCase().trim();
+
+    // 1. Filter products
+    const matchedProducts = products.filter(p =>
+      p.name?.toLowerCase().includes(query) ||
+      p.brand?.toLowerCase().includes(query) ||
+      p.category?.toLowerCase().includes(query) ||
+      p.description?.toLowerCase().includes(query)
+    );
+
+    // 2. Filter orders
+    const matchedOrders = orders.filter(o =>
+      o._id?.toLowerCase().includes(query) ||
+      o.customerName?.toLowerCase().includes(query) ||
+      o.customerEmail?.toLowerCase().includes(query) ||
+      (Array.isArray(o.items) && o.items.some(item =>
+        item.productName?.toLowerCase().includes(query)
+      ))
+    );
+
+    // 3. Filter returns
+    const matchedReturns = returns.filter(r =>
+      r.customerName?.toLowerCase().includes(query) ||
+      r.reason?.toLowerCase().includes(query) ||
+      (r.product?.name || '').toLowerCase().includes(query)
+    );
+
+    // 4. Filter verifications
+    const matchedVerifications = verifications.filter(v =>
+      getVerificationProductName(v).toLowerCase().includes(query) ||
+      (v.customerName || v.customer?.fullName || '').toLowerCase().includes(query) ||
+      (v.orderId || '').toLowerCase().includes(query)
+    );
+
+    // 5. Filter inbox conversations
+    const matchedMessages = messages.filter(m =>
+      m.senderInfo?.fullName?.toLowerCase().includes(query) ||
+      m.senderInfo?.email?.toLowerCase().includes(query) ||
+      (m.productId?.name || '').toLowerCase().includes(query) ||
+      m.message?.toLowerCase().includes(query)
+    );
+
+    setSearchResults({
+      products: matchedProducts.slice(0, 5),
+      orders: matchedOrders.slice(0, 5),
+      returns: matchedReturns.slice(0, 5),
+      verifications: matchedVerifications.slice(0, 5),
+      messages: matchedMessages.slice(0, 5)
+    });
+    setShowSearchResults(true);
+  }, [globalSearch, products, orders, returns, verifications, messages]);
+
   useEffect(() => {
     let filtered = [...products];
 
@@ -875,10 +943,22 @@ export default function SellerDashboardController() {
       filtered = filtered.filter(product => product.stock === 0);
     }
 
+    // Apply globalSearch filter
+    if (globalSearch.trim() !== '') {
+      const query = globalSearch.toLowerCase().trim();
+      filtered = filtered.filter(product =>
+        product.name?.toLowerCase().includes(query) ||
+        product.description?.toLowerCase().includes(query) ||
+        product.brand?.toLowerCase().includes(query) ||
+        product.category?.toLowerCase().includes(query) ||
+        product.subcategory?.toLowerCase().includes(query)
+      );
+    }
+
     setFilteredProducts(filtered);
     // Reset to first page when filters change
     setCurrentPage(1);
-  }, [products, productStatusFilter, productStockFilter]);
+  }, [products, productStatusFilter, productStockFilter, globalSearch]);
 
   const filteredMessages = messages.filter(msg => {
     const query = messageSearchQuery.trim().toLowerCase();
@@ -901,17 +981,24 @@ export default function SellerDashboardController() {
       filtered = filtered.filter(order => order.status === orderStatusFilter);
     }
 
-    // Apply search filter
-    if (orderSearchQuery.trim() !== '') {
+    // Apply search filter (prioritize local query, fallback to globalSearch)
+    const activeSearch = (orderSearchQuery || globalSearch).trim();
+    if (activeSearch !== '') {
+      const query = activeSearch.toLowerCase();
       filtered = filtered.filter(order =>
-        order._id.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        order.customerName?.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-        order.customerEmail?.toLowerCase().includes(orderSearchQuery.toLowerCase())
+        order._id.toLowerCase().includes(query) ||
+        order.customerName?.toLowerCase().includes(query) ||
+        order.customerEmail?.toLowerCase().includes(query) ||
+        (order.orderId && order.orderId.toLowerCase().includes(query)) ||
+        (Array.isArray(order.items) && order.items.some(item =>
+          item.product?.name?.toLowerCase().includes(query) ||
+          item.productName?.toLowerCase().includes(query)
+        ))
       );
     }
 
     setFilteredOrders(filtered);
-  }, [orderSearchQuery, orderStatusFilter, orders]);
+  }, [orderSearchQuery, globalSearch, orderStatusFilter, orders]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -1740,13 +1827,33 @@ export default function SellerDashboardController() {
     document.body.removeChild(link);
   };
 
-  if (loading) {
-    return (
-      <div className="loading-state">
-        <h2>Loading...</h2>
-      </div>
-    );
-  }
+  // Close search results and notification dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Handle search dropdown click outside
+      if (showSearchResults) {
+        const searchContainer = document.querySelector('.global-search-container');
+        if (searchContainer && !searchContainer.contains(event.target)) {
+          setShowSearchResults(false);
+        }
+      }
+
+      // Handle notification dropdown click outside
+      if (showNotifications) {
+        const notificationWrapper = document.querySelector('.notification-wrapper');
+        if (notificationWrapper && !notificationWrapper.contains(event.target)) {
+          setShowNotifications(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSearchResults, showNotifications]);
+
+
 
   const sellerDashboardContext = {
     activeTab,
@@ -1850,6 +1957,7 @@ export default function SellerDashboardController() {
     returns,
     revenueDateRange,
     revenueStats,
+    searchResults,
     selectedMessage,
     selectedOrder,
     selectedReturn,
@@ -1895,6 +2003,7 @@ export default function SellerDashboardController() {
     setReturns,
     setRevenueDateRange,
     setRevenueStats,
+    setSearchResults,
     setSelectedMessage,
     setSelectedOrder,
     setSelectedReturn,
@@ -1911,6 +2020,7 @@ export default function SellerDashboardController() {
     setShowNotifications,
     setShowPasswordSuccessModal,
     setShowRestockModal,
+    setShowSearchResults,
     setShowThreeDotMenu,
     setStats,
     setTwoFAAction,
@@ -1930,6 +2040,7 @@ export default function SellerDashboardController() {
     showNotifications,
     showPasswordSuccessModal,
     showRestockModal,
+    showSearchResults,
     showThreeDotMenu,
     stats,
     twoFAAction,

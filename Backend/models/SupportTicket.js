@@ -88,7 +88,7 @@ const supportTicketSchema = new mongoose.Schema({
 });
 
 // Generate unique ticket number
-supportTicketSchema.pre('save', async function(next) {
+supportTicketSchema.pre('validate', async function(next) {
   if (this.isNew) {
     const count = await mongoose.model('SupportTicket').countDocuments();
     this.ticketNumber = `TKT-${Date.now()}-${String(count + 1).padStart(5, '0')}`;

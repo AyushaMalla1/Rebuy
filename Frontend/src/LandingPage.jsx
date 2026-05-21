@@ -552,6 +552,7 @@ function LandingPage() {
   }, [showProfileDropdown, showNotificationDropdown]);
 
   return (
+    <>
     <div className="landing-page">
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
@@ -1415,7 +1416,7 @@ function LandingPage() {
             <li onClick={() => navigate('/order-status')} style={{cursor: 'pointer'}}>Order Status</li>
             <li onClick={() => navigate('/payment-options')} style={{cursor: 'pointer'}}>Payment Options</li>
             <li onClick={() => navigate('/contact')} style={{cursor: 'pointer'}}>Contact Us</li>
-            <li onClick={() => navigate('/help-center')} style={{cursor: 'pointer'}}>Help Center & Support</li>
+
           </ul>
         </div>
         <div className="footer-logo">
@@ -1423,10 +1424,10 @@ function LandingPage() {
           <p>THRIFT SHOP</p>
         </div>
       </footer>
-
-      {/* Chatbot */}
-      <Chatbot />
     </div>
+
+    <Chatbot />
+    </>
   );
 }
 

@@ -190,9 +190,9 @@ function AdminSupportTab() {
   } = useAdminDashboard();
 
   return (
-          <div className="content-section" style={{padding: 0, background: 'transparent'}}>
-            <AdminSupport embedded={true} />
-          </div>
+    <div className="content-section admin-support-tab">
+      <AdminSupport embedded={true} />
+    </div>
   );
 }
 

@@ -139,6 +139,8 @@ function SellerFinance() {
 
   const hasConfiguredPayoutDetails = () => {
     if (payoutDetails.preferredMethod === 'esewa') return Boolean(payoutDetails.esewaId);
+    if (payoutDetails.preferredMethod === 'khalti') return Boolean(payoutDetails.khaltiMobile);
+    if (payoutDetails.preferredMethod === 'bank') return Boolean(payoutDetails.bankAccount?.accountNumber);
     return false;
   };
 
@@ -146,7 +148,14 @@ function SellerFinance() {
     if (payoutDetails.preferredMethod === 'esewa' && !/^98\d{8}$/.test(payoutDetails.esewaId || '')) {
       return 'Please enter a valid eSewa mobile number starting with 98.';
     }
-
+    if (payoutDetails.preferredMethod === 'khalti' && !/^98\d{8}$/.test(payoutDetails.khaltiMobile || '')) {
+      return 'Please enter a valid Khalti mobile number starting with 98.';
+    }
+    if (payoutDetails.preferredMethod === 'bank') {
+      if (!payoutDetails.bankAccount?.bankName) return 'Bank name is required';
+      if (!payoutDetails.bankAccount?.accountName) return 'Account name is required';
+      if (!payoutDetails.bankAccount?.accountNumber) return 'Account number is required';
+    }
     return '';
   };
 
@@ -258,12 +267,15 @@ function SellerFinance() {
             <div className="payout-form">
               <div className="form-group">
                 <label>Preferred Payout Method</label>
-                <select
-                  value={payoutDetails.preferredMethod}
-                  onChange={(e) => setPayoutDetails({ ...payoutDetails, preferredMethod: e.target.value })}
-                >
-                  <option value="esewa">eSewa</option>
-                </select>
+                  <select
+                    value={payoutDetails.preferredMethod || ''}
+                    onChange={(e) => setPayoutDetails({ ...payoutDetails, preferredMethod: e.target.value })}
+                  >
+                    <option value="" disabled>Select Payout Method</option>
+                    <option value="esewa">eSewa</option>
+                    <option value="khalti">Khalti</option>
+                    <option value="bank">Bank Transfer</option>
+                  </select>
               </div>
 
               {/* Show only the selected method's fields */}
@@ -277,6 +289,59 @@ function SellerFinance() {
                       placeholder="98XXXXXXXX"
                       value={payoutDetails.esewaId}
                       onChange={(e) => setPayoutDetails({ ...payoutDetails, esewaId: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {payoutDetails.preferredMethod === 'khalti' && (
+                <div className="form-section">
+                  <h3>Khalti Details</h3>
+                  <div className="form-group">
+                    <label>Khalti Mobile Number</label>
+                    <input
+                      type="text"
+                      placeholder="98XXXXXXXX"
+                      value={payoutDetails.khaltiMobile}
+                      onChange={(e) => setPayoutDetails({ ...payoutDetails, khaltiMobile: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {payoutDetails.preferredMethod === 'bank' && (
+                <div className="form-section">
+                  <h3>Bank Transfer Details</h3>
+                  <div className="form-group">
+                    <label>Bank Name</label>
+                    <input
+                      type="text"
+                      value={payoutDetails.bankAccount?.bankName || ''}
+                      onChange={(e) => setPayoutDetails({ ...payoutDetails, bankAccount: { ...payoutDetails.bankAccount, bankName: e.target.value } })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Account Name</label>
+                    <input
+                      type="text"
+                      value={payoutDetails.bankAccount?.accountName || ''}
+                      onChange={(e) => setPayoutDetails({ ...payoutDetails, bankAccount: { ...payoutDetails.bankAccount, accountName: e.target.value } })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Account Number</label>
+                    <input
+                      type="text"
+                      value={payoutDetails.bankAccount?.accountNumber || ''}
+                      onChange={(e) => setPayoutDetails({ ...payoutDetails, bankAccount: { ...payoutDetails.bankAccount, accountNumber: e.target.value } })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Branch Name</label>
+                    <input
+                      type="text"
+                      value={payoutDetails.bankAccount?.branchName || ''}
+                      onChange={(e) => setPayoutDetails({ ...payoutDetails, bankAccount: { ...payoutDetails.bankAccount, branchName: e.target.value } })}
                     />
                   </div>
                 </div>
@@ -295,7 +360,7 @@ function SellerFinance() {
             <div className="payout-details-view">
               <div className="detail-item">
                 <span className="detail-label">Preferred Method:</span>
-                <span className="detail-value preferred">{payoutDetails.preferredMethod.toUpperCase()}</span>
+                <span className="detail-value preferred">{(payoutDetails.preferredMethod || '').toUpperCase()}</span>
               </div>
 
               {/* Show only the details for the preferred method */}
@@ -305,12 +370,48 @@ function SellerFinance() {
                   <span className="detail-value">{payoutDetails.esewaId}</span>
                 </div>
               )}
+              
+              {payoutDetails.preferredMethod === 'khalti' && payoutDetails.khaltiMobile && (
+                <div className="detail-item">
+                  <span className="detail-label">Khalti Mobile:</span>
+                  <span className="detail-value">{payoutDetails.khaltiMobile}</span>
+                </div>
+              )}
+              
+              {payoutDetails.preferredMethod === 'bank' && payoutDetails.bankAccount?.accountNumber && (
+                <>
+                  <div className="detail-item">
+                    <span className="detail-label">Bank Name:</span>
+                    <span className="detail-value">{payoutDetails.bankAccount.bankName}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Account Name:</span>
+                    <span className="detail-value">{payoutDetails.bankAccount.accountName}</span>
+                  </div>
+                  <div className="detail-item">
+                    <span className="detail-label">Account No:</span>
+                    <span className="detail-value">{payoutDetails.bankAccount.accountNumber}</span>
+                  </div>
+                </>
+              )}
 
               {/* Show warning if no details configured for the preferred method */}
               {(payoutDetails.preferredMethod === 'esewa' && !payoutDetails.esewaId) && (
                   <div className="no-details">
                     <p>No eSewa details configured</p>
                     <p>Please add your eSewa details to receive payments</p>
+                  </div>
+                )}
+              {(payoutDetails.preferredMethod === 'khalti' && !payoutDetails.khaltiMobile) && (
+                  <div className="no-details">
+                    <p>No Khalti details configured</p>
+                    <p>Please add your Khalti details to receive payments</p>
+                  </div>
+                )}
+              {(payoutDetails.preferredMethod === 'bank' && !payoutDetails.bankAccount?.accountNumber) && (
+                  <div className="no-details">
+                    <p>No Bank details configured</p>
+                    <p>Please add your Bank details to receive payments</p>
                   </div>
                 )}
             </div>

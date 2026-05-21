@@ -286,7 +286,7 @@ function SellerProfileTab() {
                       </label>
                       <input
                         type="text"
-                        value={profileData.fullName}
+                        value={profileData.fullName || ''}
                         onChange={(e) => setProfileData({...profileData, fullName: e.target.value})}
                         disabled={!isEditingProfile}
                         className="profile-form-input"
@@ -298,7 +298,7 @@ function SellerProfileTab() {
                       </label>
                       <input
                         type="email"
-                        value={profileData.email}
+                        value={profileData.email || ''}
                         onChange={(e) => setProfileData({...profileData, email: e.target.value})}
                         disabled={!isEditingProfile}
                         className="profile-form-input"
@@ -310,7 +310,7 @@ function SellerProfileTab() {
                       </label>
                       <input
                         type="tel"
-                        value={profileData.phone}
+                        value={profileData.phone || ''}
                         onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
                         disabled={!isEditingProfile}
                         className="profile-form-input"
@@ -322,7 +322,7 @@ function SellerProfileTab() {
                       </label>
                       <input
                         type="text"
-                        value={profileData.city}
+                        value={profileData.city || ''}
                         onChange={(e) => setProfileData({...profileData, city: e.target.value})}
                         disabled={!isEditingProfile}
                         className="profile-form-input"
@@ -334,7 +334,7 @@ function SellerProfileTab() {
                       </label>
                       <input
                         type="text"
-                        value={profileData.address}
+                        value={profileData.address || ''}
                         onChange={(e) => setProfileData({...profileData, address: e.target.value})}
                         disabled={!isEditingProfile}
                         className="profile-form-input"
@@ -346,7 +346,7 @@ function SellerProfileTab() {
                       </label>
                       <input
                         type="text"
-                        value={profileData.country}
+                        value={profileData.country || ''}
                         onChange={(e) => setProfileData({...profileData, country: e.target.value})}
                         disabled={!isEditingProfile}
                         className="profile-form-input"
@@ -367,7 +367,7 @@ function SellerProfileTab() {
                       </label>
                       <input
                         type="text"
-                        value={profileData.storeName}
+                        value={profileData.storeName || ''}
                         onChange={(e) => setProfileData({...profileData, storeName: e.target.value})}
                         disabled={!isEditingProfile}
                         className="profile-form-input"
@@ -378,7 +378,7 @@ function SellerProfileTab() {
                         STORE DESCRIPTION
                       </label>
                       <textarea
-                        value={profileData.storeDescription}
+                        value={profileData.storeDescription || ''}
                         onChange={(e) => setProfileData({...profileData, storeDescription: e.target.value})}
                         disabled={!isEditingProfile}
                         rows="4"

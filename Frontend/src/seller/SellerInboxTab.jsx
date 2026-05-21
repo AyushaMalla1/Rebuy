@@ -22,19 +22,20 @@ function SellerInboxTab() {
     showEmojiPicker,
     setShowEmojiPicker,
     handleEmojiClick,
+    globalSearch,
   } = useSellerDashboard();
 
   const commonEmojis = ['😊', '😂', '❤️', '👍', '🎉', '🔥', '✨', '💯', '🙏', '👏'];
 
   const filteredMessages = messages.filter(msg => {
-    const query = messageSearchQuery.trim().toLowerCase();
-    if (!query) return true;
+    const activeSearch = (messageSearchQuery || globalSearch || '').trim().toLowerCase();
+    if (!activeSearch) return true;
     return [
       msg.senderInfo?.fullName,
       msg.senderInfo?.email,
       msg.productId?.name,
       msg.message
-    ].some(v => String(v || '').toLowerCase().includes(query));
+    ].some(v => String(v || '').toLowerCase().includes(activeSearch));
   });
 
   const conversationProduct = getSelectedConversationProduct();
@@ -48,7 +49,7 @@ function SellerInboxTab() {
           <input
             type="text"
             placeholder="Search messages..."
-            value={messageSearchQuery}
+            value={messageSearchQuery || ''}
             onChange={e => setMessageSearchQuery(e.target.value)}
             className="inbox-search-input"
           />
@@ -174,7 +175,7 @@ function SellerInboxTab() {
                 <input
                   type="text"
                   placeholder="Type a reply..."
-                  value={replyText}
+                  value={replyText || ''}
                   onChange={e => setReplyText(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleDirectReply()}
                   className="inbox-reply-input"

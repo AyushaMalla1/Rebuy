@@ -14,6 +14,7 @@ function SellerVerificationsTab() {
     setSelectedVerification,
     fetchVerifications,
     sellerData,
+    globalSearch,
   } = useSellerDashboard();
 
   const [statusFilter, setStatusFilter] = useState('All');
@@ -24,9 +25,19 @@ function SellerVerificationsTab() {
     }
   }, [sellerData]);
 
-  const filtered = statusFilter === 'All'
+  let filtered = statusFilter === 'All'
     ? verifications
     : verifications.filter(v => v.approvalStatus === statusFilter.toLowerCase());
+
+  if (globalSearch && globalSearch.trim() !== '') {
+    const query = globalSearch.toLowerCase().trim();
+    filtered = filtered.filter(v =>
+      getVerificationProductName(v).toLowerCase().includes(query) ||
+      (v.customerName || v.customer?.fullName || '').toLowerCase().includes(query) ||
+      (v.orderId || '').toLowerCase().includes(query) ||
+      (v.customerNotes || '').toLowerCase().includes(query)
+    );
+  }
 
   return (
     <div className="verifications-section">

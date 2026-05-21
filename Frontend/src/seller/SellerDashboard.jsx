@@ -39,6 +39,10 @@ function SellerDashboardContent() {
     deleteNotification,
     globalSearch,
     setGlobalSearch,
+    showSearchResults,
+    searchResults,
+    setShowSearchResults,
+    loading,
     profileImage,
     sellerData,
     selectedOrder,
@@ -83,84 +87,92 @@ function SellerDashboardContent() {
     handleChangePassword,
     showPasswordSuccessModal,
     setShowPasswordSuccessModal
-    ,showEditModal
-    ,setShowEditModal
-    ,editingProduct
-    ,setEditingProduct
-    ,handleUpdateProduct
-    ,setRestockProduct
+    , showEditModal
+    , setShowEditModal
+    , editingProduct
+    , setEditingProduct
+    , handleUpdateProduct
+    , setRestockProduct
+    , handleSelectMessage
   } = adminOrSellerDashboardContext;
 
+  if (loading) {
+    return (
+      <div className="loading-state">
+        <h2>Loading...</h2>
+      </div>
+    );
+  }
 
   return (
     <div className="seller-container">
       {/* SIDEBAR */}
       <div className="sidebar">
         <img src="/logo.png" alt="Rebuy" className="sidebar-logo-img" />
-        
+
         <div className="menu-items-scrollable">
-          <div 
+          <div
             className={`menu-item ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('dashboard')}
           >
             <MdDashboard /> Dashboard
           </div>
-          <div 
+          <div
             className={`menu-item ${activeTab === 'products' ? 'active' : ''}`}
             onClick={() => setActiveTab('products')}
           >
             <FaBox /> Products
           </div>
-          
-          <div 
+
+          <div
             className={`menu-item ${activeTab === 'orders' ? 'active' : ''}`}
             onClick={() => setActiveTab('orders')}
           >
             <FaShoppingCart /> Orders
           </div>
-          
-          <div 
+
+          <div
             className={`menu-item ${activeTab === 'customer-returns' ? 'active' : ''}`}
             onClick={() => setActiveTab('customer-returns')}
           >
             <FaArchive /> Customer Returns
           </div>
 
-          <div 
+          <div
             className={`menu-item ${activeTab === 'verifications' ? 'active' : ''}`}
             onClick={() => setActiveTab('verifications')}
           >
             <FaCheckCircle /> Verifications
           </div>
 
-          <div 
+          <div
             className={`menu-item ${activeTab === 'finance' ? 'active' : ''}`}
             onClick={() => setActiveTab('finance')}
           >
             <FaDollarSign /> Finance
           </div>
 
-          <div 
+          <div
             className={`menu-item ${activeTab === 'inbox' ? 'active' : ''}`}
             onClick={() => setActiveTab('inbox')}
           >
             <FaBell /> Inbox
           </div>
 
-          <div 
+          <div
             className={`menu-item ${activeTab === 'revenue' ? 'active' : ''}`}
             onClick={() => setActiveTab('revenue')}
           >
             <FaChartLine /> Revenue
           </div>
-          <div 
+          <div
             className={`menu-item ${activeTab === 'performance' ? 'active' : ''}`}
             onClick={() => setActiveTab('performance')}
           >
             <FaChartBar /> Performance
           </div>
 
-          <div 
+          <div
             className="menu-item"
             onClick={() => setActiveTab('profile')}
           >
@@ -169,13 +181,13 @@ function SellerDashboardContent() {
         </div>
 
         <div className="bottom-menu">
-          <div 
+          <div
             className={`menu-item ${activeTab === 'help' ? 'active' : ''}`}
             onClick={() => setActiveTab('help')}
           >
             <FaQuestionCircle /> Help Center
           </div>
-          <div 
+          <div
             className={`menu-item ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
           >
@@ -228,10 +240,147 @@ function SellerDashboardContent() {
               <input
                 type="text"
                 placeholder="Search products, orders, customers..."
-                value={globalSearch}
+                value={globalSearch || ''}
                 onChange={(e) => setGlobalSearch(e.target.value)}
+                onFocus={() => globalSearch && globalSearch.trim() && setShowSearchResults(true)}
                 className="global-search-input"
               />
+
+              {/* Search Results Dropdown overlay */}
+              {showSearchResults && globalSearch && globalSearch.trim() && (
+                <div className="global-search-dropdown">
+                  <div className="global-search-dropdown-header">
+                    <span>Search Results</span>
+                    <button 
+                      className="global-search-close-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSearchResults(false);
+                      }}
+                      title="Close Results"
+                    >
+                      <FaTimesCircle />
+                    </button>
+                  </div>
+                  <div className="global-search-dropdown-results">
+                    {Object.values(searchResults).every(list => !list || list.length === 0) ? (
+                      <div className="global-search-no-results">
+                        No matches found for "{globalSearch}"
+                      </div>
+                    ) : (
+                      <>
+                        {/* 1. Products */}
+                        {searchResults.products && searchResults.products.length > 0 && (
+                          <div className="global-search-section">
+                            <div className="global-search-section-title">Products</div>
+                            {searchResults.products.map(product => (
+                              <div
+                                key={product._id}
+                                className="global-search-result-item"
+                                onClick={() => {
+                                  setActiveTab('products');
+                                  setGlobalSearch(product.name);
+                                  setShowSearchResults(false);
+                                }}
+                              >
+                                <span className="item-main-text">{product.name}</span>
+                                <span className="item-sub-text">{product.brand || 'No Brand'} • NPR {product.price}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 2. Orders */}
+                        {searchResults.orders && searchResults.orders.length > 0 && (
+                          <div className="global-search-section">
+                            <div className="global-search-section-title">Orders</div>
+                            {searchResults.orders.map(order => (
+                              <div
+                                key={order._id}
+                                className="global-search-result-item"
+                                onClick={() => {
+                                  setActiveTab('orders');
+                                  setGlobalSearch(order._id);
+                                  setSelectedOrder(order);
+                                  setShowSearchResults(false);
+                                }}
+                              >
+                                <span className="item-main-text">Order #{getShortOrderId(order._id)}</span>
+                                <span className="item-sub-text">{order.customerName} • NPR {order.total} • {order.status}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 3. Returns */}
+                        {searchResults.returns && searchResults.returns.length > 0 && (
+                          <div className="global-search-section">
+                            <div className="global-search-section-title">Customer Returns</div>
+                            {searchResults.returns.map(ret => (
+                              <div
+                                key={ret._id}
+                                className="global-search-result-item"
+                                onClick={() => {
+                                  setActiveTab('customer-returns');
+                                  setGlobalSearch(ret.orderId || '');
+                                  setSelectedReturn(ret);
+                                  setShowSearchResults(false);
+                                }}
+                              >
+                                <span className="item-main-text">Return for Order #{getShortOrderId(ret.orderId || '')}</span>
+                                <span className="item-sub-text">{ret.customerName} • Reason: {ret.reason}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 4. Verifications */}
+                        {searchResults.verifications && searchResults.verifications.length > 0 && (
+                          <div className="global-search-section">
+                            <div className="global-search-section-title">Verifications</div>
+                            {searchResults.verifications.map(ver => (
+                              <div
+                                key={ver._id}
+                                className="global-search-result-item"
+                                onClick={() => {
+                                  setActiveTab('verifications');
+                                  setGlobalSearch(ver.orderId || '');
+                                  setSelectedVerification(ver);
+                                  setShowSearchResults(false);
+                                }}
+                              >
+                                <span className="item-main-text">{getVerificationProductName(ver)}</span>
+                                <span className="item-sub-text">Submitted by {ver.customerName || ver.customer?.fullName}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* 5. Messages */}
+                        {searchResults.messages && searchResults.messages.length > 0 && (
+                          <div className="global-search-section">
+                            <div className="global-search-section-title">Conversations</div>
+                            {searchResults.messages.map(msg => (
+                              <div
+                                key={msg._id}
+                                className="global-search-result-item"
+                                onClick={() => {
+                                  setActiveTab('inbox');
+                                  handleSelectMessage(msg);
+                                  setShowSearchResults(false);
+                                }}
+                              >
+                                <span className="item-main-text">{msg.senderInfo?.fullName || 'Customer'}</span>
+                                <span className="item-sub-text">"{msg.message?.substring(0, 40)}..."</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="notification-wrapper">
@@ -613,7 +762,7 @@ function SellerDashboardContent() {
                   <input
                     type="text"
                     value={editingProduct.name}
-                    onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
                     required
                     className="modal-form-input"
                   />
@@ -640,7 +789,7 @@ function SellerDashboardContent() {
                   <input
                     type="number"
                     value={editingProduct.price}
-                    onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })}
                     required
                     className="modal-form-input"
                   />
@@ -650,7 +799,7 @@ function SellerDashboardContent() {
                   <input
                     type="number"
                     value={editingProduct.stock}
-                    onChange={(e) => setEditingProduct({...editingProduct, stock: e.target.value})}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })}
                     required
                     className="modal-form-input"
                   />
@@ -662,7 +811,7 @@ function SellerDashboardContent() {
                   <label className="modal-form-label">Condition *</label>
                   <select
                     value={editingProduct.condition}
-                    onChange={(e) => setEditingProduct({...editingProduct, condition: e.target.value})}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, condition: e.target.value })}
                     required
                     className="modal-form-select"
                   >
@@ -676,7 +825,7 @@ function SellerDashboardContent() {
                   <label className="modal-form-label">Category *</label>
                   <select
                     value={editingProduct.category}
-                    onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value, subcategory: ''})}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value, subcategory: '' })}
                     required
                     className="modal-form-select"
                   >
@@ -691,7 +840,7 @@ function SellerDashboardContent() {
                   <label className="modal-form-label">Subcategory</label>
                   <select
                     value={editingProduct.subcategory || ''}
-                    onChange={(e) => setEditingProduct({...editingProduct, subcategory: e.target.value})}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, subcategory: e.target.value })}
                     className="modal-form-select"
                     disabled={!editingProduct.category}
                   >
@@ -740,7 +889,7 @@ function SellerDashboardContent() {
                 <label className="modal-form-label">Description *</label>
                 <textarea
                   value={editingProduct.description}
-                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
                   required
                   rows="4"
                   className="modal-form-textarea"
@@ -748,8 +897,8 @@ function SellerDashboardContent() {
               </div>
 
               {/* Bundle Deal Section */}
-              <div className="modal-form-full-width" style={{marginTop: '16px'}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px'}}>
+              <div className="modal-form-full-width" style={{ marginTop: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                   <input
                     type="checkbox"
                     id="editBundleDealEnabled"
@@ -764,15 +913,15 @@ function SellerDashboardContent() {
                         description: editingProduct.bundleDeal?.description || ''
                       }
                     })}
-                    style={{width: '18px', height: '18px', cursor: 'pointer'}}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                   />
-                  <label htmlFor="editBundleDealEnabled" className="modal-form-label" style={{margin: 0, cursor: 'pointer'}}>
+                  <label htmlFor="editBundleDealEnabled" className="modal-form-label" style={{ margin: 0, cursor: 'pointer' }}>
                     Enable Bundle Deal
                   </label>
                 </div>
 
                 {editingProduct.bundleDeal?.enabled && (
-                  <div style={{marginLeft: '28px', padding: '12px', background: '#f8f9fa', borderRadius: '8px'}}>
+                  <div style={{ marginLeft: '28px', padding: '12px', background: '#f8f9fa', borderRadius: '8px' }}>
                     <div className="modal-form-grid">
                       <div className="modal-form-group">
                         <label className="modal-form-label">Buy Quantity *</label>
@@ -808,7 +957,7 @@ function SellerDashboardContent() {
                         />
                       </div>
                     </div>
-                    <div className="modal-form-group" style={{marginTop: '12px'}}>
+                    <div className="modal-form-group" style={{ marginTop: '12px' }}>
                       <label className="modal-form-label">Bundle Description (Optional)</label>
                       <input
                         type="text"
@@ -824,7 +973,7 @@ function SellerDashboardContent() {
                         placeholder="e.g., Buy 2 or more and save!"
                       />
                     </div>
-                    <p style={{fontSize: '12px', color: '#666', marginTop: '8px', marginBottom: 0}}>
+                    <p style={{ fontSize: '12px', color: '#666', marginTop: '8px', marginBottom: 0 }}>
                       Preview: Buy {editingProduct.bundleDeal?.buyQuantity || 2}+ Get {editingProduct.bundleDeal?.discountPercentage || 10}% OFF
                     </p>
                   </div>
@@ -861,10 +1010,10 @@ function SellerDashboardContent() {
               </div>
               <h3 className="restock-modal-title">Restock Product</h3>
             </div>
-            
+
             <div className="restock-product-info">
-              <img 
-                src={restockProduct.images?.[0] || 'https://via.placeholder.com/80'} 
+              <img
+                src={restockProduct.images?.[0] || 'https://via.placeholder.com/80'}
                 alt={restockProduct.name}
                 className="restock-product-image"
               />
@@ -890,7 +1039,7 @@ function SellerDashboardContent() {
                 </label>
                 <input
                   type="number"
-                  value={restockQuantity}
+                  value={restockQuantity || ''}
                   onChange={(e) => setRestockQuantity(e.target.value)}
                   min="1"
                   required
@@ -928,7 +1077,7 @@ function SellerDashboardContent() {
                 </button>
               </div>
             </form>
-          </div>  
+          </div>
         </div>
       )}
 
@@ -949,7 +1098,7 @@ function SellerDashboardContent() {
               </label>
               <input
                 type="password"
-                value={twoFAPassword}
+                value={twoFAPassword || ''}
                 onChange={(e) => setTwoFAPassword(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleConfirm2FA()}
                 placeholder="Enter your password"
@@ -999,9 +1148,9 @@ function SellerDashboardContent() {
             <h3 className="success-modal-title">
               Two-Factor Authentication {twoFAAction === 'enable' ? 'Enabled' : 'Disabled'}!
             </h3>
-            
+
             <p className="success-modal-description">
-              {twoFAAction === 'enable' 
+              {twoFAAction === 'enable'
                 ? 'Your account is now protected with an additional layer of security.'
                 : 'Two-factor authentication has been removed from your account.'}
             </p>
@@ -1035,7 +1184,7 @@ function SellerDashboardContent() {
             {loginHistory.length === 0 ? (
               <div className="login-history-empty">
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="login-history-empty-icon">
-                  <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <p className="login-history-empty-title">No Login History</p>
                 <p className="login-history-empty-text">Your login activity will appear here</p>
@@ -1122,7 +1271,7 @@ function SellerDashboardContent() {
               <input
                 type="password"
                 value={changePasswordData.currentPassword}
-                onChange={(e) => setChangePasswordData({...changePasswordData, currentPassword: e.target.value})}
+                onChange={(e) => setChangePasswordData({ ...changePasswordData, currentPassword: e.target.value })}
                 placeholder="Enter current password"
                 className="change-password-input"
               />
@@ -1135,7 +1284,7 @@ function SellerDashboardContent() {
               <input
                 type="password"
                 value={changePasswordData.newPassword}
-                onChange={(e) => setChangePasswordData({...changePasswordData, newPassword: e.target.value})}
+                onChange={(e) => setChangePasswordData({ ...changePasswordData, newPassword: e.target.value })}
                 placeholder="Enter new password"
                 className="change-password-input"
               />
@@ -1148,7 +1297,7 @@ function SellerDashboardContent() {
               <input
                 type="password"
                 value={changePasswordData.confirmPassword}
-                onChange={(e) => setChangePasswordData({...changePasswordData, confirmPassword: e.target.value})}
+                onChange={(e) => setChangePasswordData({ ...changePasswordData, confirmPassword: e.target.value })}
                 onKeyPress={(e) => e.key === 'Enter' && handleChangePassword()}
                 placeholder="Confirm new password"
                 className="change-password-input"
@@ -1189,7 +1338,7 @@ function SellerDashboardContent() {
             <h3 className="success-modal-title">
               Password Changed Successfully!
             </h3>
-            
+
             <p className="success-modal-description">
               Your password has been updated. Please use your new password for future logins.
             </p>

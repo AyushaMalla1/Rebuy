@@ -32,7 +32,7 @@ export const RevenueTrendChart = ({ data, title = "Revenue Trend (Last 7 Days)",
     <div className="chart-card">
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <LineChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="day" />
@@ -62,7 +62,7 @@ export const TopProductsChart = ({ data, title = "Top Selling Products" }) => {
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {chartData.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
@@ -88,7 +88,7 @@ export const MonthlySalesChart = ({ data }) => {
   return (
     <div style={{ width: "100%", height: 400 }}>
       <h3>Monthly Sales Overview</h3>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="month" />
@@ -114,7 +114,7 @@ export const PaymentMethodsChart = ({ data }) => {
   return (
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3>Payment Methods Distribution</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={300} minWidth={0}>
         <PieChart>
           <Pie
             data={data}
@@ -150,7 +150,7 @@ export const PaymentStatusChart = ({ data }) => {
   return (
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3>Payment Status Overview</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={300} minWidth={0}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="status" />
@@ -173,7 +173,7 @@ export const DailyRevenueChart = ({ data }) => {
   return (
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3>Daily Revenue (Last 7 Days)</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={300} minWidth={0}>
         <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" />
@@ -194,7 +194,7 @@ export const UserGrowthChart = ({ data, title = "User Growth Trend" }) => {
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <LineChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
@@ -220,7 +220,7 @@ export const SellerStatsChart = ({ data, title = "Seller Statistics" }) => {
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <BarChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
@@ -248,7 +248,7 @@ export const ProductDistributionChart = ({ data, title = "Product Distribution" 
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <PieChart>
             <Pie
               data={data}
@@ -283,7 +283,7 @@ export const OrdersTrendChart = ({ data, title = "Orders Trend" }) => {
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <LineChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="day" />
@@ -308,7 +308,7 @@ export const GrowthRateChart = ({ data }) => {
   return (
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3>Monthly Growth Rate</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={300} minWidth={0}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="month" />
@@ -330,7 +330,7 @@ export const RevenueBreakdownChart = ({ data, title = "Revenue Breakdown" }) => 
     <div className="chart-card" style={{marginTop: '20px'}}>
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <PieChart>
             <Pie
               data={data}
@@ -368,7 +368,7 @@ export const OrdersBarChart = ({ data, title = "Orders Trend", dataKey = "orders
     <div className="chart-card">
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="day" stroke="#666" />
@@ -398,7 +398,7 @@ export const AvgOrderValueChart = ({ data, title = "Average Order Value Trend", 
     <div className="chart-card">
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <LineChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <defs>
               <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
@@ -456,7 +456,7 @@ export const PlatformFeesChart = ({ data, title = "Platform Fees Breakdown", dat
     <div className="chart-card">
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {grossRevenue > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <PieChart>
             <Pie
               data={pieData}
@@ -499,7 +499,7 @@ export const NetRevenueChart = ({ data, title = "Net Revenue Trend", dataKey = "
     <div className="chart-card">
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <LineChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
             <defs>
               <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
@@ -545,7 +545,7 @@ export const CategoryPerformanceChart = ({ data, title = "Category Performance" 
     <div className="chart-card">
       <h3 style={{fontSize: '16px', marginBottom: '15px', color: '#333', fontWeight: '600'}}>{title}</h3>
       {data && data.length > 0 ? (
-        <ResponsiveContainer width="100%" height={280}>
+        <ResponsiveContainer width="100%" height={280} minWidth={0}>
           <PieChart>
             <Pie
               data={data}

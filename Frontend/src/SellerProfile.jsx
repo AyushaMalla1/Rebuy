@@ -80,7 +80,7 @@ function SellerProfile() {
       if (!conversationExists) {
         const token = localStorage.getItem('token');
         // Determine sender model - check userType field
-        const senderModel = user.userType === 'seller' || user.role === 'seller' ? 'Seller' : 'Customer';
+        const senderModel = user.userType === 'seller' || user.role === 'seller' ? 'Seller' : 'User';
         
         console.log('Creating new conversation with:', {
           senderId,

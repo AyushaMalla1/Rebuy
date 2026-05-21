@@ -1,16 +1,35 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FiArrowLeft, FiMail, FiPhone, FiMapPin, FiClock, FiFacebook, FiTwitter, FiInstagram } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FiArrowLeft, FiMail, FiPhone, FiMapPin, FiClock, FiFacebook, FiTwitter, FiInstagram, FiPaperclip } from 'react-icons/fi';
+import axios from 'axios';
 import './Contact.css';
 
 function Contact() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [userType, setUserType] = useState('');
+  
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
     subject: '',
-    message: ''
+    category: 'other',
+    priority: 'medium',
+    message: '',
+    attachments: []
   });
+  
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    // Check if customer is logged in to allow creating a trackable support ticket
+    const userData = localStorage.getItem('user');
+    
+    if (userData) {
+      setUser(JSON.parse(userData));
+      setUserType('customer');
+    }
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -19,14 +38,53 @@ function Contact() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleFileChange = (e) => {
+    setFormData({
+      ...formData,
+      attachments: Array.from(e.target.files)
+    });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // In production, this would send to backend
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({ name: '', email: '', subject: '', message: '' });
-    }, 3000);
+    
+    if (!user) {
+      setError('Please log in to send a message so we can track and reply to your inquiry.');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+
+    try {
+      const data = new FormData();
+      data.append('subject', formData.subject);
+      data.append('category', formData.category);
+      data.append('priority', formData.priority);
+      data.append('message', formData.message);
+      data.append('userId', user._id);
+      data.append('userType', userType);
+
+      // Append attachments
+      formData.attachments.forEach(file => {
+        data.append('attachments', file);
+      });
+
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/support/tickets`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+        setFormData({ subject: '', category: 'other', priority: 'medium', message: '', attachments: [] });
+      }, 5000);
+    } catch (err) {
+      console.error('Error creating ticket:', err);
+      setError('Failed to send message. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -96,37 +154,27 @@ function Contact() {
 
           <div className="contact-form-section">
             <h2>Send Us a Message</h2>
+            {!user && (
+              <div style={{ padding: '15px', background: '#fff3cd', color: '#856404', borderRadius: '8px', marginBottom: '20px' }}>
+                Please <Link to="/login" style={{ fontWeight: 'bold', textDecoration: 'underline' }}>log in</Link> to send us a message. This ensures we can track your request and reply to you directly through the platform.
+              </div>
+            )}
+            
+            {error && <div className="error-message" style={{ color: 'red', marginBottom: '15px' }}>{error}</div>}
+            
             {submitted ? (
               <div className="success-message">
                 <h3>Thank you for contacting us!</h3>
-                <p>We'll get back to you within 24 hours.</p>
+                <p>Your support ticket has been created successfully. You can view its status and our replies in your profile under the "Help Center" or "Support Tickets" section.</p>
               </div>
             ) : (
               <form className="contact-form" onSubmit={handleSubmit}>
-                <div className="form-group">
-                  <label>Name *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    placeholder="Your full name"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Email *</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    placeholder="your.email@example.com"
-                  />
-                </div>
-
+                {user && (
+                  <div className="form-group">
+                    <label>From: <strong>{user.fullName}</strong> ({user.email})</label>
+                  </div>
+                )}
+                
                 <div className="form-group">
                   <label>Subject *</label>
                   <input
@@ -135,8 +183,29 @@ function Contact() {
                     value={formData.subject}
                     onChange={handleChange}
                     required
+                    disabled={!user || loading}
                     placeholder="What is this regarding?"
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Category</label>
+                  <select 
+                    name="category" 
+                    value={formData.category} 
+                    onChange={handleChange}
+                    disabled={!user || loading}
+                    style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '8px' }}
+                  >
+                    <option value="refund">Refund Request</option>
+                    <option value="fake_product">Fake Product Report</option>
+                    <option value="dispute">Order Dispute</option>
+                    <option value="scam">Scam Report</option>
+                    <option value="delivery">Delivery Issue</option>
+                    <option value="account">Account Problem</option>
+                    <option value="payment">Payment Issue</option>
+                    <option value="other">Other Inquiry</option>
+                  </select>
                 </div>
 
                 <div className="form-group">
@@ -147,12 +216,28 @@ function Contact() {
                     onChange={handleChange}
                     required
                     rows="6"
+                    disabled={!user || loading}
                     placeholder="Tell us more about your inquiry..."
                   />
                 </div>
 
-                <button type="submit" className="submit-btn">
-                  Send Message
+                <div className="form-group">
+                  <label>Attachments (Optional)</label>
+                  <div className="file-input-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleFileChange}
+                      disabled={!user || loading}
+                      id="file-upload"
+                      style={{ display: 'block', width: '100%', padding: '10px', border: '1px dashed #ccc', borderRadius: '8px' }}
+                    />
+                  </div>
+                  <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>Max 5 files, 5MB each. Supported: JPG, PNG, PDF, DOC</small>
+                </div>
+
+                <button type="submit" className="submit-btn" disabled={!user || loading}>
+                  {loading ? 'Sending...' : 'Send Message'}
                 </button>
               </form>
             )}
@@ -176,7 +261,7 @@ function Contact() {
             </div>
             <div className="faq-item">
               <h3>What payment methods do you accept?</h3>
-              <p>We accept eSewa, Khalti, Credit/Debit Cards, and Cash on Delivery.</p>
+              <p>We accept eSewa, Credit/Debit Cards, and Cash on Delivery.</p>
             </div>
           </div>
         </section>

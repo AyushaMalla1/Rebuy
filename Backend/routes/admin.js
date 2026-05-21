@@ -1512,6 +1512,13 @@ router.post('/verifications/:id/approve', async (req, res) => {
     
     await verification.save();
     
+    // Update the original Order
+    const Order = require('../models/Order');
+    await Order.findByIdAndUpdate(verification.order, {
+      'conditionVerification.adminApproved': true,
+      'conditionVerification.approvedAt': new Date()
+    });
+    
     // Log audit
     await logAudit({
       action: 'VERIFICATION_APPROVED',

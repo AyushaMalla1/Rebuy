@@ -18,12 +18,13 @@ const productSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: true,
-    min: 0
+    min: 0,
+    max: 5000
   },
   category: {
     type: String,
     required: true,
-    enum: ["Men's Collection", "Women's Collection", "Kid's Collection", "Sportswear", "Vintage", "Accessories"]
+    enum: ["Men's Collection", "Women's Collection", "Unisex", "Kid's Collection", "Sportswear", "Vintage", "Accessories"]
   },
   subcategory: {
     type: String
@@ -276,13 +277,13 @@ productSchema.path('discount.startDate').validate(function(value) {
   return true;
 }, 'Discount start date must be before end date');
 
-// Validation: Sale price must be less than regular price
+// Validation: Sale price must be less than regular price and under 5000
 productSchema.path('salePrice').validate(function(value) {
   if (this.onSale && value) {
-    return value < this.price;
+    return value < this.price && value <= 5000;
   }
   return true;
-}, 'Sale price must be less than regular price');
+}, 'Sale price must be less than regular price and not exceed Rs. 5000');
 
 // Check low stock and set alert
 productSchema.pre('save', function(next) {
@@ -307,6 +308,7 @@ productSchema.pre('save', function(next) {
     const categoryPrefixes = {
       "Men's Collection": 'ME',
       "Women's Collection": 'WO',
+      "Unisex": 'UN',
       "Kid's Collection": 'KI',
       "Sportswear": 'SP',
       "Vintage": 'VI',

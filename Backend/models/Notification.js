@@ -12,11 +12,11 @@ const notificationSchema = new mongoose.Schema({
   },
   recipientModel: {
     type: String,
-    enum: ['User', 'Seller']
+    enum: ['User', 'Seller', 'Admin']
   },
   type: {
     type: String,
-    enum: ['order', 'product', 'message', 'stock', 'system'],
+    enum: ['order', 'product', 'message', 'stock', 'system', 'support'],
     required: true
   },
   title: {

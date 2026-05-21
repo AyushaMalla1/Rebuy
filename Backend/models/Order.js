@@ -150,6 +150,10 @@ const orderSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
+    adminApproved: {
+      type: Boolean,
+      default: false
+    },
     verifiedAt: Date,
     matchesDescription: {
       type: String,

@@ -7,7 +7,7 @@ const Seller = require('../models/Seller');
 const Admin = require('../models/Admin');
 const Notification = require('../models/Notification');
 const multer = require('multer');
-const cloudinary = require('../config/cloudinary');
+const { cloudinary } = require('../config/cloudinary');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 // Configure Cloudinary storage for attachments
@@ -89,8 +89,8 @@ router.post('/tickets', upload.array('attachments', 5), async (req, res) => {
     const admins = await Admin.find({ isActive: true });
     for (const admin of admins) {
       await Notification.create({
-        user: admin._id,
-        userType: 'admin',
+        recipient: admin._id,
+        recipientModel: 'Admin',
         type: 'support',
         title: 'New Support Ticket',
         message: `New ticket #${ticket.ticketNumber}: ${subject}`,
@@ -233,8 +233,8 @@ router.post('/tickets/:ticketId/reply', upload.array('attachments', 5), async (r
     if (userType === 'admin') {
       // Notify the ticket creator
       await Notification.create({
-        user: ticket.createdBy.userId,
-        userType: ticket.createdBy.userType.toLowerCase(),
+        recipient: ticket.createdBy.userId,
+        recipientModel: ticket.createdBy.userType,
         type: 'support',
         title: 'Support Ticket Reply',
         message: `Admin replied to your ticket #${ticket.ticketNumber}`,
@@ -245,8 +245,8 @@ router.post('/tickets/:ticketId/reply', upload.array('attachments', 5), async (r
       const admins = await Admin.find({ isActive: true });
       for (const admin of admins) {
         await Notification.create({
-          user: admin._id,
-          userType: 'admin',
+          recipient: admin._id,
+          recipientModel: 'Admin',
           type: 'support',
           title: 'Support Ticket Update',
           message: `New reply on ticket #${ticket.ticketNumber}`,
@@ -344,8 +344,8 @@ router.patch('/admin/tickets/:ticketId/status', async (req, res) => {
 
     // Notify ticket creator
     await Notification.create({
-      user: ticket.createdBy.userId,
-      userType: ticket.createdBy.userType.toLowerCase(),
+      recipient: ticket.createdBy.userId,
+      recipientModel: ticket.createdBy.userType,
       type: 'support',
       title: 'Ticket Status Updated',
       message: `Your ticket #${ticket.ticketNumber} status changed to ${status}`,

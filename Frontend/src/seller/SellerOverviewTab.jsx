@@ -137,7 +137,7 @@ function SellerOverviewTab() {
           </div>
           
           <div className="stock-chart-container">
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={220} minWidth={0}>
               <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                 <Pie
                   data={stockChartData}
@@ -168,7 +168,7 @@ function SellerOverviewTab() {
             <h3>Revenue Trend (Last 30 Days)</h3>
           </div>
           <div className="chart-container" style={{ height: '300px', marginTop: '20px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={chartData?.revenue || []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="day" axisLine={false} tickLine={false} />

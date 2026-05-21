@@ -14,11 +14,22 @@ function SellerCustomerReturnsTab() {
     setSelectedReturn,
     handleReturnResponse,
     handleCompleteReturn,
+    globalSearch,
   } = useSellerDashboard();
 
-  const filtered = returnStatusFilter === 'All'
+  let filtered = returnStatusFilter === 'All'
     ? returns
     : returns.filter(r => r.status === returnStatusFilter);
+
+  if (globalSearch && globalSearch.trim() !== '') {
+    const query = globalSearch.toLowerCase().trim();
+    filtered = filtered.filter(r =>
+      (r.product?.name || '').toLowerCase().includes(query) ||
+      getReturnOrderLabel(r).toLowerCase().includes(query) ||
+      (r.customer?.fullName || '').toLowerCase().includes(query) ||
+      (r.reason || '').toLowerCase().includes(query)
+    );
+  }
 
   return (
     <div className="seller-returns-section">

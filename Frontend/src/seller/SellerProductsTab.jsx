@@ -117,7 +117,7 @@ function SellerProductsTab() {
                 <label className="form-label">Product Name *</label>
                 <input
                   type="text"
-                  value={newProduct.name}
+                  value={newProduct.name || ''}
                   onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                   required
                   className="form-input"
@@ -142,12 +142,19 @@ function SellerProductsTab() {
 
             <div className="form-grid-2">
               <div>
-                <label className="form-label">Price (Rs.) *</label>
+                <label className="form-label">
+                  Price (Rs.) *
+                  <span className="form-label-hint">
+                    Max Rs. 5000 (Thrift Store)
+                  </span>
+                </label>
                 <input
                   type="number"
-                  value={newProduct.price}
+                  value={newProduct.price || ''}
                   onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
                   required
+                  min="0"
+                  max="5000"
                   className="form-input"
                 />
               </div>
@@ -155,7 +162,7 @@ function SellerProductsTab() {
                 <label className="form-label">Stock *</label>
                 <input
                   type="number"
-                  value={newProduct.stock}
+                  value={newProduct.stock || ''}
                   onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
                   required
                   className="form-input"
@@ -177,8 +184,11 @@ function SellerProductsTab() {
                   <option value="">Select Category</option>
                   <option value="Men's Collection">Men's Collection</option>
                   <option value="Women's Collection">Women's Collection</option>
+                  <option value="Unisex">Unisex</option>
+                  <option value="Kid's Collection">Kid's Collection</option>
                   <option value="Sportswear">Sportswear</option>
                   <option value="Vintage">Vintage</option>
+                  <option value="Accessories">Accessories</option>
                 </select>
               </div>
               <div>
@@ -192,37 +202,166 @@ function SellerProductsTab() {
                   <option value="">Select Subcategory</option>
                   {newProduct.category === "Men's Collection" && (
                     <>
-                      <option value="Men's Hoodie">Men's Hoodie</option>
-                      <option value="Men's Pants">Men's Pants</option>
-                      <option value="Men's Jacket">Men's Jacket</option>
+                      <optgroup label="Tops">
+                        <option value="T-Shirts">T-Shirts</option>
+                        <option value="Shirts">Shirts</option>
+                        <option value="Polos">Polos</option>
+                        <option value="Hoodies">Hoodies</option>
+                        <option value="Sweaters">Sweaters</option>
+                      </optgroup>
+                      <optgroup label="Bottoms">
+                        <option value="Jeans">Jeans</option>
+                        <option value="Pants">Pants</option>
+                        <option value="Shorts">Shorts</option>
+                        <option value="Joggers">Joggers</option>
+                      </optgroup>
+                      <optgroup label="Outerwear">
+                        <option value="Jackets">Jackets</option>
+                        <option value="Coats">Coats</option>
+                        <option value="Blazers">Blazers</option>
+                        <option value="Vests">Vests</option>
+                      </optgroup>
                       <option value="Other">Other</option>
                     </>
                   )}
                   {newProduct.category === "Women's Collection" && (
                     <>
-                      <option value="Women's Skirt">Women's Skirt</option>
-                      <option value="Women's Blazer">Women's Blazer</option>
-                      <option value="Women's Top">Women's Top</option>
+                      <optgroup label="Tops">
+                        <option value="T-Shirts">T-Shirts</option>
+                        <option value="Shirts">Shirts</option>
+                        <option value="Blouses">Blouses</option>
+                        <option value="Hoodies">Hoodies</option>
+                        <option value="Sweaters">Sweaters</option>
+                        <option value="Tank Tops">Tank Tops</option>
+                      </optgroup>
+                      <optgroup label="Bottoms">
+                        <option value="Jeans">Jeans</option>
+                        <option value="Pants">Pants</option>
+                        <option value="Shorts">Shorts</option>
+                        <option value="Skirts">Skirts</option>
+                        <option value="Leggings">Leggings</option>
+                      </optgroup>
+                      <optgroup label="Outerwear">
+                        <option value="Jackets">Jackets</option>
+                        <option value="Coats">Coats</option>
+                        <option value="Blazers">Blazers</option>
+                        <option value="Cardigans">Cardigans</option>
+                      </optgroup>
+                      <optgroup label="Dresses">
+                        <option value="Casual Dresses">Casual Dresses</option>
+                        <option value="Formal Dresses">Formal Dresses</option>
+                        <option value="Maxi Dresses">Maxi Dresses</option>
+                        <option value="Mini Dresses">Mini Dresses</option>
+                      </optgroup>
+                      <option value="Other">Other</option>
+                    </>
+                  )}
+                  {newProduct.category === "Unisex" && (
+                    <>
+                      <optgroup label="Tops">
+                        <option value="T-Shirts">T-Shirts</option>
+                        <option value="Hoodies">Hoodies</option>
+                        <option value="Sweaters">Sweaters</option>
+                        <option value="Sweatshirts">Sweatshirts</option>
+                      </optgroup>
+                      <optgroup label="Bottoms">
+                        <option value="Jeans">Jeans</option>
+                        <option value="Joggers">Joggers</option>
+                        <option value="Sweatpants">Sweatpants</option>
+                      </optgroup>
+                      <optgroup label="Outerwear">
+                        <option value="Jackets">Jackets</option>
+                        <option value="Hoodies">Hoodies</option>
+                        <option value="Windbreakers">Windbreakers</option>
+                      </optgroup>
                       <option value="Other">Other</option>
                     </>
                   )}
                   {newProduct.category === "Kid's Collection" && (
                     <>
+                      <optgroup label="Tops">
+                        <option value="T-Shirts">T-Shirts</option>
+                        <option value="Shirts">Shirts</option>
+                        <option value="Hoodies">Hoodies</option>
+                        <option value="Sweaters">Sweaters</option>
+                      </optgroup>
+                      <optgroup label="Bottoms">
+                        <option value="Jeans">Jeans</option>
+                        <option value="Pants">Pants</option>
+                        <option value="Shorts">Shorts</option>
+                        <option value="Skirts">Skirts</option>
+                      </optgroup>
+                      <optgroup label="Outerwear">
+                        <option value="Jackets">Jackets</option>
+                        <option value="Coats">Coats</option>
+                        <option value="Hoodies">Hoodies</option>
+                      </optgroup>
                       <option value="Other">Other</option>
                     </>
                   )}
                   {newProduct.category === "Sportswear" && (
                     <>
+                      <optgroup label="Athletic Wear">
+                        <option value="Sports T-Shirts">Sports T-Shirts</option>
+                        <option value="Tank Tops">Tank Tops</option>
+                        <option value="Jerseys">Jerseys</option>
+                        <option value="Tracksuits">Tracksuits</option>
+                      </optgroup>
+                      <optgroup label="Bottoms">
+                        <option value="Joggers">Joggers</option>
+                        <option value="Track Pants">Track Pants</option>
+                        <option value="Shorts">Shorts</option>
+                        <option value="Leggings">Leggings</option>
+                      </optgroup>
+                      <optgroup label="Outerwear">
+                        <option value="Windbreakers">Windbreakers</option>
+                        <option value="Hoodies">Hoodies</option>
+                        <option value="Jackets">Jackets</option>
+                      </optgroup>
                       <option value="Other">Other</option>
                     </>
                   )}
                   {newProduct.category === "Vintage" && (
                     <>
+                      <optgroup label="Vintage Tops">
+                        <option value="Vintage T-Shirts">Vintage T-Shirts</option>
+                        <option value="Vintage Shirts">Vintage Shirts</option>
+                        <option value="Vintage Sweaters">Vintage Sweaters</option>
+                        <option value="Band Tees">Band Tees</option>
+                      </optgroup>
+                      <optgroup label="Vintage Bottoms">
+                        <option value="Vintage Jeans">Vintage Jeans</option>
+                        <option value="Vintage Pants">Vintage Pants</option>
+                        <option value="Vintage Shorts">Vintage Shorts</option>
+                      </optgroup>
+                      <optgroup label="Vintage Outerwear">
+                        <option value="Vintage Jackets">Vintage Jackets</option>
+                        <option value="Vintage Coats">Vintage Coats</option>
+                        <option value="Leather Jackets">Leather Jackets</option>
+                        <option value="Denim Jackets">Denim Jackets</option>
+                      </optgroup>
                       <option value="Other">Other</option>
                     </>
                   )}
                   {newProduct.category === "Accessories" && (
                     <>
+                      <optgroup label="Bags">
+                        <option value="Backpacks">Backpacks</option>
+                        <option value="Handbags">Handbags</option>
+                        <option value="Tote Bags">Tote Bags</option>
+                        <option value="Crossbody Bags">Crossbody Bags</option>
+                      </optgroup>
+                      <optgroup label="Headwear">
+                        <option value="Caps">Caps</option>
+                        <option value="Hats">Hats</option>
+                        <option value="Beanies">Beanies</option>
+                      </optgroup>
+                      <optgroup label="Others">
+                        <option value="Belts">Belts</option>
+                        <option value="Scarves">Scarves</option>
+                        <option value="Sunglasses">Sunglasses</option>
+                        <option value="Jewelry">Jewelry</option>
+                      </optgroup>
                       <option value="Other">Other</option>
                     </>
                   )}
@@ -249,7 +388,7 @@ function SellerProductsTab() {
                 <label className="form-label">Size</label>
                 <input
                   type="text"
-                  value={newProduct.size}
+                  value={newProduct.size || ''}
                   onChange={(e) => setNewProduct({ ...newProduct, size: e.target.value })}
                   placeholder="e.g., M, L, XL"
                   className="form-input"
@@ -259,7 +398,7 @@ function SellerProductsTab() {
                 <label className="form-label">Brand</label>
                 <input
                   type="text"
-                  value={newProduct.brand}
+                  value={newProduct.brand || ''}
                   onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
                   placeholder="e.g., Nike, Adidas, Zara"
                   className="form-input"
@@ -270,7 +409,7 @@ function SellerProductsTab() {
             <div className="form-group">
               <label className="form-label">Description *</label>
               <textarea
-                value={newProduct.description}
+                value={newProduct.description || ''}
                 onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
                 required
                 rows="4"
@@ -283,7 +422,7 @@ function SellerProductsTab() {
                 Product Story
               </label>
               <textarea
-                value={newProduct.story}
+                value={newProduct.story || ''}
                 onChange={(e) => setNewProduct({ ...newProduct, story: e.target.value })}
                 rows="4"
                 placeholder="Share the unique story behind this item..."

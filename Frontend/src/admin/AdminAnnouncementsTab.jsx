@@ -6,11 +6,6 @@ import {
 } from 'react-icons/fi';
 import { MdPeople, MdStorefront, MdInventory, MdAttachMoney, MdShowChart } from 'react-icons/md';
 import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
-import AdminSupport from './AdminSupport';
-import AdminSalesReportsTab from './AdminSalesReportsTab';
-import AdminPayoutsTab from './AdminPayoutsTab';
-import AdminProfileTab from './AdminProfileTab';
-import { RevenueTrendChart, CategoryPerformanceChart } from '../components/Charts';
 import { useAdminDashboard } from './AdminDashboardContext';
 
 import './AdminAnnouncementsTab.css';
@@ -190,7 +185,7 @@ function AdminAnnouncementsTab() {
   } = useAdminDashboard();
 
   return (
-    <div className="content-section">
+    <div className="content-section announcements-page">
       <div className="announcements-grid-layout">
         {/* Left Sidebar: Controls & Creation Form */}
         <div className="announcements-sidebar">
@@ -250,7 +245,7 @@ function AdminAnnouncementsTab() {
                   </div>
                 </div>
 
-                <div className="form-row">
+                <div className="form-row form-row-expires">
                   <div className="form-group">
                     <label>Priority</label>
                     <select name="priority" value={announcementForm.priority} onChange={handleAnnouncementFormChange}>

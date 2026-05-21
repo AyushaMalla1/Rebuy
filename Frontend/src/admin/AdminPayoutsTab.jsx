@@ -279,6 +279,9 @@ function AdminPayoutsTab() {
                         {verifyMessage}
                       </div>
                     )}
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                      * Enter the Transaction ID from your eSewa/Khalti receipt. If you paid manually via your personal mobile app, simply enter the ID and click "Confirm Complete" (the Verify button only works for Merchant Gateway transactions).
+                    </div>
                   </div>
                   <div style={{ marginBottom: '15px' }}>
                     <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px' }}>Admin Notes (Optional)</label>

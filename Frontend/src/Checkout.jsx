@@ -404,6 +404,16 @@ function Checkout() {
         form.submit();
         document.body.removeChild(form);
       } else {
+        // Cancel the order before alerting user
+        try {
+          await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/cancel`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+        } catch (err) {
+          console.error('Failed to cancel order on payment initiation failure', err);
+        }
+        
         alert('eSewa payment gateway is currently unavailable. Please use Cash on Delivery (COD) instead.');
         setPaymentProcessing(false);
         // Auto-switch to COD
@@ -411,6 +421,17 @@ function Checkout() {
       }
     } catch (error) {
       console.error('Payment error:', error);
+      
+      // Cancel the order before alerting user
+      try {
+        await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/cancel`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+      } catch (err) {
+        console.error('Failed to cancel order on payment error', err);
+      }
+
       alert('eSewa service is currently unavailable. Please use Cash on Delivery (COD) instead.');
       setPaymentProcessing(false);
       // Auto-switch to COD

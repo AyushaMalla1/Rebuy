@@ -210,7 +210,7 @@ function AdminSupport({ embedded = false }) {
   }
 
   return (
-    <div className="admin-support">
+    <div className={`admin-support${embedded ? ' embedded' : ''}`}>
       {/* Header */}
       {!embedded && (
         <div className="admin-support-header">
@@ -221,61 +221,6 @@ function AdminSupport({ embedded = false }) {
             <div>
               <h1>Support Ticket Management</h1>
               <p>Manage customer and seller support requests</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Statistics Dashboard */}
-      {stats && (
-        <div className="support-stats">
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#e3f2fd' }}>
-              <FiMessageSquare color="#2196f3" />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.totalTickets}</h3>
-              <p>Total Tickets</p>
-            </div>
-          </div>
-          
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#fff3e0' }}>
-              <FiClock color="#ff9800" />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.openTickets}</h3>
-              <p>Open Tickets</p>
-            </div>
-          </div>
-          
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#e1f5fe' }}>
-              <FiAlertCircle color="#2196f3" />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.pendingTickets}</h3>
-              <p>Pending</p>
-            </div>
-          </div>
-          
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#e8f5e9' }}>
-              <FiCheckCircle color="#4caf50" />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.resolvedTickets}</h3>
-              <p>Resolved</p>
-            </div>
-          </div>
-          
-          <div className="stat-card">
-            <div className="stat-icon" style={{ background: '#ffebee' }}>
-              <FiAlertTriangle color="#f44336" />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.unreadTickets}</h3>
-              <p>Unread</p>
             </div>
           </div>
         </div>
@@ -385,23 +330,29 @@ function AdminSupport({ embedded = false }) {
           {selectedTicket ? (
             <>
               <div className="ticket-details-header">
-                <div className="header-main">
+                <div className="ticket-header-main">
                   <h2>{selectedTicket.subject}</h2>
-                  <div className="ticket-meta-info">
-                    <span className="ticket-number">#{selectedTicket.ticketNumber}</span>
-                    <span className="ticket-category" style={{ backgroundColor: getCategoryInfo(selectedTicket.category).color }}>
+                  <div className="ticket-meta-row">
+                    <span className="meta-chip id">#{selectedTicket.ticketNumber}</span>
+                    <span
+                      className="meta-chip category"
+                      style={{ '--chip-color': getCategoryInfo(selectedTicket.category).color }}
+                    >
                       {getCategoryInfo(selectedTicket.category).icon} {getCategoryInfo(selectedTicket.category).label}
                     </span>
+                    <span className="meta-chip"><FiUser size={12} /> {selectedTicket.createdBy.name}</span>
+                    <span className="meta-chip"><FiMail size={12} /> {selectedTicket.createdBy.email}</span>
+                    <span className="meta-chip user-type">{selectedTicket.createdBy.userType}</span>
+                    <span className="meta-chip"><FiCalendar size={12} /> {new Date(selectedTicket.createdAt).toLocaleString()}</span>
                   </div>
                 </div>
 
-                <div className="ticket-actions">
-                  <div className="action-group">
-                    <label>Status:</label>
-                    <select 
-                      value={selectedTicket.status} 
+                <div className="ticket-header-controls">
+                  <div className="control-item">
+                    <label>Status</label>
+                    <select
+                      value={selectedTicket.status}
                       onChange={(e) => handleUpdateStatus(e.target.value)}
-                      style={{ borderColor: getStatusColor(selectedTicket.status) }}
                     >
                       {statuses.map(status => (
                         <option key={status.value} value={status.value}>{status.label}</option>
@@ -409,12 +360,11 @@ function AdminSupport({ embedded = false }) {
                     </select>
                   </div>
 
-                  <div className="action-group">
-                    <label>Priority:</label>
-                    <select 
-                      value={selectedTicket.priority} 
+                  <div className="control-item">
+                    <label>Priority</label>
+                    <select
+                      value={selectedTicket.priority}
                       onChange={(e) => handleUpdatePriority(e.target.value)}
-                      style={{ borderColor: getPriorityColor(selectedTicket.priority) }}
                     >
                       {priorities.map(priority => (
                         <option key={priority.value} value={priority.value}>{priority.label}</option>
@@ -422,41 +372,9 @@ function AdminSupport({ embedded = false }) {
                     </select>
                   </div>
 
-                  <button className="note-btn" onClick={() => setShowNoteModal(true)}>
-                    <FiEdit /> Internal Note
+                  <button type="button" className="note-btn" onClick={() => setShowNoteModal(true)}>
+                    <FiEdit size={14} /> Note
                   </button>
-                </div>
-              </div>
-
-              {/* User Information Panel */}
-              <div className="ticket-user-panel">
-                <div className="user-info-item">
-                  <FiUser />
-                  <div>
-                    <label>Created By</label>
-                    <span>{selectedTicket.createdBy.name}</span>
-                  </div>
-                </div>
-                <div className="user-info-item">
-                  <FiMail />
-                  <div>
-                    <label>Email</label>
-                    <span>{selectedTicket.createdBy.email}</span>
-                  </div>
-                </div>
-                <div className="user-info-item">
-                  <FiTag />
-                  <div>
-                    <label>User Type</label>
-                    <span className="user-type-badge">{selectedTicket.createdBy.userType}</span>
-                  </div>
-                </div>
-                <div className="user-info-item">
-                  <FiCalendar />
-                  <div>
-                    <label>Created</label>
-                    <span>{new Date(selectedTicket.createdAt).toLocaleString()}</span>
-                  </div>
                 </div>
               </div>
 
@@ -464,17 +382,14 @@ function AdminSupport({ embedded = false }) {
               <div className="ticket-messages">
                 {messages.map((msg, index) => (
                   <div key={index} className={`message ${msg.sender.userType === 'Admin' ? 'admin-message' : 'user-message'}`}>
-                    <div className="message-avatar">
-                      {msg.sender.userType === 'Admin' ? '👨‍💼' : '👤'}
+                    <div className="message-header">
+                      <span className="message-sender">
+                        {msg.sender.name}
+                        {msg.sender.userType === 'Admin' && <span className="admin-badge">Admin</span>}
+                      </span>
+                      <span className="message-time">{new Date(msg.createdAt).toLocaleString()}</span>
                     </div>
                     <div className="message-content">
-                      <div className="message-header">
-                        <span className="message-sender">
-                          {msg.sender.name}
-                          {msg.sender.userType === 'Admin' && <span className="admin-badge">Admin</span>}
-                        </span>
-                        <span className="message-time">{new Date(msg.createdAt).toLocaleString()}</span>
-                      </div>
                       <p className="message-text">{msg.message}</p>
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="message-attachments">
@@ -498,7 +413,7 @@ function AdminSupport({ embedded = false }) {
                       placeholder="Type your admin reply..."
                       value={replyMessage}
                       onChange={(e) => setReplyMessage(e.target.value)}
-                      rows="4"
+                      rows="2"
                     />
                     <div className="reply-actions">
                       <label className="attach-btn">
@@ -521,7 +436,7 @@ function AdminSupport({ embedded = false }) {
             </>
           ) : (
             <div className="no-ticket-selected">
-              <FiMessageSquare size={64} />
+              <FiMessageSquare size={40} />
               <h3>Select a ticket to view details</h3>
               <p>Choose a ticket from the list to manage it</p>
             </div>

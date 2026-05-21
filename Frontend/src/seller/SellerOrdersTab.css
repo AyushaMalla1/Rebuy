@@ -89,9 +89,9 @@
 /* Order Status Tabs */
 .order-status-tabs {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 24px;
-  padding: 8px;
+  padding: 10px;
   background: white;
   border-radius: 12px;
   border: 1px solid #e5e7eb;

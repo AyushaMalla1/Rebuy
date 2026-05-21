@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, FiHeart, FiSettings, FiLogOut, FiEdit2, FiSave, FiX, FiHome, FiPackage, FiRefreshCw, FiTruck, FiAward, FiGift, FiMessageSquare, FiSend, FiBell, FiCheckCircle, FiSearch, FiVideo, FiMoreVertical, FiPaperclip, FiSmile, FiShoppingCart, FiMenu, FiRotateCcw } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, FiHeart, FiSettings, FiLogOut, FiEdit2, FiSave, FiX, FiHome, FiPackage, FiRefreshCw, FiTruck, FiAward, FiGift, FiMessageSquare, FiSend, FiBell, FiCheckCircle, FiSearch, FiVideo, FiMoreVertical, FiPaperclip, FiSmile, FiShoppingCart, FiMenu, FiRotateCcw, FiClock, FiShield } from 'react-icons/fi';
 import './BuyerProfile.css';
 import './LandingPage.css'; // Import LandingPage styles for header
 import { orderAPI, loyaltyAPI, customerAPI, authAPI, messageAPI } from './services/api';
@@ -193,6 +193,7 @@ function BuyerProfile() {
           sender: msg.senderId === userData._id ? 'buyer' : 'seller',
           text: msg.message,
           time: new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          createdAt: msg.createdAt, // Preserve createdAt for date divider
           read: msg.read
         }));
         
@@ -295,6 +296,7 @@ function BuyerProfile() {
           sender: 'buyer',
           text: messageText,
           time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          createdAt: new Date().toISOString(), // Add createdAt for date divider
           read: false
         };
         
@@ -794,22 +796,20 @@ function BuyerProfile() {
       
       if (profile) {
         // Update user data with profile info
-        setUserData({
+        setUserData(prev => ({
+          ...prev,
           fullName: profile.fullName,
           email: profile.email,
           phone: profile.phone || '',
-          address: '', // Will be from addresses array
-          city: '',
           profileImage: profile.profileImage || ''
-        });
-        setEditData({
+        }));
+        setEditData(prev => ({
+          ...prev,
           fullName: profile.fullName,
           email: profile.email,
           phone: profile.phone || '',
-          address: '',
-          city: '',
           profileImage: profile.profileImage || ''
-        });
+        }));
         setProfileImagePreview(profile.profileImage || '');
         
         // Load addresses
@@ -899,7 +899,13 @@ function BuyerProfile() {
   const fetchOrders = async (customerId) => {
     try {
       const fetchedOrders = await orderAPI.getCustomerOrders(customerId);
-      setOrders(fetchedOrders || []);
+      const mappedOrders = (fetchedOrders || []).map(order => ({
+        ...order,
+        conditionVerified: order.conditionVerification?.adminApproved === true,
+        verificationPending: order.conditionVerification?.verified === true && !order.conditionVerification?.adminApproved,
+        verifiedDate: order.conditionVerification?.approvedAt ? new Date(order.conditionVerification.approvedAt).toLocaleDateString() : (order.conditionVerification?.verifiedAt ? new Date(order.conditionVerification.verifiedAt).toLocaleDateString() : null)
+      }));
+      setOrders(mappedOrders);
     } catch (error) {
       console.error('❌ Error fetching orders:', error);
       setOrders([]);
@@ -1441,15 +1447,34 @@ function BuyerProfile() {
     }
   };
 
+  const formatOrderDate = (order) => {
+    const raw = order?.date || order?.createdAt || order?.placedAt || order?.orderDate;
+    if (!raw) return 'N/A';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return String(raw);
+    return parsed.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+  };
+
   const getStatusClass = (status) => {
-    if (!status) return '';
+    if (!status) return 'processing';
     switch (status.toLowerCase()) {
-      case 'delivered': return 'status-delivered';
-      case 'shipped': return 'status-shipped';
-      case 'processing': return 'status-processing';
-      case 'confirmed': return 'status-shipped';
-      case 'cancelled': return 'status-cancelled';
-      default: return '';
+      case 'delivered':
+      case 'completed':
+        return 'delivered';
+      case 'shipped':
+      case 'in transit':
+        return 'shipped';
+      case 'processing':
+      case 'confirmed':
+        return 'processing';
+      case 'pending':
+        return 'pending';
+      case 'cancelled':
+        return 'cancelled';
+      case 'returned':
+        return 'cancelled';
+      default:
+        return 'processing';
     }
   };
 
@@ -1493,7 +1518,7 @@ function BuyerProfile() {
           const reader = new FileReader();
           reader.onloadend = () => resolve(reader.result);
           reader.onerror = reject;
-          reader.readAsDataURL(img);
+          reader.readAsDataURL(img.file);
         });
       });
       
@@ -1964,8 +1989,8 @@ function BuyerProfile() {
                 <div key={order.id} className="order-card-compact">
                   <div className="order-header-compact">
                     <div className="order-id-date">
-                      <h3>Order ID : {order.id}</h3>
-                      <span className="order-date-compact">Order Placed On : {order.date}</span>
+                      <h3>Order ID : {order.orderId || order.id || order._id}</h3>
+                      <span className="order-date-compact">Order Placed On : {formatOrderDate(order)}</span>
                     </div>
                     <button 
                       className="view-details-link"
@@ -1980,7 +2005,7 @@ function BuyerProfile() {
 
                   <div className="order-products-list">
                     {(Array.isArray(order.items) ? order.items : Array.isArray(order.products) ? order.products : []).map((item, idx) => (
-                      <div key={idx} className="order-product-item">
+                      <div key={item._id || item.productId || `item-${order._id}-${idx}`} className="order-product-item">
                         <img 
                           src={item.image || item.productImage || 'https://via.placeholder.com/80'} 
                           alt={item.name || item.productName}
@@ -2071,7 +2096,7 @@ function BuyerProfile() {
                     {/* Product Items */}
                     <div className="modal-products-list">
                       {(Array.isArray(selectedOrder.items) ? selectedOrder.items : Array.isArray(selectedOrder.products) ? selectedOrder.products : []).map((item, index) => (
-                        <div key={index} className="modal-product-item">
+                        <div key={item._id || item.productId || `modal-item-${selectedOrder._id}-${index}`} className="modal-product-item">
                           <img 
                             src={item.image || item.productImage || 'https://via.placeholder.com/80'} 
                             alt={item.name || item.productName}
@@ -2438,23 +2463,20 @@ function BuyerProfile() {
                   }
                 })
                 .map(order => (
-                <div key={order.id} className="order-card-compact">
+                <div key={order._id || order.id} className="order-card-compact">
                   <div className="order-header-compact">
                     <div className="order-id-date">
-                      <h3>Order ID : {order.id}</h3>
+                      <h3>Order ID : {order.orderId || order.id || order._id}</h3>
                       <span className="order-date-compact">
                         {order.conditionVerified ? 'Verified On : ' : 'Delivered On : '}
                         {order.verifiedDate || order.deliveredDate || order.date}
                       </span>
                     </div>
-                    <span className={`status-badge-compact ${getStatusClass(order.status)}`}>
-                      {order.status}
-                    </span>
                   </div>
 
                   <div className="order-products-list">
                     {(Array.isArray(order.items) ? order.items : Array.isArray(order.products) ? order.products : []).map((item, idx) => (
-                      <div key={idx} className="order-product-item">
+                      <div key={item._id || item.productId || `cancelled-item-${order._id}-${idx}`} className="order-product-item">
                         <img 
                           src={item.image || item.productImage || 'https://via.placeholder.com/80'} 
                           alt={item.name || item.productName}
@@ -2468,6 +2490,13 @@ function BuyerProfile() {
                           <p className="product-quantity">Quantity : {item.quantity || 1}</p>
                           <p className="product-price">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString()}</p>
                         </div>
+                        {idx === 0 && (
+                          <div className="product-item-actions">
+                            <span className={`status-badge-compact ${getStatusClass(order.status)}`}>
+                              {order.status}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2476,6 +2505,10 @@ function BuyerProfile() {
                     {order.conditionVerified ? (
                       <div className="verified-badge-large">
                         <FiCheckCircle /> VERIFIED
+                      </div>
+                    ) : order.verificationPending ? (
+                      <div className="verified-badge-large" style={{ background: '#fff3cd', color: '#856404', borderColor: '#ffeeba' }}>
+                        <FiClock /> PENDING APPROVAL
                       </div>
                     ) : (
                       <button 
@@ -2531,7 +2564,6 @@ function BuyerProfile() {
               <div className="messages-sidebar">
                 <div className="messages-sidebar-header">
                   <h2>Messages</h2>
-                  <p>Chat with sellers about products</p>
                   <div className="messages-search">
                     <FiSearch />
                     <input
@@ -2652,8 +2684,8 @@ function BuyerProfile() {
                         <span>{formatDateDivider(selectedChat.messages)}</span>
                       </div>
                       {selectedChat.messages && selectedChat.messages.length > 0 ? (
-                        selectedChat.messages.map(msg => (
-                          <div key={msg.id} className={`message-row ${msg.sender === 'buyer' ? 'message-sent' : 'message-received'}`}>
+                        selectedChat.messages.map((msg, index) => (
+                          <div key={msg.id || `msg-${index}`} className={`message-row ${msg.sender === 'buyer' ? 'message-sent' : 'message-received'}`}>
                             {msg.sender === 'seller' && (
                               <div className="message-avatar-small">
                                 {selectedChat.sellerAvatar && (selectedChat.sellerAvatar.startsWith('http') || selectedChat.sellerAvatar.startsWith('data:image') || selectedChat.sellerAvatar.startsWith('/')) ? (
@@ -2692,9 +2724,9 @@ function BuyerProfile() {
                         </button>
                         {showEmojiPicker && (
                           <div className="emoji-picker-popup">
-                            {commonEmojis.map((emoji, index) => (
+                            {commonEmojis.map((emoji) => (
                               <button
-                                key={index}
+                                key={emoji}
                                 className="emoji-btn"
                                 onClick={() => handleEmojiClick(emoji)}
                               >
@@ -2794,7 +2826,7 @@ function BuyerProfile() {
                   {loyaltyData && loyaltyData.pointsHistory && loyaltyData.pointsHistory.length > 0 ? (
                     <div className="points-history-list">
                       {loyaltyData.pointsHistory.slice().reverse().map((transaction, index) => (
-                        <div key={index} className="points-history-item">
+                        <div key={transaction._id || `transaction-${index}`} className="points-history-item">
                           <div className={`points-history-icon ${transaction.type === 'earned' ? 'earned' : 'redeemed'}`}>
                             {transaction.type === 'earned' ? <FiShoppingBag /> : <FiGift />}
                           </div>
