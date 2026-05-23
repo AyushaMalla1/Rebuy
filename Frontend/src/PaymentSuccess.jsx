@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FiCheckCircle } from 'react-icons/fi';
 import './PaymentSuccess.css';
+import { API_BASE_URL } from './services/api';
+
 
 function PaymentSuccess() {
   const navigate = useNavigate();
@@ -50,7 +52,7 @@ function PaymentSuccess() {
         try {
           // Remove each ordered item from the cart
           for (const item of checkoutItems) {
-            await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/cart/${user._id}/remove/${item.id}`, {
+            await fetch(`${API_BASE_URL}/cart/${user._id}/remove/${item.id}`, {
               method: 'DELETE',
               headers: {
                 'Content-Type': 'application/json'
@@ -75,7 +77,7 @@ function PaymentSuccess() {
   const fetchShortOrderId = async (id) => {
     try {
       const res = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${id}`
+        `${API_BASE_URL}/orders/${id}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -87,7 +89,7 @@ function PaymentSuccess() {
   const verifyEsewaPayment = async (data, order_id) => {
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payment/esewa/verify-frontend`,
+        `${API_BASE_URL}/payment/esewa/verify-frontend`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { FiMessageCircle, FiX, FiSend, FiUser, FiCpu } from 'react-icons/fi';
 import './Chatbot.css';
+import { buildApiUrl } from '../services/api';
+
 
 // Removed direct Gemini API initialization as it's now handled by the Python backend.
 
@@ -76,7 +78,7 @@ function Chatbot() {
 
   const getBotResponse = async (userMessage) => {
     try {
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch(buildApiUrl('/chat'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -269,9 +271,9 @@ function Chatbot() {
                   {message.sender === 'user' ? <FiUser /> : <FiCpu />}
                 </div>
                 <div className="message-content">
-                  <div className="message-text">
+                  <p>
                     {renderMessageWithFormatting(message.text)}
-                  </div>
+                  </p>
                   <span className="message-time">
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -308,7 +310,7 @@ function Chatbot() {
                     className="quick-question-btn"
                     onClick={() => handleQuickQuestion(question)}
                   >
-                    {question}
+                    <span>{question}</span>
                   </button>
                 ))}
               </div>

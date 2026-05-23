@@ -30,147 +30,97 @@
   }
 }
 
-/* Stats Grid */
+/* Stats grid — clean neutral cards */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 20px;
-  padding: 2px 25px 1px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  padding: 0 24px;
   margin-bottom: 20px;
 }
 
 .stat-card {
   background: #ffffff;
-  border: 1px solid #e5e7eb !important;
-  border-top: 1px solid #e5e7eb !important;
-  border-left: 1px solid #e5e7eb !important;
-  border-right: 1px solid #e5e7eb !important;
-  border-bottom: 1px solid #e5e7eb !important;
-  border-radius: 3px;
-  padding: 1px 1px;
-  transition: all 0.2s ease;
-  box-shadow: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px 18px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   text-align: left;
   position: relative;
-  overflow: hidden;
 }
 
-.stat-card.blue {
-  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-  border: 1px solid #90caf9 !important;
-}
-
-.stat-card.green {
-  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-  border: 1px solid #a5d6a7 !important;
-}
-
-.stat-card.orange {
-  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-  border: 1px solid #ffcc80 !important;
-}
-
-.stat-card.purple {
-  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
-  border: 1px solid #ce93d8 !important;
-}
-
-.stat-card.cyan {
-  background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
-  border: 1px solid #80deea !important;
-}
-
+/* Same look for all variants — no pastel gradients */
+.stat-card.blue,
+.stat-card.green,
+.stat-card.orange,
+.stat-card.purple,
+.stat-card.cyan,
 .stat-card.red {
-  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
-  border: 1px solid #ef9a9a !important;
+  background: #ffffff;
+  border-color: #e5e7eb;
 }
 
 .stat-card-content {
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 14px;
 }
 
 .stat-icon-wrapper {
-  width: 18px;
-  height: 18px;
-  border-radius: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: none;
-  transition: all 0.2s ease;
-  background: transparent !important;
+  background: #f8fafc;
+  border: 1px solid #eef2f6;
+  color: #64748b;
 }
 
-.stat-card:hover .stat-icon-wrapper {
-  transform: none;
-}
-
-.stat-icon-wrapper.blue {
-  background: transparent;
-  color: #0284c7;
-}
-
-.stat-icon-wrapper.green {
-  background: transparent;
-  color: #16a34a;
-}
-
-.stat-icon-wrapper.orange {
-  background: transparent;
-  color: #ea580c;
-}
-
-.stat-icon-wrapper.purple {
-  background: transparent;
-  color: #9333ea;
-}
-
-.stat-icon-wrapper.cyan {
-  background: transparent;
-  color: #0891b2;
-}
-
+.stat-icon-wrapper.blue,
+.stat-icon-wrapper.green,
+.stat-icon-wrapper.orange,
+.stat-icon-wrapper.purple,
+.stat-icon-wrapper.cyan,
 .stat-icon-wrapper.red {
-  background: transparent;
-  color: #dc2626;
+  background: #f8fafc;
+  border: 1px solid #eef2f6;
+  color: #64748b;
 }
 
-.stat-icon-wrapper svg {
-  font-size: 26px !important;
-  width: 26px !important;
-  height: 26px !important;
+.stat-icon-wrapper svg,
+.stat-icon {
+  font-size: 20px !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.stat-content {
+  min-width: 0;
+  flex: 1;
 }
 
 .stat-label {
-  font-size: 8px;
-  color: #6b7280;
-  margin: 0;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0px;
-  text-align: left;
-  line-height: 1;
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 4px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.3;
 }
 
-.stat-card h3 {
-  font-size: 6px;
-  color: #1a202c;
-  margin: 0;
-  font-weight: 800;
-  line-height: 1;
-  text-align: left;
-}
-
+.stat-card h3,
 .stat-value {
-  font-size: 18px !important;
-  color: #1a202c;
+  font-size: 22px;
+  color: #0f172a;
   margin: 0;
-  font-weight: 600;
-  line-height: 1;
-  text-align: left;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .activity-section {
@@ -579,34 +529,18 @@
   box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
 }
 
-/* Clickable Stat Cards */
+/* Clickable stat cards */
 .clickable-stat {
   cursor: pointer;
-  position: relative;
-  transition: all 0.3s ease;
 }
 
 .clickable-stat:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
 
 .clickable-stat::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
-  opacity: 0;
-  transition: opacity 0.3s;
-  border-radius: 12px;
-  pointer-events: none;
-}
-
-.clickable-stat:hover::after {
-  opacity: 1;
+  display: none;
 }
 
 .click-indicator {

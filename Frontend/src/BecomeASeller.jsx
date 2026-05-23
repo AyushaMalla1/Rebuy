@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FiUser, FiMail, FiLock, FiPhone, FiMapPin, FiShoppingBag, FiFileText } from 'react-icons/fi';
 import './BecomeASeller.css';
+import { buildApiUrl } from './services/api';
+
 
 function BecomeASeller() {
   const navigate = useNavigate();
@@ -33,7 +35,6 @@ function BecomeASeller() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
     if (!formData.agreeToTerms) {
       setError('Please agree to Terms & Conditions');
       return;
@@ -59,7 +60,7 @@ function BecomeASeller() {
         userType: 'seller'
       });
 
-      const response = await axios.post('http://localhost:5000/api/auth/signup', {
+      const response = await axios.post(buildApiUrl('/auth/signup'), {
         fullName: formData.fullName,
         email: formData.email,
         password: formData.password,
@@ -85,7 +86,7 @@ function BecomeASeller() {
       
       // More detailed error messages
       if (err.code === 'ERR_NETWORK') {
-        setError('Cannot connect to server. Please ensure the backend is running on http://localhost:5000');
+        setError('Cannot connect to server. Please try again in a moment.');
       } else if (err.response?.status === 400) {
         setError(err.response.data.message || 'Invalid registration data');
       } else if (err.response?.status === 500) {
@@ -268,7 +269,7 @@ function BecomeASeller() {
               required
             />
             <label htmlFor="terms">
-              I agree to Rebuy's <a href="/terms">Seller Terms & Conditions</a> and <a href="/privacy">Privacy Policy</a>
+              I agree to Rebuy's <a href="/seller-terms">Seller Terms & Conditions</a>
             </label>
           </div>
 

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import './LandingPage.css';
 import { FiSearch, FiUser, FiShoppingCart, FiMenu, FiX, FiFilter, FiArrowRight, FiTag, FiBell, FiPackage, FiHeart, FiStar, FiRotateCcw, FiLogOut, FiSettings, FiMessageSquare, FiGift, FiCheckCircle } from 'react-icons/fi';
 import Chatbot from './components/Chatbot';
-import { productAPI, cartAPI } from './services/api';
+import { productAPI, cartAPI, buildApiUrl } from './services/api';
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -166,7 +166,7 @@ function LandingPage() {
     try {
       setLoading(true);
       
-      const response = await fetch('http://localhost:5000/api/products');
+      const response = await fetch(buildApiUrl('/products'));
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -426,7 +426,7 @@ function LandingPage() {
   // Fetch notifications for customers
   const fetchNotifications = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${userId}/unread-count`);
+      const response = await fetch(buildApiUrl(`/notifications/${userId}/unread-count`));
       const data = await response.json();
       
       if (response.ok && data.success) {
@@ -440,7 +440,7 @@ function LandingPage() {
   // Fetch all notifications for dropdown
   const fetchAllNotifications = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${userId}`);
+      const response = await fetch(buildApiUrl(`/notifications/${userId}`));
       const data = await response.json();
       
       if (response.ok && data.success) {
@@ -454,7 +454,7 @@ function LandingPage() {
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+      const response = await fetch(buildApiUrl(`/notifications/${notificationId}/read`), {
         method: 'PATCH'
       });
       
@@ -477,7 +477,7 @@ function LandingPage() {
     if (!user) return;
     
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${user._id}/mark-all-read`, {
+      const response = await fetch(buildApiUrl(`/notifications/${user._id}/mark-all-read`), {
         method: 'PATCH'
       });
       
@@ -982,177 +982,18 @@ function LandingPage() {
 
       {/* Collections Navigation */}
       <nav className="collections-nav">
-        <div 
-          className="collection-dropdown"
-          onMouseEnter={() => setActiveDropdown('men')}
-          onMouseLeave={() => setActiveDropdown(null)}
-        >
-          <a style={{cursor: 'pointer'}}>
-            MEN'S COLLECTIONS
-          </a>
-          {activeDropdown === 'men' && (
-            <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-content">
-                <div className="dropdown-section">
-                  <h4>Tops</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('T-Shirts', 'men'); setActiveDropdown(null); }}>T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Shirts', 'men'); setActiveDropdown(null); }}>Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Polos', 'men'); setActiveDropdown(null); }}>Polos</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Hoodies', 'men'); setActiveDropdown(null); }}>Hoodies</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sweaters', 'men'); setActiveDropdown(null); }}>Sweaters</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Bottoms</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Jeans', 'men'); setActiveDropdown(null); }}>Jeans</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Pants', 'men'); setActiveDropdown(null); }}>Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Shorts', 'men'); setActiveDropdown(null); }}>Shorts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Joggers', 'men'); setActiveDropdown(null); }}>Joggers</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Outerwear</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Jackets', 'men'); setActiveDropdown(null); }}>Jackets</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Coats', 'men'); setActiveDropdown(null); }}>Coats</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Blazers', 'men'); setActiveDropdown(null); }}>Blazers</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vests', 'men'); setActiveDropdown(null); }}>Vests</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div 
-          className="collection-dropdown"
-          onMouseEnter={() => setActiveDropdown('women')}
-          onMouseLeave={() => setActiveDropdown(null)}
-        >
-          <a style={{cursor: 'pointer'}}>
-            WOMEN'S COLLECTIONS
-          </a>
-          {activeDropdown === 'women' && (
-            <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-content">
-                <div className="dropdown-section">
-                  <h4>Tops</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('T-Shirts', 'women'); setActiveDropdown(null); }}>T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Blouses', 'women'); setActiveDropdown(null); }}>Blouses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sweaters', 'women'); setActiveDropdown(null); }}>Sweaters</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Hoodies', 'women'); setActiveDropdown(null); }}>Hoodies</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Tank Tops', 'women'); setActiveDropdown(null); }}>Tank Tops</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Bottoms</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Jeans', 'women'); setActiveDropdown(null); }}>Jeans</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Pants', 'women'); setActiveDropdown(null); }}>Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Skirts', 'women'); setActiveDropdown(null); }}>Skirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Leggings', 'women'); setActiveDropdown(null); }}>Leggings</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Dresses</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Casual Dresses', 'women'); setActiveDropdown(null); }}>Casual Dresses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Formal Dresses', 'women'); setActiveDropdown(null); }}>Formal Dresses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Maxi Dresses', 'women'); setActiveDropdown(null); }}>Maxi Dresses</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Mini Dresses', 'women'); setActiveDropdown(null); }}>Mini Dresses</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div 
-          className="collection-dropdown"
-          onMouseEnter={() => setActiveDropdown('sportswear')}
-          onMouseLeave={() => setActiveDropdown(null)}
-        >
-          <a style={{cursor: 'pointer'}}>
-            SPORTSWEAR COLLECTIONS
-          </a>
-          {activeDropdown === 'sportswear' && (
-            <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-content">
-                <div className="dropdown-section">
-                  <h4>Athletic Wear</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sports T-Shirts', 'sportswear'); setActiveDropdown(null); }}>Sports T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Tank Tops', 'sportswear'); setActiveDropdown(null); }}>Tank Tops</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Jerseys', 'sportswear'); setActiveDropdown(null); }}>Jerseys</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Tracksuits', 'sportswear'); setActiveDropdown(null); }}>Tracksuits</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Bottoms</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Joggers', 'sportswear'); setActiveDropdown(null); }}>Joggers</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Track Pants', 'sportswear'); setActiveDropdown(null); }}>Track Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sports Shorts', 'sportswear'); setActiveDropdown(null); }}>Shorts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Leggings', 'sportswear'); setActiveDropdown(null); }}>Leggings</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Outerwear</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Windbreakers', 'sportswear'); setActiveDropdown(null); }}>Windbreakers</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sports Hoodies', 'sportswear'); setActiveDropdown(null); }}>Hoodies</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Sports Jackets', 'sportswear'); setActiveDropdown(null); }}>Jackets</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div 
-          className="collection-dropdown"
-          onMouseEnter={() => setActiveDropdown('vintage')}
-          onMouseLeave={() => setActiveDropdown(null)}
-        >
-          <a style={{cursor: 'pointer'}}>
-            VINTAGE COLLECTIONS
-          </a>
-          {activeDropdown === 'vintage' && (
-            <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
-              <div className="dropdown-content">
-                <div className="dropdown-section">
-                  <h4>Vintage Tops</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Tops', 'vintage'); setActiveDropdown(null); }}>Vintage T-Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Tops', 'vintage'); setActiveDropdown(null); }}>Vintage Shirts</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Tops', 'vintage'); setActiveDropdown(null); }}>Vintage Sweaters</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Tops', 'vintage'); setActiveDropdown(null); }}>Band Tees</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Vintage Bottoms</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Bottoms', 'vintage'); setActiveDropdown(null); }}>Vintage Jeans</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Bottoms', 'vintage'); setActiveDropdown(null); }}>Vintage Pants</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Bottoms', 'vintage'); setActiveDropdown(null); }}>Vintage Shorts</li>
-                  </ul>
-                </div>
-                <div className="dropdown-section">
-                  <h4>Vintage Outerwear</h4>
-                  <ul>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Outerwear', 'vintage'); setActiveDropdown(null); }}>Vintage Jackets</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Outerwear', 'vintage'); setActiveDropdown(null); }}>Vintage Coats</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Outerwear', 'vintage'); setActiveDropdown(null); }}>Leather Jackets</li>
-                    <li onClick={(e) => { e.stopPropagation(); handleSubcategoryClick('Vintage Outerwear', 'vintage'); setActiveDropdown(null); }}>Denim Jackets</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <Link to="/mens-outlet" className="collection-link">
+          MEN'S COLLECTIONS
+        </Link>
+        <Link to="/womens-outlet" className="collection-link">
+          WOMEN'S COLLECTIONS
+        </Link>
+        <Link to="/sportswear-outlet" className="collection-link">
+          SPORTSWEAR COLLECTIONS
+        </Link>
+        <Link to="/vintage-outlet" className="collection-link">
+          VINTAGE COLLECTIONS
+        </Link>
       </nav>
 
       {/* Hero Section */}

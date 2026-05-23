@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './ForgotPassword.css';
+import { buildApiUrl } from './services/api';
+
 
 function ForgotPassword() {
   const navigate = useNavigate();
@@ -35,7 +37,6 @@ function ForgotPassword() {
     }
   }, [step, otpExpiry]);
 
-  // Format time as MM:SS
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -49,7 +50,7 @@ function ForgotPassword() {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/forgot-password', {
+      const response = await axios.post(buildApiUrl('/auth/forgot-password'), {
         email
       });
       
@@ -76,7 +77,7 @@ function ForgotPassword() {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/verify-otp', {
+      const response = await axios.post(buildApiUrl('/auth/verify-otp'), {
         email,
         otp
       });
@@ -113,7 +114,7 @@ function ForgotPassword() {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/reset-password', {
+      const response = await axios.post(buildApiUrl('/auth/reset-password'), {
         email,
         otp,
         newPassword,
@@ -141,7 +142,7 @@ function ForgotPassword() {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/forgot-password', {
+      const response = await axios.post(buildApiUrl('/auth/forgot-password'), {
         email
       });
       

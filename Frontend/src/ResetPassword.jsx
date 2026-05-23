@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import './ForgotPassword.css';
+import { buildApiUrl } from './services/api';
+
 
 function ResetPassword() {
   const navigate = useNavigate();
@@ -36,7 +38,7 @@ function ResetPassword() {
     }
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/reset-password', {
+      const response = await axios.post(buildApiUrl('/auth/reset-password'), {
         email,
         newPassword: formData.newPassword,
         confirmPassword: formData.confirmPassword

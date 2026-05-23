@@ -1,4 +1,12 @@
 {
+  "name": "rebuy",
+  "private": true,
+  "scripts": {
+    "test:frontend": "npm run test:ci --prefix Frontend",
+    "test:backend": "npm test --prefix Backend",
+    "test:ai": "cd AIChatbot && pytest",
+    "test": "npm run test:backend && npm run test:frontend && npm run test:ai"
+  },
   "dependencies": {
     "react-icons": "^5.6.0"
   }

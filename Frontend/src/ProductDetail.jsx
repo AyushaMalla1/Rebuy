@@ -4,7 +4,7 @@ import { FiHeart, FiShoppingCart, FiChevronLeft, FiChevronRight, FiStar, FiTruck
 import './ProductDetail.css';
 import Chatbot from './components/Chatbot';
 import ProductReviews from './components/ProductReviews';
-import { productAPI, cartAPI } from './services/api';
+import { productAPI, cartAPI, buildApiUrl } from './services/api';
 
 function ProductDetail() {
   const { id } = useParams();
@@ -41,7 +41,7 @@ function ProductDetail() {
       if (product && product._id) {
         try {
           // Use the dedicated similar products endpoint
-          const response = await fetch(`http://localhost:5000/api/products/${product._id}/similar`);
+          const response = await fetch(buildApiUrl(`/products/${product._id}/similar`));
           const data = await response.json();
           
           if (data.success) {
@@ -245,7 +245,7 @@ function ProductDetail() {
 
     try {
       const userData = JSON.parse(user);
-      const response = await fetch(`http://localhost:5000/api/wishlist/${userData._id}/add`, {
+      const response = await fetch(buildApiUrl(`/wishlist/${userData._id}/add`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -287,7 +287,7 @@ function ProductDetail() {
 
     try {
       const userData = JSON.parse(user);
-      const response = await fetch('http://localhost:5000/api/messages', {
+      const response = await fetch(buildApiUrl('/messages'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

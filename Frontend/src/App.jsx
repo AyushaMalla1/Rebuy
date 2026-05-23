@@ -18,6 +18,7 @@ import Contact from './Contact';
 import Sustainability from './Sustainability';
 import FAQ from './FAQ';
 import TermsConditions from './TermsConditions';
+import SellerTerms from './SellerTerms';
 import OrderStatus from './OrderStatus';
 import PaymentOptions from './PaymentOptions';
 import PaymentSuccess from './PaymentSuccess';
@@ -27,6 +28,8 @@ import Shop from './components/Shop';
 import SellerProfile from './SellerProfile';
 import MensOutlet from './MensOutlet';
 import WomensOutlet from './WomensOutlet';
+import SportswearOutlet from './SportswearOutlet';
+import VintageOutlet from './VintageOutlet';
 import MensJacket from './components/MensJacket';
 import MensHoodie from './components/MensHoodie';
 import MensPants from './components/MensPants';
@@ -106,6 +109,7 @@ function App() {
         <Route path="/sustainability" element={<Sustainability />} />
         <Route path="/faq" element={<FAQ />} />
         <Route path="/terms" element={<TermsConditions />} />
+        <Route path="/seller-terms" element={<SellerTerms />} />
         <Route path="/order-status" element={<OrderStatus />} />
         <Route path="/payment-options" element={<PaymentOptions />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
@@ -113,6 +117,8 @@ function App() {
         <Route path="/payment-verify" element={<PaymentVerify />} />
         <Route path="/mens-outlet" element={<MensOutlet />} />
         <Route path="/womens-outlet" element={<WomensOutlet />} />
+        <Route path="/sportswear-outlet" element={<SportswearOutlet />} />
+        <Route path="/vintage-outlet" element={<VintageOutlet />} />
         <Route path="/mens-jacket" element={<MensJacket />} />
         <Route path="/mens-hoodie" element={<MensHoodie />} />
         <Route path="/mens-pants" element={<MensPants />} />

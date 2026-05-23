@@ -951,11 +951,14 @@
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: heroImageFloat 6s ease-in-out infinite;
+  isolation: isolate;
 }
 
 .hero-image:hover {
   transform: scale(1.02);
+  box-shadow: 0 18px 48px rgba(0, 188, 212, 0.22);
 }
 
 .hero-image img {
@@ -964,10 +967,65 @@
   object-fit: cover;
   object-position: center 70%;
   transition: transform 0.5s ease;
+  animation: heroImagePan 12s ease-in-out infinite alternate;
 }
 
 .hero-image:hover img {
-  transform: scale(1.05);
+  transform: scale(1.08);
+  animation-play-state: paused;
+}
+
+.hero-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 38%,
+    rgba(255, 255, 255, 0.22) 48%,
+    transparent 58%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: heroImageShine 5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes heroImageFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes heroImagePan {
+  0% {
+    transform: scale(1.02) translate3d(-6px, 4px, 0);
+  }
+  100% {
+    transform: scale(1.08) translate3d(8px, -6px, 0);
+  }
+}
+
+@keyframes heroImageShine {
+  0%, 18% {
+    transform: translateX(-120%);
+  }
+  48%, 100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-image,
+  .hero-image img,
+  .hero-image::after {
+    animation: none;
+  }
 }
 
 .hero-text-overlay {

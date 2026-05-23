@@ -34,7 +34,7 @@ print("=" * 60)
 def chat():
     """Main chatbot endpoint - connects RAG and LLM"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({"error": "Invalid request"}), 400
         
@@ -87,9 +87,10 @@ def health():
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get("CHATBOT_PORT", 5001))
+    port = int(os.environ.get("PORT", os.environ.get("CHATBOT_PORT", 5001)))
+    debug = os.environ.get("NODE_ENV", "development") != "production"
     print(f"\n🚀 Starting AI Chatbot on http://0.0.0.0:{port}")
     print("📦 RAG Module: Loaded (handles database retrieval)")
     print("🧠 LLM Module: Loaded (handles AI response generation)")
     print("=" * 60)
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=debug)

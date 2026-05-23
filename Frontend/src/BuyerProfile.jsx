@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { FiUser, FiMail, FiPhone, FiMapPin, FiShoppingBag, FiHeart, FiSettings, FiLogOut, FiEdit2, FiSave, FiX, FiHome, FiPackage, FiRefreshCw, FiTruck, FiAward, FiGift, FiMessageSquare, FiSend, FiBell, FiCheckCircle, FiSearch, FiVideo, FiMoreVertical, FiPaperclip, FiSmile, FiShoppingCart, FiMenu, FiRotateCcw, FiClock, FiShield } from 'react-icons/fi';
 import './BuyerProfile.css';
 import './LandingPage.css'; // Import LandingPage styles for header
-import { orderAPI, loyaltyAPI, customerAPI, authAPI, messageAPI } from './services/api';
+import { orderAPI, loyaltyAPI, customerAPI, authAPI, messageAPI, buildApiUrl } from './services/api';
 import { getProvinces, getDistrictsByProvince, getMunicipalitiesByDistrict, getAreasByMunicipality } from './data/nepalLocations';
 
 function BuyerProfile() {
@@ -363,7 +363,7 @@ function BuyerProfile() {
     const user = JSON.parse(userData);
     
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${user._id}`);
+      const response = await fetch(buildApiUrl(`/notifications/${user._id}`));
       const data = await response.json();
       
       if (response.ok && data.success) {
@@ -383,7 +383,7 @@ function BuyerProfile() {
     const user = JSON.parse(userData);
     
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${user._id}/read-all`, {
+      const response = await fetch(buildApiUrl(`/notifications/${user._id}/read-all`), {
         method: 'PATCH'
       });
 
@@ -398,7 +398,7 @@ function BuyerProfile() {
 
   const markAsRead = async (notificationId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+      const response = await fetch(buildApiUrl(`/notifications/${notificationId}/read`), {
         method: 'PATCH'
       });
 
@@ -419,7 +419,7 @@ function BuyerProfile() {
     }
     
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
+      const response = await fetch(buildApiUrl(`/notifications/${notificationId}`), {
         method: 'DELETE'
       });
 
@@ -484,7 +484,7 @@ function BuyerProfile() {
     const user = JSON.parse(userDataLocal);
     
     try {
-      const response = await fetch(`http://localhost:5000/api/notifications/${user._id}/mark-all-read`, {
+      const response = await fetch(buildApiUrl(`/notifications/${user._id}/mark-all-read`), {
         method: 'PATCH'
       });
 
@@ -850,7 +850,7 @@ function BuyerProfile() {
       }
       
       // Fetch wishlist from backend
-      const response = await fetch(`http://localhost:5000/api/wishlist/${user._id}`, {
+      const response = await fetch(buildApiUrl(`/wishlist/${user._id}`), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -915,7 +915,7 @@ function BuyerProfile() {
   const fetchReturns = async (customerId) => {
     setLoadingReturns(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/returns/customer/${customerId}`);
+      const response = await fetch(buildApiUrl(`/returns/customer/${customerId}`));
       const data = await response.json();
       
       if (data.success) {
@@ -973,7 +973,7 @@ function BuyerProfile() {
   // Fetch cart for header
   const fetchCart = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/cart/${userId}`);
+      const response = await fetch(buildApiUrl(`/cart/${userId}`));
       const data = await response.json();
       
       if (response.ok && data.items) {
@@ -1426,7 +1426,7 @@ function BuyerProfile() {
       }
       
       // Remove from backend - using DELETE method with URL params
-      const response = await fetch(`http://localhost:5000/api/wishlist/${user._id}/remove/${itemId}`, {
+      const response = await fetch(buildApiUrl(`/wishlist/${user._id}/remove/${itemId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -4020,7 +4020,7 @@ function BuyerProfile() {
                     }
 
                     try {
-                      const response = await fetch('http://localhost:5000/api/returns/create', {
+                      const response = await fetch(buildApiUrl('/returns/create'), {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',

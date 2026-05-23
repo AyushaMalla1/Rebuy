@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Signup.css';
+import { buildApiUrl } from './services/api';
+
 
 function Signup() {
   const navigate = useNavigate();
@@ -27,7 +29,6 @@ function Signup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
     if (!formData.agreeToTerms) {
       setError('Please agree to Terms & Conditions');
       return;
@@ -47,7 +48,7 @@ function Signup() {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/signup', {
+      const response = await axios.post(buildApiUrl('/auth/signup'), {
         fullName: formData.fullName,
         email: formData.email,
         password: formData.password,

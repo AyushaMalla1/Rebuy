@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './PaymentSuccess.css';
+import { buildApiUrl } from './services/api';
+
 
 function PaymentVerify() {
   const navigate = useNavigate();
@@ -26,7 +28,7 @@ function PaymentVerify() {
 
     try {
       // For testing: manually mark order as paid
-      const response = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
+      const response = await fetch(buildApiUrl(`/orders/${orderId}/status`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -38,7 +40,7 @@ function PaymentVerify() {
 
       if (response.ok) {
         // Update payment status
-        await fetch(`http://localhost:5000/api/orders/${orderId}`, {
+        await fetch(buildApiUrl(`/orders/${orderId}`), {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json'

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiMapPin, FiPackage, FiCheck, FiX } from 'react-icons/fi';
 import './Checkout.css';
-import { orderAPI } from './services/api';
+import { orderAPI, API_BASE_URL } from './services/api';
 
 function Checkout() {
   const navigate = useNavigate();
@@ -110,7 +110,7 @@ function Checkout() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/customers/profile`, {
+      const response = await fetch(`${API_BASE_URL}/customers/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -172,7 +172,7 @@ function Checkout() {
 
       if (!token || !user) return;
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/customers/${user._id}/loyalty-points`, {
+      const response = await fetch(`${API_BASE_URL}/customers/${user._id}/loyalty-points`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -265,7 +265,7 @@ function Checkout() {
       }
 
       // Save address to backend
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/customers/addresses`, {
+      const response = await fetch(`${API_BASE_URL}/customers/addresses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -375,7 +375,7 @@ function Checkout() {
       setPaymentProcessing(true);
 
       // Call backend to initiate payment
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payment/initiate`, {
+      const response = await fetch(`${API_BASE_URL}/payment/initiate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -406,7 +406,7 @@ function Checkout() {
       } else {
         // Cancel the order before alerting user
         try {
-          await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/cancel`, {
+          await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
           });
@@ -424,7 +424,7 @@ function Checkout() {
       
       // Cancel the order before alerting user
       try {
-        await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/cancel`, {
+        await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
@@ -577,7 +577,7 @@ function Checkout() {
         try {
           // Remove each ordered item from the cart
           for (const item of cartItems) {
-            await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/cart/${user._id}/remove/${item.id}`, {
+            await fetch(`${API_BASE_URL}/cart/${user._id}/remove/${item.id}`, {
               method: 'DELETE',
               headers: {
                 'Content-Type': 'application/json'

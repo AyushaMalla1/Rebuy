@@ -1227,7 +1227,6 @@ export default function AdminDashboardController() {
     return filtered;
   };
 
-  // Helper function to format time ago
   const formatTimeAgo = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();

@@ -3,7 +3,7 @@ import {
   FaPlus, FaChartLine, FaEdit, FaTrash, FaBell, FaShoppingBag, FaQuestionCircle,
   FaCheckCircle, FaExclamationTriangle, FaTimesCircle, FaCopy, FaStar, FaChartPie,
   FaArchive, FaSearch, FaBullseye, FaLightbulb, FaEnvelope, FaBoxOpen, FaInfoCircle,
-  FaClock, FaEye
+  FaClock, FaEye, FaTruck, FaClipboardCheck
 } from 'react-icons/fa';
 import { HiTrendingUp } from 'react-icons/hi';
 import { MdDashboard } from 'react-icons/md';
@@ -207,65 +207,36 @@ function SellerOrdersTab() {
     verifications
   } = useSellerDashboard();
 
-  return (
-          <div className="products-section">
-            <div className="orders-header">
-              <h3 className="orders-title"></h3>
-              
-              <div className="orders-controls">
-              </div>
-            </div>
+  const orderStatusTabs = [
+    { key: 'All', label: 'All', icon: FaShoppingCart, count: orders.length },
+    { key: 'Pending', label: 'Pending', icon: FaClock, count: orders.filter((o) => o.status === 'Pending').length },
+    { key: 'Processing', label: 'Confirmed', icon: FaCheckCircle, count: orders.filter((o) => o.status === 'Processing').length },
+    { key: 'Shipped', label: 'Shipped', icon: FaTruck, count: orders.filter((o) => o.status === 'Shipped').length },
+    { key: 'Delivered', label: 'Completed', icon: FaClipboardCheck, count: orders.filter((o) => o.status === 'Delivered').length },
+    { key: 'Cancelled', label: 'Cancelled', icon: FaTimesCircle, count: orders.filter((o) => o.status === 'Cancelled').length },
+  ];
 
-            {/* Status Filter Tabs */}
-            <div className="order-status-tabs">
-              <button
-                onClick={() => setOrderStatusFilter('All')}
-                className={`order-status-tab ${orderStatusFilter === 'All' ? 'active' : ''}`}
-              >
-                <FaShoppingCart />
-                All
-                <span className="order-count-badge">{orders.length}</span>
-              </button>
-              <button
-                onClick={() => setOrderStatusFilter('Pending')}
-                className={`order-status-tab ${orderStatusFilter === 'Pending' ? 'active' : ''}`}
-              >
-                <FaClock />
-                Pending
-                <span className="order-count-badge">{orders.filter(o => o.status === 'Pending').length}</span>
-              </button>
-              <button
-                onClick={() => setOrderStatusFilter('Processing')}
-                className={`order-status-tab ${orderStatusFilter === 'Processing' ? 'active' : ''}`}
-              >
-                <FaCheckCircle />
-                Confirmed
-                <span className="order-count-badge">{orders.filter(o => o.status === 'Processing').length}</span>
-              </button>
-              <button
-                onClick={() => setOrderStatusFilter('Shipped')}
-                className={`order-status-tab ${orderStatusFilter === 'Shipped' ? 'active' : ''}`}
-              >
-                <FaBoxOpen />
-                Shipped
-                <span className="order-count-badge">{orders.filter(o => o.status === 'Shipped').length}</span>
-              </button>
-              <button
-                onClick={() => setOrderStatusFilter('Delivered')}
-                className={`order-status-tab ${orderStatusFilter === 'Delivered' ? 'active' : ''}`}
-              >
-                <FaCheckCircle />
-                Completed
-                <span className="order-count-badge">{orders.filter(o => o.status === 'Delivered').length}</span>
-              </button>
-              <button
-                onClick={() => setOrderStatusFilter('Cancelled')}
-                className={`order-status-tab ${orderStatusFilter === 'Cancelled' ? 'active' : ''}`}
-              >
-                <FaTimesCircle />
-                Cancelled
-                <span className="order-count-badge">{orders.filter(o => o.status === 'Cancelled').length}</span>
-              </button>
+  return (
+          <div className="products-section orders-section">
+            <div
+              className="orders-filter-tabs"
+              role="tablist"
+              aria-label="Filter orders by status"
+            >
+              {orderStatusTabs.map(({ key, label, icon: Icon, count }) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={orderStatusFilter === key}
+                  onClick={() => setOrderStatusFilter(key)}
+                  className={`orders-filter-tab ${orderStatusFilter === key ? 'active' : ''}`}
+                >
+                  <Icon className="orders-filter-tab-icon" aria-hidden />
+                  <span className="orders-filter-tab-label">{label}</span>
+                  <span className="orders-tab-count">{count}</span>
+                </button>
+              ))}
             </div>
             
             {loadingOrders ? (

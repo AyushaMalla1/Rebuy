@@ -186,17 +186,12 @@ function Cart() {
       .filter(item => selectedItems.includes(item.id))
       .reduce((total, item) => {
         let savings = 0;
-        
-        // Regular discount savings
         if (item.discount && item.originalPrice > item.price) {
           savings += (item.originalPrice - item.price) * item.quantity;
         }
-        
-        // Bundle discount savings
         if (item.bundleDiscount) {
           savings += item.bundleDiscount;
         }
-        
         return total + savings;
       }, 0);
   };
@@ -249,12 +244,12 @@ function Cart() {
       alert('Your cart is empty!');
       return;
     }
-    
+
     if (selectedItems.length === 0) {
       alert('Please select at least one item to checkout!');
       return;
     }
-    
+
     // Save only selected items to localStorage for checkout
     const itemsToCheckout = cart.filter(item => selectedItems.includes(item.id));
     localStorage.setItem('cart', JSON.stringify(itemsToCheckout));

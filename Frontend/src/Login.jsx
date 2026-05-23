@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Login.css';
+import { buildApiUrl } from './services/api';
+
 
 function Login() {
   const navigate = useNavigate();
@@ -71,7 +73,7 @@ function Login() {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axios.post(buildApiUrl('/auth/login'), {
         email: formData.email,
         password: formData.password,
         userType: activeTab
@@ -180,7 +182,7 @@ function Login() {
           onClick={() => {
             // Store the intended user type in sessionStorage before redirecting
             sessionStorage.setItem('googleAuthUserType', activeTab);
-            window.location.href = `http://localhost:5000/api/auth/google?userType=${activeTab}`;
+            window.location.href = buildApiUrl(`/auth/google?userType=${activeTab}`);
           }}
           style={{
             width: '100%',

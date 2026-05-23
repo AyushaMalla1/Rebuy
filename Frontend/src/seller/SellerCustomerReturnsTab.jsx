@@ -1,11 +1,19 @@
-import { FaArchive, FaCheckCircle, FaTimesCircle, FaBoxOpen, FaClock, FaEye } from 'react-icons/fa';
+import {
+  FaArchive,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaEye,
+  FaUser,
+  FaReceipt,
+} from 'react-icons/fa';
 import { useSellerDashboard } from './DashboardContext';
 import './SellerCustomerReturnsTab.css';
+
+const STATUS_FILTERS = ['All', 'Pending', 'Approved', 'Rejected', 'Refunded'];
 
 function SellerCustomerReturnsTab() {
   const {
     returns,
-    returnStats,
     returnStatusFilter,
     setReturnStatusFilter,
     loadingReturns,
@@ -17,102 +25,165 @@ function SellerCustomerReturnsTab() {
     globalSearch,
   } = useSellerDashboard();
 
-  let filtered = returnStatusFilter === 'All'
-    ? returns
-    : returns.filter(r => r.status === returnStatusFilter);
+  const getCustomerName = (ret) =>
+    ret.customer?.fullName ||
+    ret.orderId?.customerName ||
+    'Unknown customer';
 
-  if (globalSearch && globalSearch.trim() !== '') {
+  let filtered =
+    returnStatusFilter === 'All'
+      ? returns
+      : returns.filter((r) => r.status === returnStatusFilter);
+
+  if (globalSearch?.trim()) {
     const query = globalSearch.toLowerCase().trim();
-    filtered = filtered.filter(r =>
-      (r.product?.name || '').toLowerCase().includes(query) ||
-      getReturnOrderLabel(r).toLowerCase().includes(query) ||
-      (r.customer?.fullName || '').toLowerCase().includes(query) ||
-      (r.reason || '').toLowerCase().includes(query)
+    filtered = filtered.filter(
+      (r) =>
+        (r.product?.name || '').toLowerCase().includes(query) ||
+        getReturnOrderLabel(r).toLowerCase().includes(query) ||
+        getCustomerName(r).toLowerCase().includes(query) ||
+        (r.reason || '').toLowerCase().includes(query)
     );
   }
 
+  const countForStatus = (status) =>
+    status === 'All' ? returns.length : returns.filter((r) => r.status === status).length;
+
+  const formatDate = (value) => {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
   return (
     <div className="seller-returns-section">
-      {/* Filter Tabs */}
-      <div className="returns-filter-tabs">
-        {['All', 'Pending', 'Approved', 'Rejected', 'Refunded'].map(status => (
+      <div className="returns-filter-tabs" role="tablist" aria-label="Filter returns">
+        {STATUS_FILTERS.map((status) => (
           <button
             key={status}
+            type="button"
+            role="tab"
+            aria-selected={returnStatusFilter === status}
             onClick={() => setReturnStatusFilter(status)}
             className={`returns-filter-tab ${returnStatusFilter === status ? 'active' : ''}`}
           >
             {status}
-            <span className="returns-count-badge">
-              {status === 'All' ? returns.length : returns.filter(r => r.status === status).length}
-            </span>
+            <span className="returns-count-badge">{countForStatus(status)}</span>
           </button>
         ))}
       </div>
 
-      {/* Returns List */}
       {loadingReturns ? (
         <div className="returns-loading">
-          <p>Loading returns...</p>
+          <div className="returns-loading-spinner" />
+          <p>Loading return requests…</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="returns-empty">
-          <FaArchive size={56} className="returns-empty-icon" />
-          <h3>No Returns Found</h3>
-          <p>{returnStatusFilter === 'All' ? 'No return requests from customers yet.' : `No ${returnStatusFilter.toLowerCase()} returns.`}</p>
+          <div className="returns-empty-icon-wrap">
+            <FaArchive size={28} />
+          </div>
+          <h3>No returns found</h3>
+          <p>
+            {returnStatusFilter === 'All'
+              ? 'When customers request a return, it will show up here.'
+              : `No ${returnStatusFilter.toLowerCase()} returns right now.`}
+          </p>
         </div>
       ) : (
         <div className="returns-list">
-          {filtered.map(ret => (
-            <div key={ret._id} className="return-card">
-              <div className="return-card-image">
-                <img src={getReturnImage(ret)} alt={ret.product?.name || 'Product'} />
-              </div>
-              <div className="return-card-info">
-                <div className="return-card-header">
-                  <div>
-                    <h4 className="return-product-name">{ret.product?.name || 'Unknown Product'}</h4>
-                    <p className="return-order-id">Order: #{getReturnOrderLabel(ret)}</p>
-                    <p className="return-customer">{ret.customer?.fullName || 'Customer'}</p>
-                  </div>
-                  <span className={`return-status-badge ${ret.status?.toLowerCase()}`}>{ret.status}</span>
+          {filtered.map((ret) => {
+            const statusKey = ret.status?.toLowerCase() || 'pending';
+            return (
+              <article
+                key={ret._id}
+                className={`return-card return-card--${statusKey}`}
+              >
+                <div className="return-card-image">
+                  <img src={getReturnImage(ret)} alt="" />
                 </div>
-                <div className="return-card-details">
-                  <div className="return-detail-item">
-                    <span className="return-detail-label">Reason</span>
-                    <span className="return-detail-value">{ret.reason}</span>
+
+                <div className="return-card-main">
+                  <div className="return-card-top">
+                    <h4 className="return-product-name">
+                      {ret.product?.name || 'Unknown product'}
+                    </h4>
+                    <span className={`return-status-badge ${statusKey}`}>
+                      {ret.status}
+                    </span>
                   </div>
-                  <div className="return-detail-item">
-                    <span className="return-detail-label">Refund Amount</span>
-                    <span className="return-detail-value return-refund">Rs. {Number(ret.refundAmount || 0).toLocaleString()}</span>
+
+                  <div className="return-card-meta">
+                    <span className="return-meta-chip">
+                      <FaReceipt aria-hidden />
+                      #{getReturnOrderLabel(ret)}
+                    </span>
+                    <span className="return-meta-chip">
+                      <FaUser aria-hidden />
+                      {getCustomerName(ret)}
+                    </span>
                   </div>
-                  <div className="return-detail-item">
-                    <span className="return-detail-label">Requested</span>
-                    <span className="return-detail-value">{new Date(ret.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <div className="return-card-actions">
-                  <button className="return-btn view" onClick={() => setSelectedReturn(ret)}>
-                    <FaEye /> View Details
-                  </button>
-                  {ret.status === 'Pending' && (
-                    <>
-                      <button className="return-btn approve" onClick={() => handleReturnResponse(ret._id, 'Approved')}>
-                        <FaCheckCircle /> Approve
+
+                  <div className="return-card-footer">
+                    <dl className="return-facts">
+                      <div className="return-fact">
+                        <dt>Reason</dt>
+                        <dd>{ret.reason}</dd>
+                      </div>
+                      <div className="return-fact return-fact--refund">
+                        <dt>Refund</dt>
+                        <dd>Rs. {Number(ret.refundAmount || 0).toLocaleString()}</dd>
+                      </div>
+                      <div className="return-fact">
+                        <dt>Requested</dt>
+                        <dd>{formatDate(ret.createdAt)}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="return-card-actions">
+                      <button
+                        type="button"
+                        className="return-btn return-btn--primary"
+                        onClick={() => setSelectedReturn(ret)}
+                      >
+                        <FaEye aria-hidden /> Details
                       </button>
-                      <button className="return-btn reject" onClick={() => handleReturnResponse(ret._id, 'Rejected')}>
-                        <FaTimesCircle /> Reject
-                      </button>
-                    </>
-                  )}
-                  {ret.status === 'Approved' && (
-                    <button className="return-btn complete" onClick={() => handleCompleteReturn(ret._id)}>
-                      <FaCheckCircle /> Mark Completed
-                    </button>
-                  )}
+                      {ret.status === 'Pending' && (
+                        <>
+                          <button
+                            type="button"
+                            className="return-btn return-btn--approve"
+                            onClick={() => handleReturnResponse(ret._id, 'Approved')}
+                          >
+                            <FaCheckCircle aria-hidden /> Approve
+                          </button>
+                          <button
+                            type="button"
+                            className="return-btn return-btn--reject"
+                            onClick={() => handleReturnResponse(ret._id, 'Rejected')}
+                          >
+                            <FaTimesCircle aria-hidden /> Reject
+                          </button>
+                        </>
+                      )}
+                      {ret.status === 'Approved' && (
+                        <button
+                          type="button"
+                          className="return-btn return-btn--complete"
+                          onClick={() => handleCompleteReturn(ret._id)}
+                        >
+                          <FaCheckCircle aria-hidden /> Complete
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

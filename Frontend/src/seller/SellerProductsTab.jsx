@@ -48,60 +48,45 @@ function SellerProductsTab() {
 
   return (
     <div className="products-section">
-      <div className="product-management-panel">
-        <div className="product-management-topbar">
+      <div className="products-toolbar">
+        <div className="products-toolbar-row">
           <button
+            type="button"
             onClick={() => setShowAddProduct(!showAddProduct)}
-            className="add-product-btn"
+            className={`products-add-btn ${showAddProduct ? 'is-open' : ''}`}
           >
-            <FaPlus /> {showAddProduct ? 'Close Form' : 'Add Product'}
+            <FaPlus aria-hidden />
+            {showAddProduct ? 'Close form' : 'Add product'}
           </button>
 
-          <div className="product-toolbar">
-            <select
-              value={productStatusFilter}
-              onChange={(e) => setProductStatusFilter(e.target.value)}
-              className="product-filter-select"
-            >
-              <option value="All">All approval</option>
-              <option value="Approved">Approved</option>
-              <option value="Pending">Pending</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-            <select
-              value={productStockFilter}
-              onChange={(e) => setProductStockFilter(e.target.value)}
-              className="product-filter-select"
-            >
-              <option value="All">All stock</option>
-              <option value="Active">Active stock</option>
-              <option value="Low">Low stock</option>
-              <option value="Out">Out of stock</option>
-            </select>
+          <div className="products-toolbar-filters">
+            <label className="products-select-wrap">
+              <span className="products-select-label">Approval</span>
+              <select
+                value={productStatusFilter}
+                onChange={(e) => setProductStatusFilter(e.target.value)}
+                className="products-select"
+              >
+                <option value="All">All</option>
+                <option value="Approved">Approved</option>
+                <option value="Pending">Pending</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </label>
+            <label className="products-select-wrap">
+              <span className="products-select-label">Stock</span>
+              <select
+                value={productStockFilter}
+                onChange={(e) => setProductStockFilter(e.target.value)}
+                className="products-select"
+              >
+                <option value="All">All</option>
+                <option value="Active">In stock</option>
+                <option value="Low">Low stock</option>
+                <option value="Out">Out of stock</option>
+              </select>
+            </label>
           </div>
-        </div>
-
-        <div className="product-summary-strip">
-          <button className={`product-summary-item ${productStatusFilter === 'All' && productStockFilter === 'All' ? 'active' : ''}`} onClick={() => { setProductStatusFilter('All'); setProductStockFilter('All'); }}>
-            <span>All Products</span>
-            <strong>{products.length}</strong>
-          </button>
-          <button className={`product-summary-item ${productStatusFilter === 'Approved' ? 'active' : ''}`} onClick={() => setProductStatusFilter('Approved')}>
-            <span>Approved</span>
-            <strong>{products.filter(product => product.status === 'Approved').length}</strong>
-          </button>
-          <button className={`product-summary-item ${productStatusFilter === 'Pending' ? 'active' : ''}`} onClick={() => setProductStatusFilter('Pending')}>
-            <span>Pending</span>
-            <strong>{products.filter(product => product.status === 'Pending').length}</strong>
-          </button>
-          <button className={`product-summary-item ${productStockFilter === 'Low' ? 'active' : ''}`} onClick={() => setProductStockFilter('Low')}>
-            <span>Low Stock</span>
-            <strong>{products.filter(product => product.stock > 0 && product.stock <= 20).length}</strong>
-          </button>
-          <button className={`product-summary-item ${productStockFilter === 'Out' ? 'active' : ''}`} onClick={() => setProductStockFilter('Out')}>
-            <span>Out of Stock</span>
-            <strong>{products.filter(product => product.stock === 0).length}</strong>
-          </button>
         </div>
       </div>
 

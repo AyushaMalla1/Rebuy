@@ -602,48 +602,76 @@ function SellerDashboardContent() {
 
       {/* RETURN DETAILS MODAL */}
       {selectedReturn && (
-        <div className="modal-overlay" onClick={() => setSelectedReturn(null)}>
-          <div className="seller-detail-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="seller-detail-header">
-              <div>
-                <p className="seller-detail-kicker">Return Request</p>
+        <div className="modal-overlay return-modal-overlay" onClick={() => setSelectedReturn(null)}>
+          <div className="seller-detail-modal return-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="seller-detail-header return-detail-header">
+              <div className="return-detail-header-text">
+                <p className="seller-detail-kicker">Return request</p>
                 <h3>Order #{getReturnOrderLabel(selectedReturn)}</h3>
+                <span className={`return-status-badge ${selectedReturn.status?.toLowerCase()}`}>
+                  {selectedReturn.status}
+                </span>
               </div>
-              <button className="seller-detail-close" onClick={() => setSelectedReturn(null)}>x</button>
+              <button
+                type="button"
+                className="seller-detail-close"
+                aria-label="Close"
+                onClick={() => setSelectedReturn(null)}
+              >
+                <FaTimesCircle />
+              </button>
             </div>
 
-            <div className="seller-detail-body">
+            <div className="seller-detail-body return-detail-body">
               <div className="seller-detail-media">
-                <img src={getReturnImage(selectedReturn)} alt={selectedReturn.product?.name || 'Returned product'} />
+                <img src={getReturnImage(selectedReturn)} alt="" />
               </div>
-              <div className="seller-detail-content">
+              <div className="seller-detail-content return-detail-content">
                 <div className="detail-row">
                   <span>Product</span>
-                  <strong>{selectedReturn.product?.name || 'Unknown Product'}</strong>
+                  <strong>{selectedReturn.product?.name || 'Unknown product'}</strong>
                 </div>
                 <div className="detail-row">
                   <span>Customer</span>
-                  <strong>{selectedReturn.customer?.fullName || 'Customer'}</strong>
-                  <p>{selectedReturn.customer?.email || ''}</p>
+                  <strong>
+                    {selectedReturn.customer?.fullName ||
+                      selectedReturn.orderId?.customerName ||
+                      'Unknown customer'}
+                  </strong>
+                  {(selectedReturn.customer?.email || selectedReturn.orderId?.customerEmail) && (
+                    <p>
+                      {selectedReturn.customer?.email || selectedReturn.orderId?.customerEmail}
+                    </p>
+                  )}
                 </div>
                 <div className="detail-row">
                   <span>Reason</span>
                   <strong>{selectedReturn.reason}</strong>
-                  <p>{selectedReturn.description}</p>
+                  {selectedReturn.description && <p>{selectedReturn.description}</p>}
                 </div>
-                <div className="detail-row detail-grid">
+                <div className="detail-row detail-grid return-detail-metrics">
                   <div>
-                    <span>Status</span>
-                    <strong>{selectedReturn.status}</strong>
+                    <span>Refund amount</span>
+                    <strong className="return-detail-refund">
+                      Rs. {Number(selectedReturn.refundAmount || 0).toLocaleString()}
+                    </strong>
                   </div>
                   <div>
-                    <span>Refund</span>
-                    <strong>Rs. {Number(selectedReturn.refundAmount || 0).toLocaleString()}</strong>
+                    <span>Requested</span>
+                    <strong>
+                      {selectedReturn.createdAt
+                        ? new Date(selectedReturn.createdAt).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })
+                        : '—'}
+                    </strong>
                   </div>
                 </div>
                 {selectedReturn.sellerResponse && (
                   <div className="detail-row">
-                    <span>Your Response</span>
+                    <span>Your response</span>
                     <p>{selectedReturn.sellerResponse}</p>
                   </div>
                 )}
@@ -651,30 +679,68 @@ function SellerDashboardContent() {
             </div>
 
             {(selectedReturn.images?.length > 0 || selectedReturn.verificationImages?.length > 0) && (
-              <div className="seller-detail-gallery">
-                {[...(selectedReturn.images || []), ...(selectedReturn.verificationImages || [])].map((image, index) => (
-                  <img key={`${image}-${index}`} src={image} alt={`Return evidence ${index + 1}`} />
-                ))}
+              <div className="seller-detail-gallery return-detail-gallery">
+                <p className="return-gallery-title">Customer evidence</p>
+                <div className="return-gallery-grid">
+                  {[...(selectedReturn.images || []), ...(selectedReturn.verificationImages || [])].map((image, index) => (
+                    <a
+                      key={`${image}-${index}`}
+                      href={image}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="return-gallery-thumb"
+                    >
+                      <img src={image} alt={`Evidence ${index + 1}`} />
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
 
-            <div className="seller-detail-actions">
+            <div className="seller-detail-actions return-detail-actions">
               {selectedReturn.status === 'Pending' && (
                 <>
-                  <button className="approve-btn" onClick={() => { handleReturnResponse(selectedReturn._id, 'Approved'); setSelectedReturn(null); }}>
-                    <FaCheckCircle /> Approve
+                  <button
+                    type="button"
+                    className="return-modal-btn return-modal-btn--approve"
+                    onClick={() => {
+                      handleReturnResponse(selectedReturn._id, 'Approved');
+                      setSelectedReturn(null);
+                    }}
+                  >
+                    <FaCheckCircle /> Approve return
                   </button>
-                  <button className="reject-btn" onClick={() => { handleReturnResponse(selectedReturn._id, 'Rejected'); setSelectedReturn(null); }}>
+                  <button
+                    type="button"
+                    className="return-modal-btn return-modal-btn--reject"
+                    onClick={() => {
+                      handleReturnResponse(selectedReturn._id, 'Rejected');
+                      setSelectedReturn(null);
+                    }}
+                  >
                     <FaTimesCircle /> Reject
                   </button>
                 </>
               )}
               {selectedReturn.status === 'Approved' && (
-                <button className="complete-btn" onClick={() => { handleCompleteReturn(selectedReturn._id); setSelectedReturn(null); }}>
-                  <FaCheckCircle /> Mark Completed
+                <button
+                  type="button"
+                  className="return-modal-btn return-modal-btn--complete"
+                  onClick={() => {
+                    handleCompleteReturn(selectedReturn._id);
+                    setSelectedReturn(null);
+                  }}
+                >
+                  <FaCheckCircle /> Mark completed
                 </button>
               )}
-              <button className="modal-cancel-btn" onClick={() => setSelectedReturn(null)}>Close</button>
+              <button
+                type="button"
+                className="return-modal-btn return-modal-btn--ghost"
+                onClick={() => setSelectedReturn(null)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

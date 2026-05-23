@@ -5,7 +5,7 @@ import './components/CategoryPage.css';
 import { buildApiUrl } from './services/api';
 
 
-function MensOutlet() {
+function SportswearOutlet() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,9 +19,9 @@ function MensOutlet() {
     try {
       const response = await fetch(buildApiUrl('/products'));
       const data = await response.json();
-      // Filter by category "Men's Collection"
-      const mensProducts = data.filter(p => p.category === "Men's Collection");
-      setProducts(mensProducts);
+      // Filter by category "Sportswear"
+      const sportswearProducts = data.filter(p => p.category === "Sportswear");
+      setProducts(sportswearProducts);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -36,10 +36,10 @@ function MensOutlet() {
   return (
     <div className="outlet-page">
       <div className="outlet-breadcrumb">
-        <span onClick={() => navigate('/')}>Home</span> / <span>Men's Outlet</span>
+        <span onClick={() => navigate('/')}>Home</span> / <span>Sportswear Collection</span>
       </div>
 
-      <h1 className="outlet-title">Men's Outlet</h1>
+      <h1 className="outlet-title">Sportswear Collection</h1>
 
       <div className="outlet-container">
         {/* Sidebar Filters */}
@@ -49,7 +49,7 @@ function MensOutlet() {
             <FiSearch className="search-icon" />
             <input 
               type="text" 
-              placeholder="Search products" 
+              placeholder="Search sportswear" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -64,6 +64,10 @@ function MensOutlet() {
 
           {loading ? (
             <div className="loading-state">Loading products...</div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="no-products">
+              <p>No sportswear products found.</p>
+            </div>
           ) : (
             <div className="outlet-grid">
               {filteredProducts.map(product => (
@@ -78,6 +82,9 @@ function MensOutlet() {
                   <div className="outlet-card-info">
                     <h3>{product.name}</h3>
                     <p className="outlet-card-price">Rs.{product.price.toLocaleString()}</p>
+                    {product.condition && (
+                      <span className="product-condition">{product.condition}</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -89,4 +96,4 @@ function MensOutlet() {
   );
 }
 
-export default MensOutlet;
+export default SportswearOutlet;

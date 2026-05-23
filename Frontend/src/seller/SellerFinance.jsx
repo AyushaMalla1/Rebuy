@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { FiDollarSign, FiCreditCard, FiCheck, FiClock, FiEdit2, FiSave, FiX } from 'react-icons/fi';
 import './SellerFinance.css';
+import { API_BASE_URL } from '../services/api';
+
 
 function SellerFinance() {
   const [financeData, setFinanceData] = useState(null);
@@ -32,7 +34,7 @@ function SellerFinance() {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payouts/seller/${user._id}/summary`, {
+      const response = await fetch(`${API_BASE_URL}/payouts/seller/${user._id}/summary`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -75,7 +77,7 @@ function SellerFinance() {
         return;
       }
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payouts/seller/${user._id}/details`, {
+      const response = await fetch(`${API_BASE_URL}/payouts/seller/${user._id}/details`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -114,7 +116,7 @@ function SellerFinance() {
       setRequestingPayout(true);
       const user = JSON.parse(localStorage.getItem('user'));
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payouts/seller/${user._id}/request`, {
+      const response = await fetch(`${API_BASE_URL}/payouts/seller/${user._id}/request`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

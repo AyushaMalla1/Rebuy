@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiSearch } from 'react-icons/fi';
 import './CategoryPage.css';
+import { buildApiUrl } from '../services/api';
+
 
 function MensPants() {
   const navigate = useNavigate();
@@ -15,7 +17,7 @@ function MensPants() {
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/products');
+      const response = await fetch(buildApiUrl('/products'));
       const data = await response.json();
       const pants = data.filter(p => 
         p.category === "Men's Collection" && 

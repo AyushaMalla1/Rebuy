@@ -19,7 +19,7 @@ router.get('/seller/:sellerId', async (req, res) => {
     const returns = await Return.find(query)
       .populate('customer', 'fullName email phone')
       .populate('product', 'name images price')
-      .populate('orderId', 'orderId orderDate')
+      .populate('orderId', 'orderId orderDate customerName customerEmail customerPhone')
       .sort({ createdAt: -1 });
 
     res.json({

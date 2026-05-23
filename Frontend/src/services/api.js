@@ -1,8 +1,21 @@
-// API Base URL
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// API Base URL. REACT_APP_API_URL may be either the server origin
+// (https://rebuy-backend.onrender.com) or the API root (.../api).
+const configuredApiUrl = (process.env.REACT_APP_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+export const API_BASE_URL = configuredApiUrl.endsWith('/api')
+  ? configuredApiUrl
+  : `${configuredApiUrl}/api`;
+export const API_ORIGIN = API_BASE_URL.replace(/\/api$/, '');
 
 // Build full API URL helper
-export const buildApiUrl = (endpoint) => `${API_BASE_URL}${endpoint}`;
+export const buildApiUrl = (endpoint) => {
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${API_BASE_URL}${normalizedEndpoint}`;
+};
+
+export const buildServerUrl = (endpoint) => {
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${API_ORIGIN}${normalizedEndpoint}`;
+};
 
 // Fetch wrapper with auth token support
 export const apiFetch = async (endpoint, options = {}) => {

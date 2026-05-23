@@ -8,6 +8,8 @@ Backend/node_modules/
 Backend/.env
 AIChatbot/.env
 Frontend/.env
+*.postman_environment.json
+*.postman_collection.json
 
 # Build files
 Frontend/build/
@@ -27,3 +29,12 @@ Thumbs.db
 
 # Test files
 Backend/test-connection.js
+**/tests/
+**/__tests__/
+**/setupTests.js
+**/jest.config.js
+run-all-tests.bat
+
+# Python cache
+__pycache__/
+*.py[cod]

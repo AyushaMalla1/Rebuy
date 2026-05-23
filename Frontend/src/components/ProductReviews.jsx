@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import './ProductReviews.css';
+import { buildApiUrl } from '../services/api';
+
 
 function ProductReviews({ productId }) {
   const [verifications, setVerifications] = useState([]);
@@ -12,7 +14,7 @@ function ProductReviews({ productId }) {
   const fetchVerifications = async () => {
     try {
       // Fetch orders with condition verifications for this product
-      const response = await fetch(`http://localhost:5000/api/orders/product/${productId}/verifications`);
+      const response = await fetch(buildApiUrl(`/orders/product/${productId}/verifications`));
       const data = await response.json();
       console.log('Verification data received:', data); // Debug log
       console.log('Verifications:', data.verifications); // Debug log

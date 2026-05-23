@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiMail, FiPhone, FiMapPin, FiClock, FiFacebook, FiTwitter, FiInstagram, FiPaperclip } from 'react-icons/fi';
 import axios from 'axios';
 import './Contact.css';
+import { API_BASE_URL } from './services/api';
+
 
 function Contact() {
   const navigate = useNavigate();
@@ -70,7 +72,7 @@ function Contact() {
         data.append('attachments', file);
       });
 
-      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/support/tickets`, data, {
+      const response = await axios.post(`${API_BASE_URL}/support/tickets`, data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 

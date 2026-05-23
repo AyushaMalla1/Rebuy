@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { FiStar, FiPackage, FiShoppingBag, FiMapPin, FiClock, FiTruck, FiAward, FiMessageCircle, FiShield } from 'react-icons/fi';
 import './SellerProfile.css';
+import { buildApiUrl } from './services/api';
+
 
 function SellerProfile() {
   const { sellerId } = useParams();
@@ -25,7 +27,7 @@ function SellerProfile() {
       setLoading(true);
       
       // Fetch seller info
-      const sellerResponse = await fetch(`http://localhost:5000/api/sellers/${sellerId}`);
+      const sellerResponse = await fetch(buildApiUrl(`/sellers/${sellerId}`));
       const sellerData = await sellerResponse.json();
       
       if (!sellerData.success || !sellerData.seller) {
@@ -38,7 +40,7 @@ function SellerProfile() {
       setSeller(sellerData.seller);
       
       // Fetch seller's products
-      const productsResponse = await fetch(`http://localhost:5000/api/sellers/${sellerId}/products`);
+      const productsResponse = await fetch(buildApiUrl(`/sellers/${sellerId}/products`));
       const productsData = await productsResponse.json();
       
       if (productsData.success && productsData.products) {
@@ -66,7 +68,7 @@ function SellerProfile() {
       const conversationId = [senderId, seller._id].sort().join('_');
       
       // Check if conversation already exists
-      const existingConvResponse = await fetch(`http://localhost:5000/api/messages/conversations/${senderId}`);
+      const existingConvResponse = await fetch(buildApiUrl(`/messages/conversations/${senderId}`));
       const existingConvData = await existingConvResponse.json();
       
       let conversationExists = false;
@@ -91,7 +93,7 @@ function SellerProfile() {
           role: user.role
         });
         
-        const response = await fetch('http://localhost:5000/api/messages', {
+        const response = await fetch(buildApiUrl('/messages'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
