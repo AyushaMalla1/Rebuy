@@ -11,6 +11,7 @@ const { initFraudDetectionScheduler } = require('./utils/fraudDetectionScheduler
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1); // Trust Render's proxy
 
 // Security Middleware
 app.use(helmet());
