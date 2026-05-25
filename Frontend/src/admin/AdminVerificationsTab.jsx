@@ -129,24 +129,31 @@ function AdminVerificationsTab() {
               </button>
             </div>
             <div className="modal-body">
-              <div className="info-grid">
-                <div className="info-item">
-                  <label>Customer</label>
-                  <span>{activeVerification.customerName || activeVerification.customer?.fullName || 'Unknown'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Product</label>
-                  <span>{activeVerification.productName || activeVerification.product?.name || 'Unknown Product'}</span>
-                </div>
-                <div className="info-item">
-                  <label>Rating</label>
-                  <span>{activeVerification.rating || 0}/5</span>
-                </div>
-                <div className="info-item">
-                  <label>Status</label>
-                  <span className={`status-badge ${getStatus(activeVerification)}`}>
-                    {getStatus(activeVerification)}
-                  </span>
+              <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', alignItems: 'flex-start' }}>
+                <img 
+                  src={activeVerification.productImage || activeVerification.product?.images?.[0] || 'https://via.placeholder.com/120?text=Product'} 
+                  alt={activeVerification.productName || 'Product'} 
+                  style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }} 
+                />
+                <div className="info-grid" style={{ flex: 1, margin: 0 }}>
+                  <div className="info-item">
+                    <label>Customer</label>
+                    <span>{activeVerification.customerName || activeVerification.customer?.fullName || 'Unknown'}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Product</label>
+                    <span>{activeVerification.productName || activeVerification.product?.name || 'Unknown Product'}</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Rating</label>
+                    <span>{activeVerification.rating || 0}/5</span>
+                  </div>
+                  <div className="info-item">
+                    <label>Status</label>
+                    <span className={`status-badge ${getStatus(activeVerification)}`}>
+                      {getStatus(activeVerification)}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div className="verification-comment">

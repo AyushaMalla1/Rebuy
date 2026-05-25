@@ -586,9 +586,9 @@ export default function SellerDashboardController() {
   );
 
   const getVerificationImage = (verification) => (
-    verification?.verificationImages?.[0] ||
     verification?.productImage ||
     verification?.product?.images?.[0] ||
+    verification?.verificationImages?.[0] ||
     'https://via.placeholder.com/72?text=Verify'
   );
 

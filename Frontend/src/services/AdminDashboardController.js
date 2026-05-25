@@ -222,7 +222,7 @@ export default function AdminDashboardController() {
       };
 
       // Silently fetch analytics data - don't show errors to user
-      const response = await apiFetch('/admin/analytics-data', { headers }).catch(() => null);
+      const response = await apiFetch(`/admin/analytics-data?days=${timeRange}`, { headers }).catch(() => null);
 
       if (response && response.ok) {
         const data = await response.json().catch(() => null);

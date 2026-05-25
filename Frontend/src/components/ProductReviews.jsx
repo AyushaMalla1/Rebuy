@@ -59,6 +59,18 @@ function ProductReviews({ productId }) {
                 </div>
               </div>
 
+              {/* Display the Star Rating */}
+              {verification.rating && (
+                <div className="review-rating" style={{marginBottom: '10px'}}>
+                  <span style={{color: '#ffc107', fontSize: '18px'}}>
+                    {'★'.repeat(verification.rating)}{'☆'.repeat(5 - verification.rating)}
+                  </span>
+                  <span style={{marginLeft: '8px', fontSize: '14px', color: '#555', fontWeight: '500'}}>
+                    {verification.rating}/5
+                  </span>
+                </div>
+              )}
+
               {/* Condition Verification Details */}
               <div className="verification-details">
                 <div className="verification-header">
@@ -67,9 +79,9 @@ function ProductReviews({ productId }) {
                     {verification.matchesDescription === 'yes' ? '✓ Matches Description' : '✕ Does Not Match Description'}
                   </span>
                 </div>
-                {verification.customerFeedback && (
+                {verification.customerNotes && (
                   <p className="verification-notes">
-                    "{verification.customerFeedback}"
+                    "{verification.customerNotes}"
                   </p>
                 )}
                 {verification.verificationImages && verification.verificationImages.length > 0 ? (

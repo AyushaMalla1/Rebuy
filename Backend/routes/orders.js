@@ -305,7 +305,7 @@ router.post('/:orderId/verify-condition', async (req, res) => {
     const { matchesDescription, customerNotes, images, rating } = req.body;
     const order = await Order.findById(req.params.orderId)
       .populate('customer', 'fullName email')
-      .populate('items.product', 'name images')
+      .populate('items.product', 'name images seller')
       .populate('items.seller', 'fullName email');
     
     if (!order) {
@@ -326,40 +326,33 @@ router.post('/:orderId/verify-condition', async (req, res) => {
       return res.status(400).json({ message: 'Rating is required (1-5 stars)' });
     }
     
-    // Validate images - MINIMUM 2, MAXIMUM 5
-    if (!images || images.length < 2) {
-      return res.status(400).json({ message: 'At least 2 product images are required for verification' });
-    }
-    
-    if (images.length > 5) {
+    // Images and notes are optional per user request
+    if (images && images.length > 5) {
       return res.status(400).json({ message: 'Maximum 5 images allowed' });
     }
     
-    // Validate notes - REQUIRED
-    if (!customerNotes || customerNotes.trim() === '') {
-      return res.status(400).json({ message: 'Notes about product condition are required' });
-    }
-    
-    // Upload base64 images to Cloudinary
+    // Upload base64 images to Cloudinary (only if provided)
     const { cloudinary } = require('../config/cloudinary');
     const uploadedImageUrls = [];
-    for (const base64Image of images) {
-      try {
-        // Only attempt Cloudinary upload if valid credentials exist
-        if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_KEY !== 'your_api_key') {
-          const uploadResult = await cloudinary.uploader.upload(base64Image, {
-            folder: 'rebuy-verifications',
-            resource_type: 'auto'
-          });
-          uploadedImageUrls.push(uploadResult.secure_url);
-        } else {
-          // Fallback to base64 string if no Cloudinary keys
+    if (images && images.length > 0) {
+      for (const base64Image of images) {
+        try {
+          // Only attempt Cloudinary upload if valid credentials exist
+          if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_KEY !== 'your_api_key') {
+            const uploadResult = await cloudinary.uploader.upload(base64Image, {
+              folder: 'rebuy-verifications',
+              resource_type: 'auto'
+            });
+            uploadedImageUrls.push(uploadResult.secure_url);
+          } else {
+            // Fallback to base64 string if no Cloudinary keys
+            uploadedImageUrls.push(base64Image);
+          }
+        } catch (uploadError) {
+          console.error('Error uploading verification image to Cloudinary, falling back to base64:', uploadError.message);
+          // Fallback to base64 data URI if upload fails
           uploadedImageUrls.push(base64Image);
         }
-      } catch (uploadError) {
-        console.error('Error uploading verification image to Cloudinary, falling back to base64:', uploadError.message);
-        // Fallback to base64 data URI if upload fails
-        uploadedImageUrls.push(base64Image);
       }
     }
     
@@ -386,7 +379,7 @@ router.post('/:orderId/verify-condition', async (req, res) => {
     for (const item of order.items) {
       // Get product and seller IDs - handle both populated and non-populated cases
       const productId = item.product?._id || item.product;
-      const sellerId = item.seller?._id || item.seller;
+      const sellerId = item.seller?._id || item.seller || item.product?.seller;
       
       // Log for debugging
       console.log('Processing verification for item:', {

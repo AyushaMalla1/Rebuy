@@ -269,8 +269,7 @@
 }
 
 .chatbot-window .message-content {
-  flex: 0 0 min(320px, calc(100% - 50px));
-  width: min(320px, calc(100% - 50px));
+  flex: 0 1 auto;
   max-width: min(320px, calc(100% - 50px));
   display: flex;
   flex-direction: column;
@@ -280,6 +279,14 @@
   background: transparent;
   border-radius: 0;
   word-wrap: normal;
+}
+
+.chatbot-window .message-bot .message-content {
+  align-items: flex-start;
+}
+
+.chatbot-window .message-user .message-content {
+  align-items: flex-end;
 }
 
 .chatbot-window .message-content p {
@@ -292,8 +299,6 @@
   line-height: 1.6;
   white-space: pre-line;
   position: relative;
-  width: 100%;
-  max-width: 100%;
   overflow-wrap: break-word;
   word-break: normal;
 }
@@ -500,13 +505,13 @@
   }
 
   .chatbot-window .message-content {
-    flex-basis: min(300px, calc(100% - 50px));
-    width: min(300px, calc(100% - 50px));
+    flex-basis: auto;
+    width: auto;
     max-width: min(300px, calc(100% - 50px));
   }
 
   .chatbot-window .message-content p {
-    width: 100%;
+    width: auto;
     max-width: 100%;
   }
 

@@ -16,56 +16,91 @@ function Chatbot() {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    let userInfo = null;
-    try {
-      const storedUserInfo = localStorage.getItem('userInfo');
-      const storedUser = localStorage.getItem('user');
-      const rawData = (storedUserInfo && storedUserInfo !== "undefined") ? storedUserInfo : 
-                      ((storedUser && storedUser !== "undefined") ? storedUser : null);
-      if (rawData) {
-        userInfo = JSON.parse(rawData);
+    const fetchHistoryAndInitialize = async () => {
+      let userInfo = null;
+      try {
+        const storedUserInfo = localStorage.getItem('userInfo');
+        const storedUser = localStorage.getItem('user');
+        const rawData = (storedUserInfo && storedUserInfo !== "undefined") ? storedUserInfo : 
+                        ((storedUser && storedUser !== "undefined") ? storedUser : null);
+        if (rawData) {
+          userInfo = JSON.parse(rawData);
+        }
+      } catch (e) {
+        console.error('Failed to parse user info', e);
       }
-    } catch (e) {
-      console.error('Failed to parse user info', e);
-    }
-    
-    let determinedRole = 'Guest';
-    if (userInfo) {
-      if (userInfo.role) {
-        determinedRole = userInfo.role.charAt(0).toUpperCase() + userInfo.role.slice(1).toLowerCase();
-      } else if (userInfo.userType === 'admin' || userInfo.isAdmin) {
-        determinedRole = 'Admin';
-      } else if (userInfo.userType === 'seller' || userInfo.isSeller) {
-        determinedRole = 'Seller';
-      } else {
-        determinedRole = 'Customer';
-      }
-      if (userInfo._id || userInfo.id) {
-        setUserId(userInfo._id || userInfo.id);
-      }
-    } else {
-      setUserId('guest');
-    }
-    
-    setUserRole(determinedRole);
+      
+      let determinedRole = 'Guest';
+      let currentUserId = 'guest';
 
-    let welcomeText = "Hi! I'm Rebuy AI Assistant. How can I help you today?";
-    if (determinedRole === 'Seller') {
-      welcomeText = "Hi! I'm Rebuy AI Assistant. I can help you with trending products, low-stock alerts, promotional ideas, and performance insights. What would you like to know?";
-    } else if (determinedRole === 'Customer') {
-      welcomeText = "Hi! I'm Rebuy AI Assistant. I can help with product recommendations, orders, payments, and delivery. What can I help you with?";
-    } else if (determinedRole === 'Admin') {
-      welcomeText = "Hi! I'm Rebuy AI Assistant. I provide analytics, reports, and system performance updates. How can I assist you?";
-    }
+      if (userInfo) {
+        if (userInfo.role) {
+          determinedRole = userInfo.role.charAt(0).toUpperCase() + userInfo.role.slice(1).toLowerCase();
+        } else if (userInfo.userType === 'admin' || userInfo.isAdmin) {
+          determinedRole = 'Admin';
+        } else if (userInfo.userType === 'seller' || userInfo.isSeller) {
+          determinedRole = 'Seller';
+        } else {
+          determinedRole = 'Customer';
+        }
+        if (userInfo._id || userInfo.id) {
+          currentUserId = userInfo._id || userInfo.id;
+        }
+      }
+      
+      setUserId(currentUserId);
+      setUserRole(determinedRole);
 
-    setMessages([
-      {
+      let welcomeText = "Hi! I'm Rebuy AI Assistant. How can I help you today?";
+      if (determinedRole === 'Seller') {
+        welcomeText = "Hi! I'm Rebuy AI Assistant. I can help you with trending products, low-stock alerts, promotional ideas, and performance insights. What would you like to know?";
+      } else if (determinedRole === 'Customer') {
+        welcomeText = "Hi! I'm Rebuy AI Assistant. I can help with product recommendations, orders, payments, and delivery. What can I help you with?";
+      } else if (determinedRole === 'Admin') {
+        welcomeText = "Hi! I'm Rebuy AI Assistant. I provide analytics, reports, and system performance updates. How can I assist you?";
+      }
+
+      const defaultWelcome = {
         id: 1,
         text: welcomeText,
         sender: 'bot',
         timestamp: new Date()
+      };
+
+      if (currentUserId !== 'guest') {
+        try {
+          const response = await fetch(buildApiUrl(`/chatbot-history/history/${currentUserId}`));
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.history && data.history.length > 0) {
+              const historyMessages = [];
+              data.history.forEach((item, index) => {
+                historyMessages.push({
+                  id: `hist-user-${item._id || index}`,
+                  text: item.message,
+                  sender: 'user',
+                  timestamp: new Date(item.timestamp)
+                });
+                historyMessages.push({
+                  id: `hist-bot-${item._id || index}`,
+                  text: item.reply,
+                  sender: 'bot',
+                  timestamp: new Date(new Date(item.timestamp).getTime() + 100)
+                });
+              });
+              setMessages(historyMessages);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load chat history:", error);
+        }
       }
-    ]);
+
+      setMessages([defaultWelcome]);
+    };
+
+    fetchHistoryAndInitialize();
   }, []);
 
   const scrollToBottom = () => {
@@ -73,8 +108,10 @@ function Chatbot() {
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (isOpen) {
+      setTimeout(() => scrollToBottom(), 100);
+    }
+  }, [messages, isOpen]);
 
   const getBotResponse = async (userMessage) => {
     try {

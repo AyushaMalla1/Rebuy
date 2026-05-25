@@ -1496,17 +1496,7 @@ function BuyerProfile() {
       return;
     }
     
-    // REQUIRED: Minimum 2 images, Maximum 5 images
-    if (verificationData.images.length < 2) {
-      showToast('Please upload at least 2 images of the product', 'error');
-      return;
-    }
-    
-    // REQUIRED: Notes must be provided
-    if (!verificationData.customerNotes || verificationData.customerNotes.trim() === '') {
-      showToast('Please provide notes about the product condition', 'error');
-      return;
-    }
+    // Note and images are optional per user request
     
     try {
       // Convert boolean to string format expected by backend
@@ -3586,13 +3576,13 @@ function BuyerProfile() {
                 </div>
               </div>
               
-              {/* Image Upload Section - MIN 2, MAX 5 REQUIRED */}
+              {/* Image Upload Section - OPTIONAL */}
               <div className="form-field" style={{marginTop: '16px'}}>
                 <label style={{fontSize: '13px', fontWeight: '500', marginBottom: '8px', display: 'block'}}>
-                  Upload Product Images <span style={{color: '#e53e3e'}}>* Required (Min 2, Max 5)</span>
+                  Upload Product Images (Optional)
                 </label>
                 <p style={{fontSize: '12px', color: '#666', marginBottom: '8px'}}>
-                  Please upload at least 2 clear images of the product for admin verification
+                  You can upload up to 5 clear images of the product.
                 </p>
                 <input
                   type="file"
@@ -3663,17 +3653,25 @@ function BuyerProfile() {
                 )}
               </div>
               
+              {/* Notes - OPTIONAL */}
               <div className="form-field" style={{marginTop: '16px'}}>
                 <label style={{fontSize: '13px', fontWeight: '500', marginBottom: '8px', display: 'block'}}>
-                  Notes <span style={{color: '#e53e3e'}}>* Required</span>
+                  Additional Notes (Optional)
                 </label>
                 <textarea
+                  placeholder="Describe the condition of the item you received..."
                   value={verificationData.customerNotes}
                   onChange={(e) => setVerificationData({...verificationData, customerNotes: e.target.value})}
-                  placeholder="Please describe the product condition in detail..."
-                  rows="3"
-                  style={{width: '100%', padding: '10px', border: '1px solid #e0e0e0', borderRadius: '4px', fontFamily: 'Arial, sans-serif', fontSize: '13px'}}
-                  required
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                    minHeight: '80px',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
                 />
               </div>
               {verificationData.matchesDescription === true && (

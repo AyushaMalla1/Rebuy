@@ -82,7 +82,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/loyalty', loyaltyRoutes);
-app.use('/api/reviews', reviewRoutes);
+// app.use('/api/reviews', reviewRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/sellers', sellerRoutes);
 app.use('/api/messages', messageRoutes);

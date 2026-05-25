@@ -159,7 +159,7 @@ function AdminSalesReportsTab({
       {selectedMetric === 'revenue' && (
         <div className="dynamic-charts" style={{ marginTop: '30px' }}>
           <div className="chart-container">
-            <RevenueTrendChart data={charts.revenue} />
+            <RevenueTrendChart data={charts.revenue} title={`Revenue Trend (${timeRange === 'all' ? 'All Time' : timeRange === '365' ? 'Last Year' : `Last ${timeRange} Days`})`} />
           </div>
           <div className="chart-container" style={{ marginTop: '20px' }}>
             <RevenueBreakdownChart data={charts.revenueBreakdown} title="Revenue Breakdown by Category" />
@@ -170,7 +170,7 @@ function AdminSalesReportsTab({
       {selectedMetric === 'orders' && (
         <div className="dynamic-charts" style={{ marginTop: '30px' }}>
           <div className="chart-container">
-            <OrdersTrendChart data={charts.ordersTrend} />
+            <OrdersTrendChart data={charts.ordersTrend} title={`Orders Trend (${timeRange === 'all' ? 'All Time' : timeRange === '365' ? 'Last Year' : `Last ${timeRange} Days`})`} />
           </div>
         </div>
       )}
@@ -239,7 +239,7 @@ function AdminSalesReportsTab({
       {!selectedMetric && (
         <>
           <div className="chart-container" style={{ marginTop: '30px' }}>
-            <RevenueTrendChart data={charts.revenue} />
+            <RevenueTrendChart data={charts.revenue} title={`Revenue Trend (${timeRange === 'all' ? 'All Time' : timeRange === '365' ? 'Last Year' : `Last ${timeRange} Days`})`} />
           </div>
 
           <div className="metrics-row" style={{ marginTop: '20px' }}>

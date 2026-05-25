@@ -869,10 +869,14 @@ router.get('/sales-reports', async (req, res) => {
     const totalOrders = orders.length;
 
     // Get active sellers
-    const activeSellers = await Seller.countDocuments({ status: 'approved' }).catch(() => 0);
+    const sellerQuery = { status: 'approved' };
+    if (daysParam !== 'all') sellerQuery.createdAt = { $gte: dateFilter.orderDate.$gte };
+    const activeSellers = await Seller.countDocuments(sellerQuery).catch(() => 0);
 
     // Get total customers
-    const totalCustomers = await User.countDocuments({ userType: 'customer' }).catch(() => 0);
+    const customerQuery = { userType: 'customer' };
+    if (daysParam !== 'all') customerQuery.createdAt = { $gte: dateFilter.orderDate.$gte };
+    const totalCustomers = await User.countDocuments(customerQuery).catch(() => 0);
 
     // Calculate average order value
     const averageOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
@@ -950,40 +954,96 @@ router.get('/sales-reports', async (req, res) => {
       console.log('Revenue growth calculation error, using default');
     }
 
-    // Revenue data for last 7 days
+    // Revenue data based on time range
     let revenueData = [];
     try {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const days = daysParam === 'all' ? 365 : parseInt(daysParam);
       
-      const revenueByDay = await Order.aggregate([
-        { $match: { orderDate: { $gte: sevenDaysAgo }, status: { $nin: ['Cancelled'] } } },
-        {
-          $group: {
-            _id: { $dayOfWeek: '$orderDate' },
-            revenue: { $sum: '$total' }
+      if (days <= 7) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 7);
+        const revenueByDay = await Order.aggregate([
+          { $match: { orderDate: { $gte: startDate }, status: { $nin: ['Cancelled'] } } },
+          {
+            $group: {
+              _id: { $dayOfWeek: '$orderDate' },
+              revenue: { $sum: '$total' }
+            }
           }
-        },
-        { $sort: { '_id': 1 } }
-      ]);
-
-      // Map day numbers to day names (1=Sunday, 2=Monday, etc.)
-      const dayMap = { 1: 'Sun', 2: 'Mon', 3: 'Tue', 4: 'Wed', 5: 'Thu', 6: 'Fri', 7: 'Sat' };
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      
-      revenueData = days.map(day => {
-        const dayNum = Object.keys(dayMap).find(key => dayMap[key] === day);
-        const found = revenueByDay.find(r => r._id === parseInt(dayNum));
-        return { day, revenue: found ? found.revenue : 0 };
-      });
+        ]);
+        const dayMap = { 1: 'Sun', 2: 'Mon', 3: 'Tue', 4: 'Wed', 5: 'Thu', 6: 'Fri', 7: 'Sat' };
+        
+        // Generate last 7 days starting from today
+        const daysArr = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            daysArr.push(dayMap[d.getDay() + 1]);
+        }
+        
+        revenueData = daysArr.map(day => {
+          const dayNum = Object.keys(dayMap).find(key => dayMap[key] === day);
+          const found = revenueByDay.find(r => r._id === parseInt(dayNum));
+          return { day, revenue: found ? found.revenue : 0 };
+        });
+      } else if (days <= 90) {
+        // Group by Date
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        const revenueByDate = await Order.aggregate([
+          { $match: { orderDate: { $gte: startDate }, status: { $nin: ['Cancelled'] } } },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m-%d", date: "$orderDate" } },
+              revenue: { $sum: '$total' }
+            }
+          }
+        ]);
+        const dateMap = {};
+        revenueByDate.forEach(r => { dateMap[r._id] = r.revenue; });
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const displayDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            revenueData.push({ day: displayDay, revenue: dateMap[dateStr] || 0 });
+        }
+      } else {
+        // Group by Month
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        const revenueByMonth = await Order.aggregate([
+          { $match: { orderDate: { $gte: startDate }, status: { $nin: ['Cancelled'] } } },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m", date: "$orderDate" } },
+              revenue: { $sum: '$total' }
+            }
+          }
+        ]);
+        const monthMap = {};
+        revenueByMonth.forEach(r => { monthMap[r._id] = r.revenue; });
+        const numMonths = daysParam === 'all' ? 12 : Math.ceil(days / 30);
+        for (let i = numMonths - 1; i >= 0; i--) {
+            const d = new Date();
+            d.setMonth(d.getMonth() - i);
+            const monthStr = d.toISOString().slice(0, 7);
+            const displayMonth = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            revenueData.push({ day: displayMonth, revenue: monthMap[monthStr] || 0 });
+        }
+      }
     } catch (err) {
-      console.log('Revenue by day error, using empty data');
+      console.log('Revenue data error, using empty data', err);
     }
 
     // Top selling products
     let topProducts = [];
     try {
       topProducts = await Order.aggregate([
+        { $match: { 
+          ...dateFilter,
+          status: { $nin: ['Cancelled'] } 
+        } },
         { $unwind: '$items' },
         {
           $group: {
@@ -1008,7 +1068,12 @@ router.get('/sales-reports', async (req, res) => {
     // Category performance
     let categoryPerformance = [];
     try {
+      let prodQuery = {};
+      if (daysParam !== 'all') {
+        prodQuery.createdAt = { $gte: dateFilter.orderDate.$gte };
+      }
       categoryPerformance = await Product.aggregate([
+        { $match: prodQuery },
         { $group: { _id: '$category', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 5 },
@@ -1096,6 +1161,9 @@ router.get('/export-sales-report', async (req, res) => {
 // Get Analytics Data for Dashboard Charts
 router.get('/analytics-data', async (req, res) => {
   try {
+    const daysParam = req.query.days || '7';
+    const days = daysParam === 'all' ? 365 : parseInt(daysParam);
+
     // Revenue data for last 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -1112,8 +1180,8 @@ router.get('/analytics-data', async (req, res) => {
 
     // Map day numbers to day names
     const dayMap = { 1: 'Sun', 2: 'Mon', 3: 'Tue', 4: 'Wed', 5: 'Thu', 6: 'Fri', 7: 'Sat' };
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const revenue = days.map(day => {
+    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const revenue = weekDays.map(day => {
       const dayNum = Object.keys(dayMap).find(key => dayMap[key] === day);
       const found = revenueByDay.find(r => r._id === parseInt(dayNum));
       return { day, revenue: found ? found.revenue : 0 };
@@ -1160,105 +1228,144 @@ router.get('/analytics-data', async (req, res) => {
       { $limit: 5 }
     ]);
 
-    // User growth (last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const userGrowth = await User.aggregate([
-      { $match: { createdAt: { $gte: sixMonthsAgo }, userType: { $ne: 'admin' } } },
-      {
-        $group: {
-          _id: { $month: '$createdAt' },
-          newUsers: { $sum: 1 }
+    // User growth based on time range
+    let userGrowthData = [];
+    try {
+      if (days <= 90) {
+        const startDate = new Date(); startDate.setDate(startDate.getDate() - days);
+        const userGrowth = await User.aggregate([
+          { $match: { createdAt: { $gte: startDate }, userType: { $ne: 'admin' } } },
+          { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, newUsers: { $sum: 1 } } }
+        ]);
+        let cumulativeUsers = await User.countDocuments({ createdAt: { $lt: startDate }, userType: { $ne: 'admin' } });
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const displayDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const found = userGrowth.find(u => u._id === dateStr);
+            const newUsers = found ? found.newUsers : 0;
+            cumulativeUsers += newUsers;
+            userGrowthData.push({ month: displayDay, users: cumulativeUsers, newUsers });
         }
-      },
-      { $sort: { '_id': 1 } }
-    ]);
-
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentMonth = new Date().getMonth();
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const monthIndex = (currentMonth - i + 12) % 12;
-      months.push(monthNames[monthIndex]);
-    }
-
-    let cumulativeUsers = await User.countDocuments({ 
-      createdAt: { $lt: sixMonthsAgo },
-      userType: { $ne: 'admin' }
-    });
-
-    const userGrowthData = months.map((month, index) => {
-      const monthNum = (currentMonth - 5 + index + 12) % 12 + 1;
-      const found = userGrowth.find(u => u._id === monthNum);
-      const newUsers = found ? found.newUsers : 0;
-      cumulativeUsers += newUsers;
-      return { month, users: cumulativeUsers, newUsers };
-    });
-
-    // Seller stats (last 6 months)
-    const sellerGrowth = await Seller.aggregate([
-      { $match: { createdAt: { $gte: sixMonthsAgo }, status: 'approved' } },
-      {
-        $group: {
-          _id: { $month: '$createdAt' },
-          newSellers: { $sum: 1 }
+      } else {
+        const startDate = new Date(); startDate.setDate(startDate.getDate() - days);
+        const userGrowth = await User.aggregate([
+          { $match: { createdAt: { $gte: startDate }, userType: { $ne: 'admin' } } },
+          { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } }, newUsers: { $sum: 1 } } }
+        ]);
+        let cumulativeUsers = await User.countDocuments({ createdAt: { $lt: startDate }, userType: { $ne: 'admin' } });
+        const numMonths = daysParam === 'all' ? 12 : Math.ceil(days / 30);
+        for (let i = numMonths - 1; i >= 0; i--) {
+            const d = new Date(); d.setMonth(d.getMonth() - i);
+            const monthStr = d.toISOString().slice(0, 7);
+            const displayMonth = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            const found = userGrowth.find(u => u._id === monthStr);
+            const newUsers = found ? found.newUsers : 0;
+            cumulativeUsers += newUsers;
+            userGrowthData.push({ month: displayMonth, users: cumulativeUsers, newUsers });
         }
-      },
-      { $sort: { '_id': 1 } }
-    ]);
+      }
+    } catch(err) { console.log('user growth err'); }
 
-    let cumulativeSellers = await Seller.countDocuments({ 
-      createdAt: { $lt: sixMonthsAgo },
-      status: 'approved'
-    });
-
-    const sellerStats = months.map((month, index) => {
-      const monthNum = (currentMonth - 5 + index + 12) % 12 + 1;
-      const found = sellerGrowth.find(s => s._id === monthNum);
-      const newSellers = found ? found.newSellers : 0;
-      cumulativeSellers += newSellers;
-      return { month, sellers: cumulativeSellers, newSellers };
-    });
+    // Seller stats based on time range
+    let sellerStats = [];
+    try {
+      if (days <= 90) {
+        const startDate = new Date(); startDate.setDate(startDate.getDate() - days);
+        const sellerGrowth = await Seller.aggregate([
+          { $match: { createdAt: { $gte: startDate }, status: 'approved' } },
+          { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, newSellers: { $sum: 1 } } }
+        ]);
+        let cumulativeSellers = await Seller.countDocuments({ createdAt: { $lt: startDate }, status: 'approved' });
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const displayDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const found = sellerGrowth.find(s => s._id === dateStr);
+            const newSellers = found ? found.newSellers : 0;
+            cumulativeSellers += newSellers;
+            sellerStats.push({ month: displayDay, sellers: cumulativeSellers, newSellers });
+        }
+      } else {
+        const startDate = new Date(); startDate.setDate(startDate.getDate() - days);
+        const sellerGrowth = await Seller.aggregate([
+          { $match: { createdAt: { $gte: startDate }, status: 'approved' } },
+          { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } }, newSellers: { $sum: 1 } } }
+        ]);
+        let cumulativeSellers = await Seller.countDocuments({ createdAt: { $lt: startDate }, status: 'approved' });
+        const numMonths = daysParam === 'all' ? 12 : Math.ceil(days / 30);
+        for (let i = numMonths - 1; i >= 0; i--) {
+            const d = new Date(); d.setMonth(d.getMonth() - i);
+            const monthStr = d.toISOString().slice(0, 7);
+            const displayMonth = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            const found = sellerGrowth.find(s => s._id === monthStr);
+            const newSellers = found ? found.newSellers : 0;
+            cumulativeSellers += newSellers;
+            sellerStats.push({ month: displayMonth, sellers: cumulativeSellers, newSellers });
+        }
+      }
+    } catch(err) { console.log('seller stats err'); }
 
     // Product distribution by status
     const productDistribution = await Product.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          value: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          name: '$_id',
-          value: 1,
-          _id: 0
-        }
-      }
+      { $group: { _id: '$status', value: { $sum: 1 } } },
+      { $project: { name: '$_id', value: 1, _id: 0 } }
     ]);
 
-    // Orders trend (last 7 days)
-    const ordersTrend = await Order.aggregate([
-      { $match: { orderDate: { $gte: sevenDaysAgo } } },
-      {
-        $group: {
-          _id: { 
-            day: { $dayOfWeek: '$orderDate' },
-            status: '$status'
-          },
-          count: { $sum: 1 }
+    // Orders trend based on time range
+    let ordersTrendData = [];
+    try {
+      if (days <= 7) {
+        const startDate = new Date(); startDate.setDate(startDate.getDate() - 7);
+        const ordersTrend = await Order.aggregate([
+          { $match: { orderDate: { $gte: startDate } } },
+          { $group: { _id: { day: { $dayOfWeek: '$orderDate' }, status: '$status' }, count: { $sum: 1 } } }
+        ]);
+        const dayMap = { 1: 'Sun', 2: 'Mon', 3: 'Tue', 4: 'Wed', 5: 'Thu', 6: 'Fri', 7: 'Sat' };
+        const daysArr = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i); daysArr.push(dayMap[d.getDay() + 1]);
+        }
+        ordersTrendData = daysArr.map(day => {
+          const dayNum = Object.keys(dayMap).find(key => dayMap[key] === day);
+          const dayOrders = ordersTrend.filter(o => o._id.day === parseInt(dayNum));
+          const total = dayOrders.reduce((sum, o) => sum + o.count, 0);
+          const completed = dayOrders.find(o => o._id.status === 'Delivered')?.count || 0;
+          return { day, orders: total, completed };
+        });
+      } else if (days <= 90) {
+        const startDate = new Date(); startDate.setDate(startDate.getDate() - days);
+        const ordersTrend = await Order.aggregate([
+          { $match: { orderDate: { $gte: startDate } } },
+          { $group: { _id: { date: { $dateToString: { format: "%Y-%m-%d", date: "$orderDate" } }, status: '$status' }, count: { $sum: 1 } } }
+        ]);
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            const displayDay = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const dayOrders = ordersTrend.filter(o => o._id.date === dateStr);
+            const total = dayOrders.reduce((sum, o) => sum + o.count, 0);
+            const completed = dayOrders.find(o => o._id.status === 'Delivered')?.count || 0;
+            ordersTrendData.push({ day: displayDay, orders: total, completed });
+        }
+      } else {
+        const startDate = new Date(); startDate.setDate(startDate.getDate() - days);
+        const ordersTrend = await Order.aggregate([
+          { $match: { orderDate: { $gte: startDate } } },
+          { $group: { _id: { month: { $dateToString: { format: "%Y-%m", date: "$orderDate" } }, status: '$status' }, count: { $sum: 1 } } }
+        ]);
+        const numMonths = daysParam === 'all' ? 12 : Math.ceil(days / 30);
+        for (let i = numMonths - 1; i >= 0; i--) {
+            const d = new Date(); d.setMonth(d.getMonth() - i);
+            const monthStr = d.toISOString().slice(0, 7);
+            const displayMonth = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            const monthOrders = ordersTrend.filter(o => o._id.month === monthStr);
+            const total = monthOrders.reduce((sum, o) => sum + o.count, 0);
+            const completed = monthOrders.find(o => o._id.status === 'Delivered')?.count || 0;
+            ordersTrendData.push({ day: displayMonth, orders: total, completed });
         }
       }
-    ]);
-
-    const ordersTrendData = days.map(day => {
-      const dayNum = Object.keys(dayMap).find(key => dayMap[key] === day);
-      const dayOrders = ordersTrend.filter(o => o._id.day === parseInt(dayNum));
-      const total = dayOrders.reduce((sum, o) => sum + o.count, 0);
-      const completed = dayOrders.find(o => o._id.status === 'Delivered')?.count || 0;
-      return { day, orders: total, completed };
-    });
+    } catch(err) { console.log('orders trend err'); }
 
     // Revenue breakdown by category
     const revenueBreakdown = await Order.aggregate([
@@ -1518,6 +1625,17 @@ router.post('/verifications/:id/approve', async (req, res) => {
       'conditionVerification.adminApproved': true,
       'conditionVerification.approvedAt': new Date()
     });
+
+    // Update the Product rating
+    const Product = require('../models/Product');
+    const product = await Product.findById(verification.product);
+    if (product && verification.rating) {
+      const currentCount = product.reviewCount || 0;
+      const currentTotal = (product.averageRating || 0) * currentCount;
+      product.reviewCount = currentCount + 1;
+      product.averageRating = (currentTotal + verification.rating) / product.reviewCount;
+      await product.save();
+    }
     
     // Log audit
     await logAudit({
