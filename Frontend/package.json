@@ -17,7 +17,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "cross-env CI=false react-scripts build",
     "test": "react-scripts test",
     "test:ci": "react-scripts test --watchAll=false --coverage=false",
     "test:coverage": "react-scripts test --watchAll=false --coverage",
@@ -43,7 +43,8 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1"
+    "@testing-library/user-event": "^14.6.1",
+    "cross-env": "^10.1.0"
   },
   "jest": {
     "moduleNameMapper": {
