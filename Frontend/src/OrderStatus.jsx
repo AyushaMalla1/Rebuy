@@ -120,7 +120,7 @@ function OrderStatus() {
                 key={index} 
                 className="status-summary-card"
                 onClick={() => {
-                  const token = localStorage.getItem('token');
+                  const token = sessionStorage.getItem('token');
                   if (token) {
                     navigate('/profile?tab=orders');
                   } else {
@@ -175,7 +175,7 @@ function OrderStatus() {
                 <button 
                   className="action-btn primary"
                   onClick={() => {
-                    const token = localStorage.getItem('token');
+                    const token = sessionStorage.getItem('token');
                     if (token) {
                       navigate('/profile?tab=orders');
                     } else {
@@ -226,7 +226,7 @@ function OrderStatus() {
               <button 
                 className="action-btn primary"
                 onClick={() => {
-                  const token = localStorage.getItem('token');
+                  const token = sessionStorage.getItem('token');
                   if (token) {
                     navigate('/profile?tab=orders');
                   } else {

@@ -47,7 +47,7 @@ function PaymentSuccess() {
       const checkoutItems = JSON.parse(localStorage.getItem('checkoutItems') || '[]');
       
       // Clear backend cart items that were ordered
-      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      const user = JSON.parse(sessionStorage.getItem('user') || 'null');
       if (user && user._id && checkoutItems.length > 0) {
         try {
           // Remove each ordered item from the cart

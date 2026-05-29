@@ -442,7 +442,9 @@ async function getEnhancedContext(role, userId) {
     contextParts.push('Shipping: 3-5 business days across Nepal');
     contextParts.push('Returns: Within 7 days (unused items)');
     contextParts.push('Payment: COD, eSewa, Khalti');
-    contextParts.push('Loyalty Points: Earn on every purchase');
+    contextParts.push('Loyalty Points: Earn 1 point per Rs. 100 spent on every purchase. New accounts start with 0 points.');
+    contextParts.push('Seller Products: All new products created by sellers start as "Pending" and must be approved by an Admin before buyers can see them.');
+    contextParts.push("Categories: Men's Collection, Women's Collection, Unisex, Sportswear, Vintage.");
     contextParts.push('Bundle Deals: Save more on combo purchases');
     contextParts.push('Support: 9 AM - 6 PM Nepal Time');
 

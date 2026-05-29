@@ -53,8 +53,8 @@ function ScrollToTop() {
 
 // Protected Landing Page - redirects admin/seller to their dashboards
 function ProtectedLandingPage() {
-  const userData = localStorage.getItem('user');
-  const token = localStorage.getItem('token');
+  const userData = sessionStorage.getItem('user');
+  const token = sessionStorage.getItem('token');
   
   // Only redirect if both user data and token exist
   if (userData && token) {
@@ -75,8 +75,8 @@ function ProtectedLandingPage() {
     } catch (error) {
       console.error('Error parsing user data:', error);
       // Clear invalid data
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
     }
   }
   

@@ -49,22 +49,7 @@ function AdminProfileTab() {
               onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
             />
           </div>
-          <div className="form-group">
-            <label>Phone</label>
-            <input
-              type="text"
-              value={profileData.phone || ''}
-              onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-            />
-          </div>
-          <div className="form-group">
-            <label>City</label>
-            <input
-              type="text"
-              value={profileData.city || ''}
-              onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
-            />
-          </div>
+
         </div>
 
         <button className="save-settings-btn" onClick={handleProfileUpdate}>

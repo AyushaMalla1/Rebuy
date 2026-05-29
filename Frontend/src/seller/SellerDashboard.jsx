@@ -927,11 +927,7 @@ function SellerDashboardContent() {
                         <option value="Other">Other</option>
                       </>
                     )}
-                    {editingProduct.category === "Kid's Collection" && (
-                      <>
-                        <option value="Other">Other</option>
-                      </>
-                    )}
+
                     {editingProduct.category === "Sportswear" && (
                       <>
                         <option value="Other">Other</option>
@@ -942,11 +938,7 @@ function SellerDashboardContent() {
                         <option value="Other">Other</option>
                       </>
                     )}
-                    {editingProduct.category === "Accessories" && (
-                      <>
-                        <option value="Other">Other</option>
-                      </>
-                    )}
+
                   </select>
                 </div>
               </div>

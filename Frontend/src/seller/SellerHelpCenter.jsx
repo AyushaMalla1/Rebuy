@@ -132,7 +132,7 @@ function HelpCenter({ sellerId }) {
     e.preventDefault();
     
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       
       const response = await apiFetch(`/support/tickets`, {
         method: 'POST',

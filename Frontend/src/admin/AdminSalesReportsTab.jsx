@@ -43,7 +43,7 @@ function AdminSalesReportsTab({
 
   const handleExportSalesReport = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch('/admin/export-sales-report', {
         headers: {
           Authorization: `Bearer ${token}`

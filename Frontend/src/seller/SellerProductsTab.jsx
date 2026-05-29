@@ -170,10 +170,8 @@ function SellerProductsTab() {
                   <option value="Men's Collection">Men's Collection</option>
                   <option value="Women's Collection">Women's Collection</option>
                   <option value="Unisex">Unisex</option>
-                  <option value="Kid's Collection">Kid's Collection</option>
                   <option value="Sportswear">Sportswear</option>
                   <option value="Vintage">Vintage</option>
-                  <option value="Accessories">Accessories</option>
                 </select>
               </div>
               <div>
@@ -262,27 +260,6 @@ function SellerProductsTab() {
                       <option value="Other">Other</option>
                     </>
                   )}
-                  {newProduct.category === "Kid's Collection" && (
-                    <>
-                      <optgroup label="Tops">
-                        <option value="T-Shirts">T-Shirts</option>
-                        <option value="Shirts">Shirts</option>
-                        <option value="Hoodies">Hoodies</option>
-                        <option value="Sweaters">Sweaters</option>
-                      </optgroup>
-                      <optgroup label="Bottoms">
-                        <option value="Jeans">Jeans</option>
-                        <option value="Pants">Pants</option>
-                        <option value="Shorts">Shorts</option>
-                        <option value="Skirts">Skirts</option>
-                      </optgroup>
-                      <optgroup label="Outerwear">
-                        <option value="Jackets">Jackets</option>
-                        <option value="Coats">Coats</option>
-                        <option value="Hoodies">Hoodies</option>
-                      </optgroup>
-                      <option value="Other">Other</option>
-                    </>
                   )}
                   {newProduct.category === "Sportswear" && (
                     <>
@@ -328,27 +305,6 @@ function SellerProductsTab() {
                       <option value="Other">Other</option>
                     </>
                   )}
-                  {newProduct.category === "Accessories" && (
-                    <>
-                      <optgroup label="Bags">
-                        <option value="Backpacks">Backpacks</option>
-                        <option value="Handbags">Handbags</option>
-                        <option value="Tote Bags">Tote Bags</option>
-                        <option value="Crossbody Bags">Crossbody Bags</option>
-                      </optgroup>
-                      <optgroup label="Headwear">
-                        <option value="Caps">Caps</option>
-                        <option value="Hats">Hats</option>
-                        <option value="Beanies">Beanies</option>
-                      </optgroup>
-                      <optgroup label="Others">
-                        <option value="Belts">Belts</option>
-                        <option value="Scarves">Scarves</option>
-                        <option value="Sunglasses">Sunglasses</option>
-                        <option value="Jewelry">Jewelry</option>
-                      </optgroup>
-                      <option value="Other">Other</option>
-                    </>
                   )}
                 </select>
               </div>

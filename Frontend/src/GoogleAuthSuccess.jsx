@@ -14,8 +14,8 @@ function GoogleAuthSuccess() {
         const user = JSON.parse(decodeURIComponent(userParam));
         
         // Save to localStorage
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
+        sessionStorage.setItem('token', token);
+        sessionStorage.setItem('user', JSON.stringify(user));
 
         // Redirect based on user type
         if (user.userType === 'admin') {

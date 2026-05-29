@@ -65,6 +65,10 @@ const sellerSchema = new mongoose.Schema({
       return !this.googleId;
     }
   },
+  country: {
+    type: String,
+    default: 'Nepal'
+  },
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected', 'suspended'],

@@ -25,7 +25,7 @@ function Contact() {
 
   useEffect(() => {
     // Check if customer is logged in to allow creating a trackable support ticket
-    const userData = localStorage.getItem('user');
+    const userData = sessionStorage.getItem('user');
     
     if (userData) {
       setUser(JSON.parse(userData));

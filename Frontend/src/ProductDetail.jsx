@@ -159,8 +159,8 @@ function ProductDetail() {
   };
 
   const handleAddToCart = async () => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    const token = sessionStorage.getItem('token');
+    const userData = sessionStorage.getItem('user');
     
     if (!token || !userData) {
       setShowAuthModal(true);
@@ -192,8 +192,8 @@ function ProductDetail() {
 
   // Add to cart silently (for Buy It Now - no modal)
   const addToCartSilently = async () => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    const token = sessionStorage.getItem('token');
+    const userData = sessionStorage.getItem('user');
     
     if (!token || !userData) {
       setShowAuthModal(true);
@@ -235,8 +235,8 @@ function ProductDetail() {
 
   const handleAddToWishlist = async () => {
     // Check if user is logged in
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const token = sessionStorage.getItem('token');
+    const user = sessionStorage.getItem('user');
     
     if (!token || !user) {
       setShowAuthModal(true);
@@ -272,8 +272,8 @@ function ProductDetail() {
   const handleContactSeller = async (e) => {
     e.preventDefault();
     
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const token = sessionStorage.getItem('token');
+    const user = sessionStorage.getItem('user');
     
     if (!token || !user) {
       setShowAuthModal(true);
@@ -333,8 +333,8 @@ function ProductDetail() {
 
   const handlePurchase = async () => {
     // Check if user is logged in
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const token = sessionStorage.getItem('token');
+    const user = sessionStorage.getItem('user');
     
     if (!token || !user) {
       setShowAuthModal(true);

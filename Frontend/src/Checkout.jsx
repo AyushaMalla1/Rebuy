@@ -107,7 +107,7 @@ function Checkout() {
 
   const loadAddressesFromBackend = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) return;
 
       const response = await fetch(`${API_BASE_URL}/customers/profile`, {
@@ -167,8 +167,8 @@ function Checkout() {
 
   const loadLoyaltyPoints = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user'));
+      const token = sessionStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user'));
 
       if (!token || !user) return;
 
@@ -256,8 +256,8 @@ function Checkout() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user'));
+      const token = sessionStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user'));
 
       if (!token || !user) {
         alert('Please login to save address');
@@ -379,7 +379,7 @@ function Checkout() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         },
         body: JSON.stringify({ orderId })
       });
@@ -408,7 +408,7 @@ function Checkout() {
         try {
           await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
           });
         } catch (err) {
           console.error('Failed to cancel order on payment initiation failure', err);
@@ -426,7 +426,7 @@ function Checkout() {
       try {
         await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${sessionStorage.getItem('token')}` }
         });
       } catch (err) {
         console.error('Failed to cancel order on payment error', err);
@@ -465,7 +465,7 @@ function Checkout() {
     }
 
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
 
       if (!user || !user._id) {
         alert('Please login to place an order');
@@ -543,7 +543,7 @@ function Checkout() {
 
   const completeOrderSuccess = async (order) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
 
       // Save order to localStorage for immediate display
       const orders = JSON.parse(localStorage.getItem('orders') || '[]');

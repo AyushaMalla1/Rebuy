@@ -27,7 +27,7 @@ export const apiFetch = async (endpoint, options = {}) => {
       ...options.headers,
     },
   };
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   if (token) config.headers['Authorization'] = `Bearer ${token}`;
   try {
     return await fetch(url, config);

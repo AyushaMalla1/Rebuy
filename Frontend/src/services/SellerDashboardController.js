@@ -158,8 +158,14 @@ export default function SellerDashboardController() {
   };
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    if (!user || !user._id) {
+    const userStr = sessionStorage.getItem('user');
+    if (!userStr) {
+      navigate('/login');
+      return;
+    }
+    
+    const user = JSON.parse(userStr);
+    if (!user || !user._id || !(user.role === 'seller' || user.isSeller || user.userType === 'seller')) {
       navigate('/login');
       return;
     }
@@ -372,7 +378,7 @@ export default function SellerDashboardController() {
 
   const fetchConversationMessages = async (conversationId) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       const response = await apiFetch(`/messages/conversation/${conversationId}?userId=${user._id}`);
       const data = await response.json();
 
@@ -400,7 +406,7 @@ export default function SellerDashboardController() {
     if (!replyText.trim() || !selectedMessage) return;
 
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       const response = await apiFetch(`/messages`, {
         method: 'POST',
         headers: {
@@ -475,7 +481,7 @@ export default function SellerDashboardController() {
 
       if (response.ok) {
         alert(`Order status updated to ${newStatus}`);
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         fetchOrders(user._id);
       } else {
         alert(data.message || 'Failed to update order status');
@@ -490,7 +496,7 @@ export default function SellerDashboardController() {
     if (sellerData?._id) return sellerData._id;
 
     try {
-      return JSON.parse(localStorage.getItem('user'))?._id || null;
+      return JSON.parse(sessionStorage.getItem('user'))?._id || null;
     } catch (error) {
       return null;
     }
@@ -692,7 +698,7 @@ export default function SellerDashboardController() {
 
   // Fetch notifications from backend
   const fetchNotifications = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || !user._id) return;
 
     setLoadingNotifications(true);
@@ -712,7 +718,7 @@ export default function SellerDashboardController() {
   };
 
   const markAllAsRead = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || !user._id) return;
 
     try {
@@ -829,7 +835,7 @@ export default function SellerDashboardController() {
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     try {
       const response = await apiFetch(`/sellers/${user._id}`, {
@@ -1001,7 +1007,7 @@ export default function SellerDashboardController() {
   }, [orderSearchQuery, globalSearch, orderStatusFilter, orders]);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (user && user._id) {
       fetchReturns(user._id);
     }
@@ -1009,7 +1015,7 @@ export default function SellerDashboardController() {
 
   // Fetch verifications when verifications tab is active
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (user && user._id && activeTab === 'verifications') {
       fetchVerifications(user._id);
     }
@@ -1017,7 +1023,7 @@ export default function SellerDashboardController() {
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     try {
       const productData = {
@@ -1083,7 +1089,7 @@ export default function SellerDashboardController() {
 
       if (response.ok) {
         alert('Product deleted successfully');
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         fetchProducts(user._id);
         fetchStats(user._id);
       } else {
@@ -1105,7 +1111,7 @@ export default function SellerDashboardController() {
 
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     try {
       // Prepare update data
@@ -1160,7 +1166,7 @@ export default function SellerDashboardController() {
 
   const handleRestockSubmit = async (e) => {
     e.preventDefault();
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
 
     if (!restockQuantity || parseInt(restockQuantity) <= 0) {
       alert('Please enter a valid quantity');
@@ -1230,8 +1236,8 @@ export default function SellerDashboardController() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     navigate('/');
   };
 
@@ -1254,7 +1260,7 @@ export default function SellerDashboardController() {
 
       if (response.ok) {
         alert(`Return request ${status.toLowerCase()} successfully`);
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         fetchReturns(user._id);
         fetchReturnStats(user._id);
       } else {
@@ -1283,7 +1289,7 @@ export default function SellerDashboardController() {
 
       if (response.ok) {
         alert('Return completed and refund processed successfully');
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         fetchReturns(user._id);
         fetchReturnStats(user._id);
       } else {
@@ -1297,7 +1303,7 @@ export default function SellerDashboardController() {
 
   // Settings handlers
   const handleDeactivateAccount = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || !user._id) return;
 
     if (!window.confirm('Are you sure you want to deactivate your account? You can reactivate it by logging in again.')) {
@@ -1324,7 +1330,7 @@ export default function SellerDashboardController() {
   };
 
   const handleDeleteAccount = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || !user._id) return;
 
     if (!window.confirm('⚠️ WARNING: This will permanently delete your account and all data. This action CANNOT be undone. Are you absolutely sure?')) {
@@ -1363,7 +1369,7 @@ export default function SellerDashboardController() {
   };
 
   const handleConfirm2FA = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || !user._id) return;
 
     if (!twoFAPassword) {
@@ -1402,7 +1408,7 @@ export default function SellerDashboardController() {
   };
 
   const handleViewLoginHistory = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || !user._id) return;
 
     try {
@@ -1422,7 +1428,7 @@ export default function SellerDashboardController() {
   };
 
   const handleChangePassword = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || !user._id) return;
 
     if (!changePasswordData.currentPassword || !changePasswordData.newPassword || !changePasswordData.confirmPassword) {

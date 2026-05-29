@@ -16,7 +16,7 @@ function SellerProfile() {
   useEffect(() => {
     fetchSellerProfile();
     // Get logged in user
-    const userData = localStorage.getItem('user');
+    const userData = sessionStorage.getItem('user');
     if (userData) {
       setUser(JSON.parse(userData));
     }
@@ -80,7 +80,7 @@ function SellerProfile() {
       
       // Only send initial message if conversation doesn't exist
       if (!conversationExists) {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         // Determine sender model - check userType field
         const senderModel = user.userType === 'seller' || user.role === 'seller' ? 'Seller' : 'User';
         

@@ -20,7 +20,7 @@ function Chatbot() {
       let userInfo = null;
       try {
         const storedUserInfo = localStorage.getItem('userInfo');
-        const storedUser = localStorage.getItem('user');
+        const storedUser = sessionStorage.getItem('user');
         const rawData = (storedUserInfo && storedUserInfo !== "undefined") ? storedUserInfo : 
                         ((storedUser && storedUser !== "undefined") ? storedUser : null);
         if (rawData) {

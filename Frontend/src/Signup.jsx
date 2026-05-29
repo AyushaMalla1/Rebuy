@@ -57,8 +57,8 @@ function Signup() {
 
       if (response.data.success) {
         // Store token in localStorage
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        sessionStorage.setItem('token', response.data.token);
+        sessionStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Redirect to home page
         alert('Account created successfully!');

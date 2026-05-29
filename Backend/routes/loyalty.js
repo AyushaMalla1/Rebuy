@@ -8,15 +8,10 @@ router.get('/:customerId', async (req, res) => {
     let loyaltyAccount = await LoyaltyPoints.findOne({ customer: req.params.customerId });
     
     if (!loyaltyAccount) {
-      // Create new account with welcome bonus
       loyaltyAccount = new LoyaltyPoints({
         customer: req.params.customerId,
-        totalPoints: 500,
-        pointsHistory: [{
-          points: 500,
-          type: 'earned',
-          reason: 'Welcome bonus'
-        }]
+        totalPoints: 0,
+        pointsHistory: []
       });
       await loyaltyAccount.save();
     }

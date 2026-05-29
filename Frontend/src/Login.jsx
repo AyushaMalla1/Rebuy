@@ -17,7 +17,7 @@ function Login() {
   // Check if user is already logged in
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const user = localStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     if (user) {
       try {
         const userData = JSON.parse(user);
@@ -31,15 +31,15 @@ function Login() {
         }
       } catch (error) {
         // If parsing fails, clear invalid data
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('token');
       }
     }
   }, [navigate]);
 
   const handleTabChange = (tab) => {
     // Check if user is already logged in
-    const user = localStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     if (user) {
       try {
         const userData = JSON.parse(user);
@@ -81,8 +81,8 @@ function Login() {
 
       if (response.data.success) {
         // Store token and user data
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        sessionStorage.setItem('token', response.data.token);
+        sessionStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Redirect based on user type
         if (activeTab === 'admin') {

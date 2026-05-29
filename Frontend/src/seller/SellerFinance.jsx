@@ -28,7 +28,7 @@ function SellerFinance() {
 
   const loadFinanceData = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (!user || !user._id) {
         console.error('No user found');
         return;
@@ -36,7 +36,7 @@ function SellerFinance() {
 
       const response = await fetch(`${API_BASE_URL}/payouts/seller/${user._id}/summary`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
 
@@ -69,7 +69,7 @@ function SellerFinance() {
   const handleSavePayoutDetails = async () => {
     try {
       setSaving(true);
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       const validationError = validatePayoutDetails();
 
       if (validationError) {
@@ -81,7 +81,7 @@ function SellerFinance() {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         },
         body: JSON.stringify(payoutDetails)
       });
@@ -114,12 +114,12 @@ function SellerFinance() {
 
     try {
       setRequestingPayout(true);
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
 
       const response = await fetch(`${API_BASE_URL}/payouts/seller/${user._id}/request`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }
       });
 

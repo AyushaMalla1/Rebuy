@@ -260,7 +260,7 @@ function BuyerProfile() {
     if (!messageText.trim() || !selectedChat) return;
     
     // Get user ID from localStorage as fallback
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     const userId = userData?._id || user?._id || user?.id;
     
     if (!userId) {
@@ -357,7 +357,7 @@ function BuyerProfile() {
 
   // Notification functions
   const fetchNotifications = async () => {
-    const userData = localStorage.getItem('user');
+    const userData = sessionStorage.getItem('user');
     if (!userData) return;
 
     const user = JSON.parse(userData);
@@ -377,7 +377,7 @@ function BuyerProfile() {
   };
 
   const markAllAsRead = async () => {
-    const userData = localStorage.getItem('user');
+    const userData = sessionStorage.getItem('user');
     if (!userData) return;
 
     const user = JSON.parse(userData);
@@ -478,7 +478,7 @@ function BuyerProfile() {
 
   // Mark all notifications as read
   const markAllNotificationsAsRead = async () => {
-    const userDataLocal = localStorage.getItem('user');
+    const userDataLocal = sessionStorage.getItem('user');
     if (!userDataLocal) return;
 
     const user = JSON.parse(userDataLocal);
@@ -515,7 +515,7 @@ function BuyerProfile() {
     }
     
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       await authAPI.changePassword(user._id, {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
@@ -551,7 +551,7 @@ function BuyerProfile() {
 
   const handleEnable2FA = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (!user || !user._id) {
         showToast('Please login to enable 2FA', 'error');
         return;
@@ -572,7 +572,7 @@ function BuyerProfile() {
 
   const handleViewLoginActivity = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (user && user._id) {
         const response = await customerAPI.getLoginHistory(user._id);
         if (response.success) {
@@ -606,7 +606,7 @@ function BuyerProfile() {
 
   const confirmDeactivateAccount = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (!user || !user._id) {
         showToast('Please login to deactivate account', 'error');
         return;
@@ -620,8 +620,8 @@ function BuyerProfile() {
         
         // Logout user after deactivation
         setTimeout(() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
           navigate('/');
         }, 2000);
       }
@@ -643,7 +643,7 @@ function BuyerProfile() {
     }
     
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (!user || !user._id) {
         showToast('Please login to delete account', 'error');
         return;
@@ -658,8 +658,8 @@ function BuyerProfile() {
         
         // Logout user after deletion
         setTimeout(() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
           navigate('/');
         }, 3000);
       }
@@ -690,7 +690,7 @@ function BuyerProfile() {
       });
     }
     
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     
     if (user) {
       // Redirect sellers to seller dashboard
@@ -764,7 +764,7 @@ function BuyerProfile() {
   // Fetch conversations when messages tab is active
   useEffect(() => {
     if (activeTab === 'messages') {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       const userId = userData._id || user?._id || user?.id;
       
       if (userId) {
@@ -841,8 +841,8 @@ function BuyerProfile() {
 
   const loadWishlist = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const token = localStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user'));
+      const token = sessionStorage.getItem('token');
       
       if (!user || !token) {
         setWishlist([]);
@@ -964,8 +964,8 @@ function BuyerProfile() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     setShowProfileDropdown(false);
     navigate('/');
   };
@@ -1060,7 +1060,7 @@ function BuyerProfile() {
     
     try {
       setUploadingImage(true);
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       
       if (!user || !user._id) {
         showToast('Please login to upload profile image', 'error');
@@ -1084,7 +1084,7 @@ function BuyerProfile() {
       
       // Update localStorage so the image persists across page refreshes
       const updatedUser = { ...user, profileImage: result.profileImage };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      sessionStorage.setItem('user', JSON.stringify(updatedUser));
       
       // Dispatch event to notify other components
       window.dispatchEvent(new Event('userUpdated'));
@@ -1100,7 +1100,7 @@ function BuyerProfile() {
 
   const handleImageDelete = async () => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       
       if (!user || !user._id) {
         showToast('Please login to delete profile image', 'error');
@@ -1116,7 +1116,7 @@ function BuyerProfile() {
       
       // Update localStorage
       const updatedUser = { ...user, profileImage: '' };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      sessionStorage.setItem('user', JSON.stringify(updatedUser));
       
       // Dispatch event to notify other components
       window.dispatchEvent(new Event('userUpdated'));
@@ -1162,7 +1162,7 @@ function BuyerProfile() {
     }
     
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       
       // Update customer profile in backend
       const response = await customerAPI.update(user._id, {
@@ -1173,7 +1173,7 @@ function BuyerProfile() {
       
       setUserData({ ...editData });
       const updatedUser = { ...user, fullName: editData.fullName, email: editData.email, phone: editData.phone };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      sessionStorage.setItem('user', JSON.stringify(updatedUser));
       setIsEditing(false);
       showToast('Profile updated successfully!', 'success');
     } catch (error) {
@@ -1307,7 +1307,7 @@ function BuyerProfile() {
     }
     
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       
       if (editingAddress) {
         // Update existing address
@@ -1346,7 +1346,7 @@ function BuyerProfile() {
   const handleDeleteAddress = async (id) => {
     if (window.confirm('Are you sure you want to delete this address?')) {
       try {
-        const user = JSON.parse(localStorage.getItem('user'));
+        const user = JSON.parse(sessionStorage.getItem('user'));
         const response = await customerAPI.deleteAddress(user._id, id);
         
         // Refresh addresses
@@ -1362,7 +1362,7 @@ function BuyerProfile() {
 
   const handleSetDefaultAddress = async (id) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       await customerAPI.setDefaultAddress(user._id, id);
       
       // Refresh addresses
@@ -1386,7 +1386,7 @@ function BuyerProfile() {
 
   const handleAddToCartFromWishlist = async (item) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       
       // Add to cart
       const cart = JSON.parse(localStorage.getItem('cart') || '[]');
@@ -1417,8 +1417,8 @@ function BuyerProfile() {
 
   const handleRemoveFromWishlist = async (itemId) => {
     try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const token = localStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user'));
+      const token = sessionStorage.getItem('token');
       
       if (!user || !token) {
         showToast('Please login to manage wishlist', 'error');
@@ -1531,7 +1531,7 @@ function BuyerProfile() {
       setVerificationData({ matchesDescription: null, customerNotes: '', images: [], rating: 0 });
       
       // Refresh orders
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (user._id) {
         fetchOrders(user._id);
         fetchLoyaltyData(user._id);
@@ -1618,7 +1618,7 @@ function BuyerProfile() {
       setCancelData({ orderId: null, reason: '' });
       
       // Refresh orders
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (user._id) {
         fetchOrders(user._id);
       }
@@ -1648,7 +1648,7 @@ function BuyerProfile() {
       setReturnData({ orderId: null, reason: '', description: '', images: [] });
       
       // Refresh orders
-      const user = JSON.parse(localStorage.getItem('user'));
+      const user = JSON.parse(sessionStorage.getItem('user'));
       if (user._id) {
         fetchOrders(user._id);
       }
@@ -4048,7 +4048,7 @@ function BuyerProfile() {
                         });
                         
                         // Refresh returns list
-                        const user = JSON.parse(localStorage.getItem('user'));
+                        const user = JSON.parse(sessionStorage.getItem('user'));
                         if (user && user._id) {
                           fetchReturns(user._id);
                         }

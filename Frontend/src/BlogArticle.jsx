@@ -11,7 +11,7 @@ function BlogArticle() {
     // Scroll to top when component mounts
     window.scrollTo(0, 0);
     
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     const userRole = localStorage.getItem('userRole');
     if (token && userRole) {
       setUser({ role: userRole });
@@ -19,7 +19,7 @@ function BlogArticle() {
   }, [slug]);
 
   const handleShopClick = () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (token) {
       navigate('/shop');
     } else {

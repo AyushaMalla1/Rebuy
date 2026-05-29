@@ -16,7 +16,7 @@ function Cart() {
   const [selectedItems, setSelectedItems] = useState([]);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
+    const userData = sessionStorage.getItem('user');
     if (userData) {
       setUser(JSON.parse(userData));
     }
@@ -27,7 +27,7 @@ function Cart() {
   const loadCart = async () => {
     setLoading(true);
     try {
-      const userData = localStorage.getItem('user');
+      const userData = sessionStorage.getItem('user');
       if (!userData) {
         setCart([]);
         localStorage.removeItem('cart'); // Clear any old cart data

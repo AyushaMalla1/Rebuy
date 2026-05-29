@@ -24,7 +24,7 @@ const productSchema = new mongoose.Schema({
   category: {
     type: String,
     required: true,
-    enum: ["Men's Collection", "Women's Collection", "Unisex", "Kid's Collection", "Sportswear", "Vintage", "Accessories"]
+    enum: ["Men's Collection", "Women's Collection", "Unisex", "Sportswear", "Vintage"]
   },
   subcategory: {
     type: String
@@ -309,10 +309,8 @@ productSchema.pre('save', function(next) {
       "Men's Collection": 'ME',
       "Women's Collection": 'WO',
       "Unisex": 'UN',
-      "Kid's Collection": 'KI',
       "Sportswear": 'SP',
-      "Vintage": 'VI',
-      "Accessories": 'AC'
+      "Vintage": 'VI'
     };
     
     const categoryPrefix = categoryPrefixes[this.category] || 'GE';

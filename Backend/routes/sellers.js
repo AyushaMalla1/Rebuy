@@ -34,7 +34,7 @@ router.get('/:id', async (req, res) => {
 // Update seller profile
 router.put('/:id', async (req, res) => {
   try {
-    const { fullName, phone, address, city, storeName, storeDescription, profileImage } = req.body;
+    const { fullName, phone, address, city, country, storeName, storeDescription, profileImage } = req.body;
     
     const seller = await Seller.findById(req.params.id);
     
@@ -50,6 +50,7 @@ router.put('/:id', async (req, res) => {
     if (phone) seller.phone = phone;
     if (address) seller.address = address;
     if (city) seller.city = city;
+    if (country) seller.country = country;
     if (storeName) seller.storeName = storeName;
     if (storeDescription !== undefined) seller.storeDescription = storeDescription;
     if (profileImage) seller.profileImage = profileImage;
@@ -66,6 +67,7 @@ router.put('/:id', async (req, res) => {
         phone: seller.phone,
         address: seller.address,
         city: seller.city,
+        country: seller.country,
         storeName: seller.storeName,
         storeDescription: seller.storeDescription,
         profileImage: seller.profileImage,

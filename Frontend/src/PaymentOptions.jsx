@@ -128,7 +128,7 @@ function PaymentOptions() {
             <button onClick={() => navigate('/contact')}>Contact Support</button>
             <button onClick={() => navigate('/faq')}>View FAQs</button>
             <button onClick={() => {
-              const token = localStorage.getItem('token');
+              const token = sessionStorage.getItem('token');
               if (token) {
                 navigate('/profile');
               } else {

@@ -128,7 +128,7 @@ export default function AdminDashboardController() {
   // Get user data from localStorage
   const getUserData = () => {
     try {
-      const userStr = localStorage.getItem('user');
+      const userStr = sessionStorage.getItem('user');
       if (userStr) {
         const user = JSON.parse(userStr);
         return {
@@ -210,7 +210,7 @@ export default function AdminDashboardController() {
 
   const fetchAnalyticsData = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
 
       if (!token) {
         return;
@@ -263,9 +263,16 @@ export default function AdminDashboardController() {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
+      const userStr = sessionStorage.getItem('user');
 
-      if (!token) {
+      if (!token || !userStr) {
+        navigate('/login');
+        return;
+      }
+      
+      const user = JSON.parse(userStr);
+      if (!(user.role === 'admin' || user.isAdmin || user.userType === 'admin')) {
         navigate('/login');
         return;
       }
@@ -343,7 +350,7 @@ export default function AdminDashboardController() {
           console.error('Settings fetch error:', err);
           return mockResponse(500);
         }),
-        fetchWithTimeout(`/admin/profile?adminId=${JSON.parse(localStorage.getItem('user') || '{}')._id || ''}`, { headers }).catch(err => {
+        fetchWithTimeout(`/admin/profile?adminId=${JSON.parse(sessionStorage.getItem('user') || '{}')._id || ''}`, { headers }).catch(err => {
           // Profile endpoint requires auth - this is expected to fail sometimes
           return mockResponse(401);
         })
@@ -368,8 +375,8 @@ export default function AdminDashboardController() {
       // Check for authentication errors
       if (statsRes.status === 401 || usersRes.status === 401) {
         console.log('Authentication failed, redirecting to login');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
         navigate('/login');
         return;
       }
@@ -515,15 +522,15 @@ export default function AdminDashboardController() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
     navigate('/');
   };
 
   const handleDeleteUser = async (id) => {
     if (window.confirm('Are you sure you want to deactivate this user?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/customers/${id}/status`, {
           method: 'PATCH',
           headers: {
@@ -549,7 +556,7 @@ export default function AdminDashboardController() {
   const handleDeleteProduct = async (id) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/admin/products/${id}`, {
           method: 'DELETE',
           headers: {
@@ -572,7 +579,7 @@ export default function AdminDashboardController() {
 
   const handleViewProduct = async (id) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/products/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -594,7 +601,7 @@ export default function AdminDashboardController() {
 
   const handleViewUser = async (id) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/admin/users/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -616,7 +623,7 @@ export default function AdminDashboardController() {
 
   const handleViewOrder = async (orderId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/orders/${orderId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -639,7 +646,7 @@ export default function AdminDashboardController() {
   const handleApproveSeller = async (id) => {
     if (window.confirm('Approve this seller application?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const row = pendingSellers.find(s => s.id === id);
         const response = await apiFetch(`/admin/sellers/${id}/status`, {
           method: 'PATCH',
@@ -667,7 +674,7 @@ export default function AdminDashboardController() {
     const reason = prompt('Please provide a reason for rejection:');
     if (reason && window.confirm('Reject this seller application?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/admin/sellers/${id}/status`, {
           method: 'PATCH',
           headers: {
@@ -693,7 +700,7 @@ export default function AdminDashboardController() {
   const handleBlockUser = async (userId) => {
     if (window.confirm('Block this user for suspicious activity?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/customers/${userId}/status`, {
           method: 'PATCH',
           headers: {
@@ -718,7 +725,7 @@ export default function AdminDashboardController() {
 
   const handleViewSeller = async (sellerId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/admin/sellers/${sellerId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -742,7 +749,7 @@ export default function AdminDashboardController() {
     const reason = prompt('Please provide a reason for suspension:');
     if (reason && window.confirm('Suspend this seller?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/admin/sellers/${sellerId}/status`, {
           method: 'PATCH',
           headers: {
@@ -768,7 +775,7 @@ export default function AdminDashboardController() {
   const handleReactivateSeller = async (sellerId) => {
     if (window.confirm('Reactivate this seller?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/admin/sellers/${sellerId}/status`, {
           method: 'PATCH',
           headers: {
@@ -803,8 +810,8 @@ export default function AdminDashboardController() {
     e.preventDefault();
 
     try {
-      const token = localStorage.getItem('token');
-      const userData = JSON.parse(localStorage.getItem('user'));
+      const token = sessionStorage.getItem('token');
+      const userData = JSON.parse(sessionStorage.getItem('user'));
 
       console.log('Creating announcement with data:', {
         ...announcementForm,
@@ -850,7 +857,7 @@ export default function AdminDashboardController() {
 
   const handleToggleAnnouncement = async (id) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/announcements/${id}/toggle`, {
         method: 'PATCH',
         headers: {
@@ -874,7 +881,7 @@ export default function AdminDashboardController() {
   const handleDeleteAnnouncement = async (id) => {
     if (window.confirm('Delete this announcement?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/announcements/${id}`, {
           method: 'DELETE',
           headers: {
@@ -899,7 +906,7 @@ export default function AdminDashboardController() {
 
   const handleUpdateLoyaltyPoints = async (userId, points) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const action = points > 0 ? 'add' : 'subtract';
       const response = await apiFetch(`/admin/loyalty-points/${userId}`, {
         method: 'PATCH',
@@ -924,7 +931,7 @@ export default function AdminDashboardController() {
 
   const handleSaveSettings = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch('/admin/settings', {
         method: 'PATCH',
         headers: {
@@ -1000,8 +1007,8 @@ export default function AdminDashboardController() {
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const token = sessionStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user') || '{}');
       const response = await apiFetch('/admin/profile', {
         method: 'PATCH',
         headers: {
@@ -1024,7 +1031,7 @@ export default function AdminDashboardController() {
           phone: data.admin?.phone || profileData.phone,
           profileImage: data.admin?.profileImage || profileImage
         };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
         window.dispatchEvent(new Event('userUpdated'));
         alert('Profile updated successfully!');
       } else {
@@ -1162,7 +1169,7 @@ export default function AdminDashboardController() {
   const handleApproveProduct = async (id) => {
     if (window.confirm('Approve this product?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/products/${id}/status`, {
           method: 'PATCH',
           headers: {
@@ -1189,7 +1196,7 @@ export default function AdminDashboardController() {
     const reason = prompt('Please provide a reason for rejection:');
     if (reason && window.confirm('Reject this product?')) {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         const response = await apiFetch(`/products/${id}/status`, {
           method: 'PATCH',
           headers: {
@@ -1335,7 +1342,7 @@ export default function AdminDashboardController() {
 
   // Notification functions
   const fetchNotifications = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     const userId = user?._id || user?.id;
     if (!userId) return;
 
@@ -1356,7 +1363,7 @@ export default function AdminDashboardController() {
   };
 
   const markAllAsRead = async () => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     const userId = user?._id || user?.id;
     if (!userId) return;
 
@@ -1396,7 +1403,7 @@ export default function AdminDashboardController() {
     setLoadingFraud(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch('/admin/fraud-detection', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1422,7 +1429,7 @@ export default function AdminDashboardController() {
     setLoadingFraud(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch('/admin/fraud-detection/scan', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1450,7 +1457,7 @@ export default function AdminDashboardController() {
     if (!window.confirm('Dismiss this fraud alert?')) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/admin/fraud-detection/${alertId}`, {
         method: 'PATCH',
         headers: {
@@ -1473,7 +1480,7 @@ export default function AdminDashboardController() {
 
   const resolveFraudAlert = async (alertId, actionTaken) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/admin/fraud-detection/${alertId}`, {
         method: 'PATCH',
         headers: {
@@ -1522,7 +1529,7 @@ export default function AdminDashboardController() {
   // Payout functions
   const fetchPayouts = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch('/payouts/admin/all', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1545,7 +1552,7 @@ export default function AdminDashboardController() {
 
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/payouts/${payoutId}/complete`, {
         method: 'POST',
         headers: {
@@ -1573,7 +1580,7 @@ export default function AdminDashboardController() {
     if (!reason) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch(`/payouts/${payoutId}/cancel`, {
         method: 'POST',
         headers: {
@@ -1607,7 +1614,7 @@ export default function AdminDashboardController() {
   // Verification Approval Functions
   const fetchVerifications = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       const response = await apiFetch('/admin/verifications/all', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1635,8 +1642,8 @@ export default function AdminDashboardController() {
     if (!window.confirm('Approve this condition verification? It will become public.')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const token = sessionStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user') || '{}');
       const response = await apiFetch(`/admin/verifications/${verificationId}/approve`, {
         method: 'POST',
         headers: {
@@ -1665,8 +1672,8 @@ export default function AdminDashboardController() {
     if (!reason) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const token = sessionStorage.getItem('token');
+      const user = JSON.parse(sessionStorage.getItem('user') || '{}');
       const response = await apiFetch(`/admin/verifications/${verificationId}/reject`, {
         method: 'POST',
         headers: {

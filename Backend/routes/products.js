@@ -395,7 +395,7 @@ router.post('/', async (req, res) => {
       story: story || '',
       paymentOptions,
       discount: discount || undefined,
-      status: 'Approved' // Auto-approve for now, can be changed to 'Pending'
+      status: 'Pending' // Requires admin approval
     });
     
     await product.save();

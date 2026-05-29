@@ -40,7 +40,7 @@ function HelpCenter() {
   ];
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
+    const userData = sessionStorage.getItem('user');
     const sellerData = localStorage.getItem('seller');
     
     if (userData) {

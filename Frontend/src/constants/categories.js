@@ -26,14 +26,7 @@ export const CATEGORIES = {
       "Outerwear": ["Jackets", "Hoodies", "Windbreakers"]
     }
   },
-  "Kid's Collection": {
-    label: "Kid's Collection",
-    subcategories: {
-      "Tops": ["T-Shirts", "Shirts", "Hoodies", "Sweaters"],
-      "Bottoms": ["Jeans", "Pants", "Shorts", "Skirts"],
-      "Outerwear": ["Jackets", "Coats", "Hoodies"]
-    }
-  },
+
   "Sportswear": {
     label: "Sportswear",
     subcategories: {
@@ -48,14 +41,6 @@ export const CATEGORIES = {
       "Vintage Tops": ["Vintage T-Shirts", "Vintage Shirts", "Vintage Sweaters", "Band Tees"],
       "Vintage Bottoms": ["Vintage Jeans", "Vintage Pants", "Vintage Shorts"],
       "Vintage Outerwear": ["Vintage Jackets", "Vintage Coats", "Leather Jackets", "Denim Jackets"]
-    }
-  },
-  "Accessories": {
-    label: "Accessories",
-    subcategories: {
-      "Bags": ["Backpacks", "Handbags", "Tote Bags", "Crossbody Bags"],
-      "Headwear": ["Caps", "Hats", "Beanies"],
-      "Others": ["Belts", "Scarves", "Sunglasses", "Jewelry"]
     }
   }
 };

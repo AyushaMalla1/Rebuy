@@ -52,7 +52,7 @@ function AdminSupport({ embedded = false }) {
   ];
 
   useEffect(() => {
-    const adminData = localStorage.getItem('user');
+    const adminData = sessionStorage.getItem('user');
     
     if (adminData) {
       const parsedAdmin = JSON.parse(adminData);

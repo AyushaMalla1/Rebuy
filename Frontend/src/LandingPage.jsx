@@ -55,7 +55,7 @@ function LandingPage() {
 
   useEffect(() => {
     // Load user from localStorage
-    const userData = localStorage.getItem('user');
+    const userData = sessionStorage.getItem('user');
     if (userData) {
       const parsedUser = JSON.parse(userData);
       setUser(parsedUser);
@@ -92,7 +92,7 @@ function LandingPage() {
     
     // Listen for user profile updates
     const handleUserUpdate = () => {
-      const updatedUser = localStorage.getItem('user');
+      const updatedUser = sessionStorage.getItem('user');
       if (updatedUser) {
         setUser(JSON.parse(updatedUser));
       }
@@ -416,8 +416,8 @@ function LandingPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('token');
     setUser(null);
     setShowProfileDropdown(false);
     navigate('/');
