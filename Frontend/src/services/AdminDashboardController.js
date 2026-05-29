@@ -1176,7 +1176,7 @@ export default function AdminDashboardController() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ status: 'approved' })
+          body: JSON.stringify({ status: 'Approved' })
         });
 
         if (response.ok) {
@@ -1203,7 +1203,7 @@ export default function AdminDashboardController() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ status: 'rejected', reason })
+          body: JSON.stringify({ status: 'Rejected', reason })
         });
 
         if (response.ok) {
